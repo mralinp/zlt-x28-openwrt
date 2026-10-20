@@ -1,0 +1,34 @@
+#!/bin/sh
+# templog        append one status line to /root/templog (temps, load, uptime, cpu freq, free mem)
+# templog loop   same, every 60 s (run by /etc/init.d/templog)
+# Persistent on purpose: the last lines before a reboot are the evidence. Capped at 200 lines.
+LOG=/root/templog
+T=/sys/class/thermal
+
+temp() { # temp <zone type> -> whole degrees C, "?" if missing
+	for z in $T/thermal_zone*; do
+		[ "$(cat $z/type 2>/dev/null)" = "$1" ] && { echo $(( $(cat $z/temp) / 1000 )); return; }
+	done
+	echo ?
+}
+
+line() {
+	read up _ < /proc/uptime
+	read l1 _ < /proc/loadavg
+	mem=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+	echo "$(date '+%Y-%m-%dT%H:%M:%S') up=${up%.*} load=$l1 soc=$(temp soc_max) cpu0=$(temp cpu_little0)" \
+		"md4g=$(temp md_4g) nrpa=$(temp nrpa_ntc) ltepa=$(temp ltepa_ntc) rf=$(temp rf_ntc) pmic=$(temp pmic)" \
+		"f0=$(( $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null || echo 0) / 1000 )) memfree=${mem}M"
+}
+
+once() {
+	line >> $LOG
+	[ "$(wc -l < $LOG)" -gt 200 ] && { tail -n 150 $LOG > $LOG.tmp && mv $LOG.tmp $LOG; }
+	return 0
+}
+
+case "$1" in
+loop) while :; do once; sleep 60; done ;;
+"")   once ;;
+*)    echo "usage: templog [loop]" >&2; exit 1 ;;
+esac
