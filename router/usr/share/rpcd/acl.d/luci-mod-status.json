@@ -1,0 +1,10 @@
+{
+	"luci-mod-status-index": {
+		"description": "Grant access to status include listing",
+		"read": {
+			"file": {
+				"/www/luci-static/resources/view/status/include": [ "list" ]
+			}
+		}
+	}
+}

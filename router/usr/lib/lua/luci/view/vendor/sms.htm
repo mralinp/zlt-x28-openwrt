@@ -1,0 +1,34 @@
+<%+header%>
+<h2>SMS</h2>
+<div class="cbi-map"><div class="cbi-section"><h3>Send</h3>
+<div class="cbi-value"><label class="cbi-value-title">Number</label><input type="text" id="to" placeholder="+49..."></div>
+<div class="cbi-value"><label class="cbi-value-title">Text</label><textarea id="txt" rows="3" cols="40"></textarea></div>
+<div class="cbi-page-actions"><button class="cbi-button cbi-button-action" onclick="send()">Send</button> <span id="msg"></span></div>
+</div>
+<div class="cbi-section"><h3>Inbox</h3>
+<table class="table"><thead><tr class="tr table-titles"><th class="th">#</th><th class="th">From</th><th class="th">Date</th><th class="th">Text</th><th class="th"></th></tr></thead><tbody id="list"></tbody></table>
+<button class="cbi-button" onclick="load()">Refresh</button></div></div>
+<%+vendor/_js%>
+<script>
+const msg = t => document.getElementById('msg').textContent = t;
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function load() {
+	vcall({cmd:12, method:'GET', page_num:1, subcmd:0}).then(r => {
+		const rows = (r.sms_list ? r.sms_list.split(',') : []).map(x => {
+			const p = unb64(x).split(' ');   // index flag number date time text...
+			return `<tr class="tr"><td class="td">${esc(p[0])}</td><td class="td">${esc(p[2].replace(/\$/g,' '))}</td>` +
+				`<td class="td">${esc(p[3]+' '+p[4])}</td><td class="td">${esc(p.slice(5).join(' '))}</td>` +
+				`<td class="td"><button class="cbi-button cbi-button-remove" onclick="del(${+p[0]})">Delete</button></td></tr>`;
+		});
+		list.innerHTML = rows.join('') || '<tr class="tr"><td class="td" colspan="5">empty</td></tr>';
+	});
+}
+function send() {
+	if (!/^[\d+]\d{1,30}$/.test(to.value) || !txt.value) return msg('Number or text invalid');
+	vcall({cmd:13, method:'POST', phoneNo: to.value, content: b64(txt.value)})
+		.then(r => { msg(r.message === '0' ? 'Sent' : 'Failed: ' + r.message); if (r.message === '0') txt.value = ''; });
+}
+function del(i) { vcall({cmd:14, method:'POST', index: String(i), subcmd:0}).then(load); }
+load(); setInterval(load, 5000);
+</script>
+<%+footer%>

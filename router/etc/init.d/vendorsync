@@ -1,0 +1,11 @@
+#!/bin/sh /etc/rc.common
+# Triggered by ucitrack (LuCI Save & Apply on dhcp/firewall) and at boot.
+START=99
+
+start() {
+	( n=0; while [ $n -lt 30 ]; do vendorsync import 2>/dev/null && exit 0; n=$((n+1)); sleep 10; done ) &
+}
+
+reload() {
+	vendorsync export && vendorsync import
+}

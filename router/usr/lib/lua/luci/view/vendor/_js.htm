@@ -1,0 +1,10 @@
+<script>
+// vcall({cmd:172,method:'GET',subcmd:6}).then(reply => ...)
+function vcall(b) {
+	return fetch('<%=luci.dispatcher.build_url("admin/vendor/call")%>?token=<%=token%>', {
+		method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)
+	}).then(r => r.json());
+}
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+const unb64 = s => decodeURIComponent(escape(atob(s)));
+</script>

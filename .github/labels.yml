@@ -1,0 +1,23 @@
+# name: color description
+- {name: P0-critical, color: b60205, description: "Bricked/locked out/data loss. Drop everything"}
+- {name: P1-high, color: d93f0b, description: "Blocks a phase"}
+- {name: P2-medium, color: fbca04, description: "Normal priority"}
+- {name: P3-low, color: 0e8a16, description: "Nice to have"}
+- {name: type/feature, color: 1d76db, description: "New capability"}
+- {name: type/bug, color: d73a4a, description: "Something is broken"}
+- {name: type/task, color: 5319e7, description: "Planned piece of work"}
+- {name: type/research, color: c5def5, description: "Investigation, read-only recon"}
+- {name: type/docs, color: 0075ca, description: "Documentation"}
+- {name: area/luci, color: bfd4f2, description: "LuCI and vendor menu pages"}
+- {name: area/adapter, color: bfd4f2, description: "UCI <-> vendor backend adapter, bridge"}
+- {name: area/sms-voice, color: bfd4f2, description: "SMS, USSD, calls, audio"}
+- {name: area/thermal, color: bfd4f2, description: "Heat, CPU/PHY power, stability"}
+- {name: area/firmware-build, color: bfd4f2, description: "Toolchain, rootfs, image, flashing"}
+- {name: area/safety, color: bfd4f2, description: "Backups, UART, recovery"}
+- {name: area/tooling, color: bfd4f2, description: "Scripts, CI, repo"}
+- {name: risk/brick, color: 000000, description: "Touches flash, bootloader or partitions"}
+- {name: risk/lockout, color: 000000, description: "Can cut SSH/LuCI/network access"}
+- {name: risk/reboot, color: 000000, description: "Can reboot or crash the device"}
+- {name: blocked, color: e99695, description: "Waiting on something"}
+- {name: needs-info, color: e99695, description: "Needs more information"}
+- {name: good-first-task, color: 7057ff, description: "Small and well-defined"}

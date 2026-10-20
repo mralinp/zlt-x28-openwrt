@@ -1,0 +1,27 @@
+# secrets: never commit
+*.pem
+id_rsa*
+id_ed25519*
+known_hosts*
+router-root-ssh/
+*.cred
+.env
+
+# vendor material (proprietary UI, firmware dumps, scratch work)
+vendor-ui/
+you-are-a-senior-embedded-linux/
+firmware-dumps/
+*.bin
+*.img
+*.tgz
+work/
+outputs/
+
+# scratch scripts that embed the vendor login
+*-original.py
+main.py
+
+# macOS / editor / Claude local
+.DS_Store
+._*
+.claude/settings.local.json

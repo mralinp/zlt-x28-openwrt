@@ -1,0 +1,21 @@
+name: Task
+description: A planned piece of work (default way to start anything)
+labels: ["type/task"]
+body:
+  - type: textarea
+    id: goal
+    attributes: {label: Goal, description: "What and why, in 1-3 sentences"}
+    validations: {required: true}
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: "Checkboxes, verifiable on a real unit"
+      value: "- [ ] \n- [ ] "
+    validations: {required: true}
+  - type: textarea
+    id: risk
+    attributes: {label: Risk and rollback, description: "Lockout, brick, reboot? How do we undo it? (or 'none')"}
+  - type: textarea
+    id: deps
+    attributes: {label: Dependencies, description: "Blocked by #..., related to #..."}

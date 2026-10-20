@@ -1,0 +1,43 @@
+<%+header%>
+<h2>Port forwarding</h2>
+<div class="cbi-map"><div class="cbi-section">
+<table class="table"><thead><tr class="tr table-titles"><th class="th">On</th><th class="th">Proto</th><th class="th">WAN port</th><th class="th">To</th><th class="th">Note</th><th class="th"></th></tr></thead><tbody id="rules"></tbody></table>
+<h3>Add rule</h3>
+<div class="cbi-value"><label class="cbi-value-title">Protocol</label><select id="proto"><option>TCP</option><option>UDP</option><option>TCP+UDP</option></select></div>
+<div class="cbi-value"><label class="cbi-value-title">WAN port</label><input type="text" id="port" placeholder="8080 or 8000:8100"></div>
+<div class="cbi-value"><label class="cbi-value-title">LAN IP</label><input type="text" id="mip" placeholder="192.168.70.x"></div>
+<div class="cbi-value"><label class="cbi-value-title">LAN port</label><input type="text" id="mport"></div>
+<div class="cbi-value"><label class="cbi-value-title">Note</label><input type="text" id="remark"></div>
+<div class="cbi-page-actions"><button class="cbi-button cbi-button-add" onclick="add()">Add</button>
+<button class="cbi-button cbi-button-save" onclick="save()">Save &amp; apply</button> <span id="msg"></span></div>
+</div></div>
+<%+vendor/_js%>
+<script>
+const msg = t => document.getElementById('msg').textContent = t;
+const ipre = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let rules = [];
+function draw() {
+	document.getElementById('rules').innerHTML = rules.map((r, i) =>
+		`<tr class="tr"><td class="td"><input type="checkbox" ${r.enableRule ? 'checked' : ''} onchange="rules[${i}].enableRule=this.checked"></td>` +
+		`<td class="td">${esc(r.protocol)}</td><td class="td">${esc(r.port)}</td><td class="td">${esc(r.mappingIpPort)}</td><td class="td">${esc(r.remark)}</td>` +
+		`<td class="td"><button class="cbi-button cbi-button-remove" onclick="rules.splice(${i},1);draw()">Delete</button></td></tr>`).join('') ||
+		'<tr class="tr"><td class="td" colspan="6">no rules</td></tr>';
+}
+function load() { vcall({cmd:27, method:'GET', getfun:true}).then(r => { rules = r.datas || []; draw(); }); }
+function add() {
+	const pr = /^\d{1,5}(:\d{1,5})?$/;
+	if (!pr.test(port.value) || !/^\d{1,5}$/.test(mport.value) || !ipre.test(mip.value)) return msg('Check port / IP');
+	if (rules.length >= 32) return msg('Max 32 rules');
+	rules.push({port: port.value, mappingIpPort: mip.value + ':' + mport.value, mappingIp: mip.value, mappingPort: mport.value,
+		remark: remark.value, enableRule: true, protocol: proto.value, ifName: 'DEFAULT'});
+	draw(); msg('Not saved yet');
+}
+function save() {
+	msg('Applying...');
+	vcall({cmd:27, method:'POST', success:true, datas: rules}).then(r => r.success == 1 ?
+		vcall({cmd:20, method:'POST'}).then(a => msg(a.success == 1 ? 'Saved' : 'Apply failed')) : msg('Failed'));
+}
+load();
+</script>
+<%+footer%>

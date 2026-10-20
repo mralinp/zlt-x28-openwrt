@@ -1,0 +1,32 @@
+<%+header%>
+<h2>USSD</h2>
+<div class="cbi-map"><div class="cbi-section">
+<div class="cbi-value"><label class="cbi-value-title">Code / reply</label><input type="text" id="code" placeholder="*100#"></div>
+<div class="cbi-page-actions"><button class="cbi-button cbi-button-action" onclick="send(0)">Send</button>
+<button class="cbi-button" onclick="send(2)">Reply</button>
+<button class="cbi-button cbi-button-reset" onclick="cancel()">Cancel</button> <span id="msg"></span></div>
+<pre id="out"></pre>
+</div></div>
+<%+vendor/_js%>
+<script>
+const msg = t => document.getElementById('msg').textContent = t;
+// vendor returns the reply as 4-hex-digit UCS-2 units
+const dec = h => (h || '').replace(/[0-9a-f]{4}/gi, x => x === '0000' || x === '0009' ? '' : String.fromCharCode(parseInt(x, 16)));
+async function poll() {
+	for (let i = 0; i < 15; i++) {
+		await new Promise(r => setTimeout(r, 1000));
+		const r = await vcall({cmd:350, method:'GET'});
+		if (r.message && r.message !== '506' && r.message !== '507') { out.textContent = dec(r.message); msg(r.need_reply == '1' ? 'Reply expected' : 'Done'); return; }
+		if (r.message === '507') return msg('Timed out');
+	}
+	msg('No answer');
+}
+function send(sub) {
+	if (!/^[0-9*#]+$/.test(code.value)) return msg('Digits, * and # only');
+	msg('Sending...');
+	vcall({cmd:350, method:'POST', subcmd:String(sub), ussd_code: code.value})
+		.then(r => r.message === '0' ? poll() : msg('Failed: ' + r.message));
+}
+function cancel() { vcall({cmd:350, method:'POST', subcmd:'1'}).then(r => msg(r.message === '0' ? 'Cancelled' : 'Failed')); }
+</script>
+<%+footer%>

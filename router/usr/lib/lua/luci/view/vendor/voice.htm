@@ -1,0 +1,54 @@
+<%+header%>
+<h2>Calls</h2>
+<div class="cbi-map"><div class="cbi-section">
+<div class="cbi-value"><label class="cbi-value-title">Number</label><input type="text" id="num" placeholder="+49..."></div>
+<div class="cbi-page-actions">
+<button class="cbi-button cbi-button-action" onclick="act('dial')">Dial</button>
+<button class="cbi-button cbi-button-save" onclick="act('answer')">Answer</button>
+<button class="cbi-button cbi-button-remove" onclick="act('hangup')">Hang up</button>
+<button class="cbi-button" onclick="act('status')">Refresh</button></div>
+<p>IMS (VoLTE) registration: <b id="ims">?</b> &nbsp; <small>(second digit 1 = registered; calls need it on this SIM)</small></p>
+<pre id="calls"></pre><details><summary>Voice log</summary><pre id="log"></pre></details>
+</div></div>
+<h2>Voice settings</h2>
+<div class="cbi-map"><div class="cbi-section">
+<select id="cmd" onchange="load()">
+ <option value="295">Basic</option><option value="294">Advanced</option>
+ <option value="297">VoIP advanced</option><option value="298">Call codes</option><option value="283">SIP</option>
+</select>
+<div id="form"></div>
+<div class="cbi-page-actions"><button class="cbi-button cbi-button-save" onclick="save()">Save</button> <span id="msg"></span></div>
+</div></div>
+<%+vendor/_js%>
+<script>
+// Generic editor: every scalar field the vendor returns becomes an input; Save posts them back unchanged keys only.
+const msg = t => document.getElementById('msg').textContent = t;
+let data = {};
+function act(a) {
+	fetch('<%=luci.dispatcher.build_url("admin/vendor/voicectl")%>?token=<%=token%>', {method:'POST',
+		headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:a, number:num.value})})
+	.then(r => r.json()).then(r => {
+		ims.textContent = r.ims || '?'; calls.textContent = r.calls || '(no active call)'; log.textContent = r.log || '';
+		if (r.message) msg(r.message);
+	});
+}
+act('status'); setInterval(() => act('status'), 5000);
+function load() {
+	vcall({cmd:+cmd.value, method:'GET'}).then(r => {
+		data = r; form.innerHTML = '';
+		Object.keys(r).filter(k => typeof r[k] !== 'object' && !['cmd','success','message'].includes(k)).forEach(k => {
+			const d = document.createElement('div'); d.className = 'cbi-value';
+			const l = document.createElement('label'); l.className = 'cbi-value-title'; l.textContent = k;
+			const i = document.createElement('input'); i.dataset.k = k; i.value = r[k];
+			d.append(l, i); form.append(d);
+		});
+	});
+}
+function save() {
+	const b = {cmd:+cmd.value, method:'POST'};
+	form.querySelectorAll('input').forEach(i => b[i.dataset.k] = i.value);
+	vcall(b).then(r => msg(r.success == 1 || r.errorCode === '0' || r.message === '0' ? 'Saved' : 'Failed'));
+}
+load();
+</script>
+<%+footer%>

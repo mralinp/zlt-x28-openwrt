@@ -1,0 +1,49 @@
+<%+header%>
+<h2>LAN / DHCP</h2>
+<div class="cbi-map"><div class="cbi-section">
+<p><small>LAN address and netmask are shown read-only: changing them restarts the network and can lock you out.</small></p>
+<div class="cbi-value"><label class="cbi-value-title">LAN IP</label><input type="text" id="lanIp" disabled></div>
+<div class="cbi-value"><label class="cbi-value-title">Netmask</label><input type="text" id="netMask" disabled></div>
+<div class="cbi-value"><label class="cbi-value-title">DHCP server</label><input type="checkbox" id="dhcpServer"></div>
+<div class="cbi-value"><label class="cbi-value-title">Range start</label><input type="text" id="ipBegin"></div>
+<div class="cbi-value"><label class="cbi-value-title">Range end</label><input type="text" id="ipEnd"></div>
+<div class="cbi-value"><label class="cbi-value-title">Lease time (hours)</label><input type="number" id="expireTime" min="1" max="720"></div>
+<div class="cbi-value"><label class="cbi-value-title">DNS 1</label><input type="text" id="main_dns"></div>
+<div class="cbi-value"><label class="cbi-value-title">DNS 2</label><input type="text" id="vice_dns"></div>
+<div class="cbi-page-actions"><button class="cbi-button cbi-button-save" onclick="save()">Save</button> <span id="msg"></span></div>
+</div>
+<div class="cbi-section"><h3>Reserved addresses</h3>
+<table class="table"><thead><tr class="tr table-titles"><th class="th">MAC</th><th class="th">IP</th><th class="th">Note</th></tr></thead><tbody id="res"></tbody></table></div></div>
+<%+vendor/_js%>
+<script>
+const msg = t => document.getElementById('msg').textContent = t;
+const ipre = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+const FIELDS = ['lanIp','netMask','ipBegin','ipEnd','main_dns','vice_dns'];
+let cfg = {};
+function load() {
+	vcall({cmd:3, method:'GET'}).then(r => {
+		cfg = r; FIELDS.forEach(k => document.getElementById(k).value = r[k] || '');
+		dhcpServer.checked = r.dhcpServer == '1';
+		expireTime.value = parseInt(r.expireTime) || 24;
+	});
+	vcall({cmd:24, method:'GET', getfun:true}).then(r => {
+		res.innerHTML = (r.datas || []).map(d => `<tr class="tr"><td class="td">${d.mac}</td><td class="td">${d.ip}</td><td class="td">${d.remark || ''}</td></tr>`).join('') ||
+			'<tr class="tr"><td class="td" colspan="3">none</td></tr>';
+	});
+}
+function save() {
+	if (dhcpServer.checked) {
+		for (const k of ['ipBegin','ipEnd','main_dns']) if (!ipre.test(document.getElementById(k).value)) return msg('Invalid ' + k);
+		if (vice_dns.value && !ipre.test(vice_dns.value)) return msg('Invalid DNS 2');
+	}
+	if (!confirm('Applying restarts the LAN services; this page may be unreachable for up to 30 s. Continue?')) return;
+	// start from the full GET so unknown vendor fields (port binding, IPv6) are sent back unchanged
+	const b = Object.assign({}, cfg, {cmd:3, method:'POST', dhcpServer: dhcpServer.checked ? '1' : '0',
+		ipBegin: ipBegin.value, ipEnd: ipEnd.value, expireTime: expireTime.value + 'h', main_dns: main_dns.value, vice_dns: vice_dns.value});
+	delete b.success; delete b.sessionId; delete b.token;
+	msg('Applying...');
+	vcall(b).then(r => { msg(r.success || r.flag === '0' ? 'Saved' : 'Failed'); setTimeout(load, 15000); });
+}
+load();
+</script>
+<%+footer%>

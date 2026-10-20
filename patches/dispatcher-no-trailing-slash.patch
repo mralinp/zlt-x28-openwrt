@@ -1,0 +1,12 @@
+--- a/usr/lib/lua/luci/dispatcher.lua
++++ b/usr/lib/lua/luci/dispatcher.lua
+@@ -380,9 +380,6 @@
+ 		end
+ 	end
+ 
+-	if #path == 0 then
+-		url[#url+1] = "/"
+-	end
+ 
+ 	return table.concat(url, "")
+ end

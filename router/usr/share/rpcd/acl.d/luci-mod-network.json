@@ -1,0 +1,6 @@
+{
+	"luci-mod-network-shim": {
+		"description": "Protocol handler list for the network shim",
+		"read": { "ubus": { "network": [ "get_proto_handlers" ] } }
+	}
+}

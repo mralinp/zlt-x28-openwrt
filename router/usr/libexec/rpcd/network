@@ -1,0 +1,19 @@
+#!/bin/sh
+# Read-only stand-in for netifd's "network" ubus object: LuCI only needs the protocol list.
+# Not used while real netifd runs (it registers its own "network" object).
+. /usr/share/libubox/jshn.sh
+case "$1" in
+list)
+	echo "{\"get_proto_handlers\":{}}" ;;
+call)
+	[ "$2" = get_proto_handlers ] || exit 1
+	json_init
+	json_add_object static; json_add_boolean no_device 0; json_close_object
+	for f in /lib/netifd/proto/*.sh; do
+		n=$(basename "$f" .sh)
+		json_add_object "$n"
+		grep -q "no_device=1" "$f" && json_add_boolean no_device 1 || json_add_boolean no_device 0
+		json_close_object
+	done
+	json_dump ;;
+esac

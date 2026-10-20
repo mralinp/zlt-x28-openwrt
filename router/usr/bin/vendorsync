@@ -1,0 +1,6 @@
+#!/usr/bin/lua
+package.path = "/usr/lib/lua/?.lua;" .. package.path
+local m = require "vendorsync"
+local a = arg[1]
+if a == "import" then m.import() elseif a == "export" then m.export() elseif a == "selftest" then m.selftest()
+else io.stderr:write("usage: vendorsync import|export|selftest\n") os.exit(1) end

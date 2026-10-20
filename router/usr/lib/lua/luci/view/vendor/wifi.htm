@@ -1,0 +1,45 @@
+<%+header%>
+<h2>WiFi</h2>
+<div class="cbi-map">
+<div class="cbi-section"><h3>2.4 GHz</h3><div id="w24"></div></div>
+<div class="cbi-section"><h3>5 GHz</h3><div id="w5"></div></div>
+<span id="msg"></span></div>
+<%+vendor/_js%>
+<script>
+const msg = t => document.getElementById('msg').textContent = t;
+const AUTH = [['0','Open'],['2','WPA2-PSK'],['3','WPA/WPA2-PSK'],['4','WPA3-PSK'],['5','WPA2/WPA3-PSK']];
+const BANDS = [{id:'w24', cmd:2}, {id:'w5', cmd:211}];
+function row(l, el) { const d = document.createElement('div'); d.className = 'cbi-value'; const t = document.createElement('label'); t.className = 'cbi-value-title'; t.textContent = l; d.append(t, el); return d; }
+function field(tag, props) { const e = document.createElement(tag); Object.assign(e, props); return e; }
+function build(b, sub) {
+	const box = document.getElementById(b.id); box.innerHTML = '';
+	vcall({cmd:b.cmd, method:'GET', subcmd:sub}).then(r => {
+		const on = field('input', {type:'checkbox', checked: r.wifiOpen == '1'});
+		const bc = field('input', {type:'checkbox', checked: r.broadcast == '1'});
+		const ssid = field('input', {type:'text', value: r.ssid ? unb64(r.ssid) : ''});
+		const key = field('input', {type:'password', value: r.key || ''});
+		const auth = field('select'); AUTH.forEach(a => auth.add(new Option(a[1], a[0], false, a[0] == r.authenticationType)));
+		const btn = field('button', {className:'cbi-button cbi-button-save', textContent:'Save'});
+		btn.onclick = () => {
+			if (!ssid.value || ssid.value.length > 32) return msg('SSID 1-32 chars');
+			if (auth.value != '0' && (key.value.length < 8 || key.value.length > 63 || /;/.test(key.value + ssid.value))) return msg('Key 8-63 chars, no semicolon');
+			if (!confirm('Changing WiFi may disconnect you. Continue?')) return;
+			msg('Applying...');
+			// SSID 0 (main) carries extra vendor fields: send the whole GET back with our changes; guest SSIDs take only these 6
+			const base = sub === 0 ? Object.assign({}, r) : {};
+			['success','ssidList','sessionId','token'].forEach(k => delete base[k]);
+			vcall(Object.assign(base, {cmd:b.cmd, method:'POST', subcmd:sub, wifiOpen: on.checked ? '1' : '0', broadcast: bc.checked ? '1' : '0',
+				ssid: b64(ssid.value), key: key.value, authenticationType: auth.value})).then(x => msg(x.message === '0' ? 'Saved' : 'Failed'));
+		};
+		box.append(row('Enabled', on), row('Broadcast SSID', bc), row('SSID', ssid), row('Security', auth), row('Password', key), btn);
+	});
+}
+BANDS.forEach(b => {
+	const box = document.getElementById(b.id);
+	const sel = field('select'); for (let i = 0; i <= 4; i++) sel.add(new Option(i ? 'Guest SSID ' + i : 'Main SSID', i));
+	const holder = field('div'); box.parentNode.insertBefore(sel, box); box.parentNode.insertBefore(holder, box);
+	b.id = b.id + '_f'; box.id = b.id; sel.onchange = () => build(b, +sel.value);
+	build(b, 0);
+});
+</script>
+<%+footer%>

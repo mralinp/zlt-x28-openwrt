@@ -1,0 +1,23 @@
+#!/bin/sh
+# voicectl start|stop|dial <num>|answer|hangup|status  -- drives Quectel sample_voice via a FIFO.
+IN=/tmp/voice.in LOG=/tmp/voice.log PID=/tmp/voice.pid
+send() { for l in "$@"; do echo "$l" > $IN; sleep 1; done; }
+running() { [ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null; }
+case "$1" in
+start)
+	running && exit 0
+	rm -f $IN; mkfifo $IN; : > $LOG
+	( sleep 2147483647 > $IN & echo $! > $PID.hold; exec /usr/bin/sample_voice < $IN >> $LOG 2>&1 ) &
+	echo $! > $PID
+	sleep 2; send 0 5 10 ;;
+stop)
+	running && { send -1; sleep 1; }
+	kill "$(cat $PID.hold 2>/dev/null)" 2>/dev/null; rm -f $PID $PID.hold $IN ;;
+dial)
+	case "$2" in ''|*[!0-9+]*) echo "bad number" >&2; exit 1;; esac
+	"$0" start; send 3 "$2" ;;
+answer) "$0" start; send 2 ;;
+hangup) running && send 4 ;;
+status) tail -n ${2:-30} $LOG 2>/dev/null ;;
+*) echo "usage: $0 start|stop|dial N|answer|hangup|status" >&2; exit 1 ;;
+esac
