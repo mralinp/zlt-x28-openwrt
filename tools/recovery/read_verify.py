@@ -6,7 +6,10 @@ Read-only: only `mtk ro` (READ-FLASH) is issued. The download agent is loaded in
 the modem's RAM, which is cleared at power-off. A match proves that USB flash
 access works and that the computed partition offset is right.
 
-    python3 tools/recovery/read_verify.py lk_b [--backup DIR] [--debug]
+    python3 tools/recovery/read_verify.py lk_b [--backup DIR] [--loader DA.bin] [--debug]
+
+--loader swaps mtkclient's bundled download agent (which refuses reads on the X28)
+for another DA file, e.g. a vendor one.
 """
 import argparse
 import sys
@@ -20,15 +23,23 @@ def main():
     ap.add_argument("partition", help="name from /proc/mtd, e.g. lk_b")
     ap.add_argument("--backup", type=Path, default=DEFAULT_BACKUP,
                     help="verified backup holding mtd.txt and SHA256SUMS")
+    ap.add_argument("--loader", type=Path, help="download agent file to use instead of mtkclient's")
     ap.add_argument("--debug", action="store_true", help="mtkclient --debugmode (logs DA XML replies)")
     args = ap.parse_args()
 
     part, expected = backup_partition(args.backup, args.partition)
 
-    outfile = f"{part['name']}-usb.bin"
+    tag = f"-{args.loader.stem}" if args.loader else ""
+    outfile = f"{part['name']}-usb{tag}.bin"
     mtk_args = ["ro", hex(part["offset"]), hex(part["size"]), outfile, "--skipwdt"]
+    if args.loader:
+        if not args.loader.is_file():
+            sys.exit(f"no such loader: {args.loader}")
+        mtk_args += ["--loader", str(args.loader.resolve())]  # mtk runs from the probe dir
+    if args.debug:
+        mtk_args.append("--debugmode")
     print(f"{part['name']}: offset {part['offset']:#x}, size {part['size']:#x}, expect {expected}")
-    code, out = run_mtk(mtk_args + (["--debugmode"] if args.debug else []), f"read-{part['name']}.log")
+    code, out = run_mtk(mtk_args, f"read-{part['name']}{tag}.log")
 
     got = out / outfile
     print("cycle the modem's power to boot it normally")

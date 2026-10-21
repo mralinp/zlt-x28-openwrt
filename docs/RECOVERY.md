@@ -227,8 +227,23 @@ verified on download). Only the DA, the scatter file and `MD5SUMS.txt` were extr
 | `DA_BR.bin` | `MTK_DA_v6_2023-06-28`, one entry: hw `0x992`, sub `0x8a00`, hw ver `0xca00`. Build paths `/home/quectel/workspace/Scm_MTK_T750/...`: **Quectel's own T750 DA**, not the FM350 one |
 | `DA_BR.bin` vs. the package's `MD5SUMS.txt` | **Mismatch** (listed `2eec3723…`, actual `54500f76…`). The package also has `DA_BR_unsign.bin`: same length, 509 bytes differ at `0x2f5cc`–`0x5d2db`, matches neither. Provenance of the shipped DA is unclear |
 
-Next: a read-only `lk_b` read with this DA (`mtk ro … --loader DA_BR.bin`). Running it executes
-third-party code in the modem's RAM, as any DA does; it writes nothing to flash.
+**Result (2026-10-22):** `read_verify.py lk_b --loader …/DA_BR.bin` loads the Quectel DA
+(stage 2 is `0x2DB10` bytes vs. `0x2C560` for the FM350 one), and it behaves **exactly like the
+bundled DA**: the same setup commands are refused, `GET-HW-INFO` works, and `READ-FLASH` returns
+`ERR!UNSUPPORTED`. Nothing was read or written.
+
+Two different DAs refusing the same commands point at the session, not the DA:
+
+- mtkclient's DA2 patching is not the cause: none of its "Patched …" lines appear, only two
+  "not patched" warnings, so stage 2 runs unmodified.
+- Open suspect: NAND init failing inside the DA (its strings include `All storage init fail`
+  and `device is not SNAND nor PNAND`), which would leave flash commands disabled while
+  hardware queries still work. The raw `GET-HW-INFO` reply would show this; mtkclient does
+  not print it.
+- Open suspect: a host-side setup step that SP Flash Tool sends and mtkclient does not
+  (several `SET-…` and `HOST-…` commands are refused before any read).
+
+The reference tool for this DA is SP Flash Tool (Windows or x86 Linux), which this Mac cannot run natively.
 
 ## Open questions
 
