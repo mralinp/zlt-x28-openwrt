@@ -15,7 +15,7 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 | 3. Find the USB recovery port | `usb_watch.py` | ✅ preloader `0e8d:2000`, needs a USB-A-to-C cable |
 | 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient v2.1.4.1 plus 3 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
-| 6. Read a partition over USB, compare hash | `read_verify.py` | ❌ download agent loads, but rejects `READ-FLASH` as unsupported |
+| 6. Read a partition over USB, compare hash | `read_verify.py` (offset), `read_by_name.py` (name) | ❌ bundled download agent refuses every read command; needs a different DA |
 | 7. Restore a partition over USB | none | not started |
 
 ## Safety rules
@@ -128,6 +128,12 @@ python3 tools/recovery/read_verify.py lk_b
 hash in the backup. The offset comes from the backup's `/proc/mtd`, the expected hash from
 its `SHA256SUMS`. Add `--debug` to log the download agent's XML replies.
 
+To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
+
+```bash
+python3 tools/recovery/read_by_name.py lk_b
+```
+
 ## Device facts
 
 | | |
@@ -189,9 +195,21 @@ built for the **Fibocom FM350 (MT6880)** module, not this board. Observed on 202
 So this DA speaks a smaller, older XML command set and does not take `READ-FLASH`. Its strings
 include `READ-PARTITION`, `READ-PARTITION-TABLE`, `NAND-WHOLE`, `NAND-AREA0` and `NAND-BMT`.
 
-Next: read the DA's own partition table (`READ-PARTITION-TABLE`), then read `lk_b` by name
-(`READ-PARTITION`). mtkclient's by-name path is broken for non-GPT storage, so this needs a small
-direct call. Failing that, find the board vendor's own DA.
+`read_by_name.py` then tried the other two read commands directly (mtkclient's by-name path is
+broken for non-GPT storage):
+
+| Command | DA reply |
+|---|---|
+| `READ-PARTITION lk_b`, first command of a fresh session | `ERR!UNSUPPORTED`, "Unsupported command." |
+| `READ-PARTITION-TABLE` | `ERR!UNSUPPORTED` |
+
+After a refused command this DA stops answering, so each command needs its own power cycle to
+be tested fairly.
+
+**Conclusion:** the download agent mtkclient bundles for `0x992` refuses every flash read
+command on this board (`READ-FLASH`, `READ-PARTITION`, `READ-PARTITION-TABLE`). USB reads need
+a different DA, most likely the vendor's own from a ZLT or Quectel RG500L firmware package,
+or another route such as UART (#2).
 
 ## Open questions
 
