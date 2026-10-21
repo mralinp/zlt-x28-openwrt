@@ -15,7 +15,7 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 | 3. Find the USB recovery port | `usb_watch.py` | ✅ preloader `0e8d:2000`, needs a USB-A-to-C cable |
 | 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient v2.1.4.1 plus 3 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
-| 6. Read a partition over USB, compare hash | `read_verify.py` | ❌ download agent loads, `READ-FLASH` is rejected |
+| 6. Read a partition over USB, compare hash | `read_verify.py` | ❌ download agent loads and accepts `READ-FLASH`, but sends no data |
 | 7. Restore a partition over USB | none | not started |
 
 ## Safety rules
@@ -167,16 +167,25 @@ Partition offsets assume the `/proc/mtd` partitions sit back to back from 0. A m
 ### Download agent (step 6) so far
 
 mtkclient picks the `0x992` entry in `MTK_DA_V6.bin` (XML protocol, built 2021 for
-`hw ver 0xca00`). Observed on 2026-10-22:
+`hw ver 0xca00`). Source paths embedded in it (`fm350-openwrt/.../mt6880/...`) show it was
+built for the **Fibocom FM350 (MT6880)** module, not this board. Observed on 2026-10-22:
 
 1. Stage 1 and stage 2 upload and run (≈1.1 MB/s).
 2. `DA.SLA` property query: empty reply, about 2 minutes of USB timeouts, then treated as SLA off.
 3. Hardware info: storage type **NAND**.
-4. mtkclient's own DA extensions fail to load (non-fatal).
-5. `READ-FLASH` on `NAND-WHOLE` at `0x1d800000`, length `0x200000`: **rejected, empty error text.**
+4. One command gets `ERR!UNSUPPORTED`, most likely mtkclient's extension loader (`DA XML Extensions failed`, non-fatal).
+5. `READ-FLASH` on `NAND-WHOLE` at `0x1d800000`, length `0x200000`: the DA **acknowledges it**
+   (an `ERR!UNSUPPORTED` reply would make mtkclient print "Read flash isn't supported"), then
+   sends no data before mtkclient's read times out. mtkclient reports an empty error.
 
-Next: rerun with `--debug` to capture the DA's actual reply, then decide between another
-partition type or address form, a newer DA, or the board vendor's own DA.
+The DA's strings list `NAND-WHOLE`, `NAND-AREA0`, `NAND-BMT`, `READ-FLASH`, `READ-PARTITION`
+and `READ-PARTITION-TABLE`, so the partition type is supported. One hypothesis, not yet tested:
+the first NAND access triggers a bad-block-table scan (`nand_bbt`, `interface_nandx_init`)
+that outlasts mtkclient's timeout.
+
+Next: log each XML command with the DA's reply (a diagnostic line in mtkclient's
+`send_command`), then try a longer read timeout, `READ-PARTITION-TABLE`, or the board
+vendor's own DA.
 
 ## Open questions
 
