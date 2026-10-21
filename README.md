@@ -25,7 +25,9 @@
 | SMS send / receive | Working |
 | Voice calls | Blocked: SIM has no VoLTE/IMS registration and no CS fallback on this network |
 | Stock LuCI Network/Firewall pages changing the router | In progress: `vendorsync` adapter (DHCP/DNS, port forwards, DMZ) |
-| Custom firmware image | Planned (A/B slot, needs flash dump + UART first) |
+| Full NAND backup (51 partitions, hash-verified) | Done, see [docs/RECOVERY.md](docs/RECOVERY.md) |
+| USB recovery (MediaTek preloader + download agent) | Port and security state confirmed; USB flash read not working yet |
+| Custom firmware image | Planned (A/B slot, needs proven USB restore + UART first) |
 
 ## Architecture
 
@@ -46,12 +48,14 @@
 |---|---|
 | `router/` | Overlay files copied to the router (`usr/`, `etc/`, `www/`): bridge, controller, views, adapter, init scripts |
 | `scripts/` | `install.sh` (deploy LuCI fixes), helpers |
+| `tools/recovery/` | Backup, verify and USB recovery scripts, one per step ([docs/RECOVERY.md](docs/RECOVERY.md)) |
 | `patches/` | Patches against stock files (`dispatcher.lua`) |
-| `docs/` | [Project plan](docs/PROJECT-PLAN.md), [workflow](docs/WORKFLOW.md), [vendor command map](docs/vendor-command-map.md), [LuCI on stock firmware](docs/luci-on-stock.md), [fix notes](docs/luci-fix-notes.md) |
+| `docs/` | [Recovery](docs/RECOVERY.md), [project plan](docs/PROJECT-PLAN.md), [workflow](docs/WORKFLOW.md), [vendor command map](docs/vendor-command-map.md), [LuCI on stock firmware](docs/luci-on-stock.md), [fix notes](docs/luci-fix-notes.md) |
 | `.claude/agents/` | Project agents for Claude Code (planner, safety auditor, reviewer, researcher) |
 | `CLAUDE.md` | Rules and context for Claude Code sessions |
 
-Not in the repo on purpose: the vendor web UI (`vendor-ui/`), firmware dumps, SSH keys, credentials.
+Not in the repo on purpose: the vendor web UI (`vendor-ui/`), firmware dumps and USB probe logs
+(kept in the git-ignored `private/`), SSH keys, credentials.
 
 ## Quick start (existing unit with root SSH)
 
