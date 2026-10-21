@@ -211,6 +211,25 @@ command on this board (`READ-FLASH`, `READ-PARTITION`, `READ-PARTITION-TABLE`). 
 a different DA, most likely the vendor's own from a ZLT or Quectel RG500L firmware package,
 or another route such as UART (#2).
 
+### Candidate vendor DA (community package, 2026-10-22)
+
+No official ZLT or Quectel package is public (Quectel supplies RG500L firmware through support).
+The community project [mt6890-cpe-recovery](https://github.com/mt6890-cpe-recovery/mt6890-cpe-recovery)
+publishes a pre-release SP Flash Tool package for the X28, `spft-x28-nand-unlocked.zip`
+(63,755,310 bytes, sha256 `67a4fbc312a0166d572879e2d0961055df6269ed8f8c5831c26a60a791892b18`,
+verified on download). Only the DA, the scatter file and `MD5SUMS.txt` were extracted, into
+`private/`. Its rootfs is modified (known root password, telnet), so **never flash its images**.
+
+| Check | Result |
+|---|---|
+| Package images vs. this unit's backup | `lk`, `boot`, `tee`, `md1img`, `md1dsp`, `sspm`, `mcupm`, `medmcu`, `dpm`, `spmfw`, `pi_img`, `mcf1/2`, `rootfs_sig` are **byte-identical to both A/B slots** (rest of each partition `0xFF`): same firmware build |
+| Expected differences | `ubi-rootfs.ubi` (modified), the flashable preloader `.bin` (NAND copy has a different header), `loader_ext.img` (first 594 bytes match; unexplained) |
+| `DA_BR.bin` | `MTK_DA_v6_2023-06-28`, one entry: hw `0x992`, sub `0x8a00`, hw ver `0xca00`. Build paths `/home/quectel/workspace/Scm_MTK_T750/...`: **Quectel's own T750 DA**, not the FM350 one |
+| `DA_BR.bin` vs. the package's `MD5SUMS.txt` | **Mismatch** (listed `2eec3723…`, actual `54500f76…`). The package also has `DA_BR_unsign.bin`: same length, 509 bytes differ at `0x2f5cc`–`0x5d2db`, matches neither. Provenance of the shipped DA is unclear |
+
+Next: a read-only `lk_b` read with this DA (`mtk ro … --loader DA_BR.bin`). Running it executes
+third-party code in the modem's RAM, as any DA does; it writes nothing to flash.
+
 ## Open questions
 
 - A working USB read (step 6), then a write and restore tested on recoverable hardware.
