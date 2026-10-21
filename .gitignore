@@ -25,3 +25,8 @@ main.py
 .DS_Store
 ._*
 .claude/settings.local.json
+
+# private device data: NAND backups, USB probe logs (chip IDs), mtkclient venv
+private/
+__pycache__/
+graphify-out/
