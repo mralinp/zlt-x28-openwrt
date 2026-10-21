@@ -12,9 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from common import PRIVATE, image_name, parse_mtd, run_mtk, sha256_file
-
-DEFAULT_BACKUP = PRIVATE / "recovery" / "20261020-capture-prepared-20261021"
+from common import DEFAULT_BACKUP, backup_partition, run_mtk, sha256_file
 
 
 def main():
@@ -25,12 +23,7 @@ def main():
     ap.add_argument("--debug", action="store_true", help="mtkclient --debugmode (logs DA XML replies)")
     args = ap.parse_args()
 
-    mtd = next(p for p in (args.backup / "mtd.txt", args.backup / "metadata" / "mtd.txt") if p.exists())
-    part = next((p for p in parse_mtd(mtd.read_text()) if p["name"] == args.partition), None)
-    if part is None:
-        sys.exit(f"no partition {args.partition!r} in {mtd}")
-    sums = dict(reversed(l.split("  ", 1)) for l in (args.backup / "SHA256SUMS").read_text().splitlines())
-    expected = sums[f"images/{image_name(part)}"]
+    part, expected = backup_partition(args.backup, args.partition)
 
     outfile = f"{part['name']}-usb.bin"
     mtk_args = ["ro", hex(part["offset"]), hex(part["size"]), outfile, "--skipwdt"]

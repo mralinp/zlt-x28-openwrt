@@ -38,6 +38,25 @@ def image_name(part):
     return f"mtd{part['index']:02d}-{part['name']}.bin"
 
 
+DEFAULT_BACKUP = PRIVATE / "recovery" / "20261020-capture-prepared-20261021"
+
+
+def backup_partition(backup, name):
+    """Return (partition, expected SHA-256) for `name` from a verified backup."""
+    mtd = next(p for p in (backup / "mtd.txt", backup / "metadata" / "mtd.txt") if p.exists())
+    part = next((p for p in parse_mtd(mtd.read_text()) if p["name"] == name), None)
+    if part is None:
+        sys.exit(f"no partition {name!r} in {mtd}")
+    sums = dict(reversed(l.split("  ", 1)) for l in (backup / "SHA256SUMS").read_text().splitlines())
+    return part, sums[f"images/{image_name(part)}"]
+
+
+def probe_dir():
+    out = PRIVATE / "usb-probe" / datetime.date.today().strftime("%Y%m%d")
+    out.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return out
+
+
 def run_mtk(args, logname):
     """Run mtkclient, echo its output, and save a colour-free copy under
     private/usb-probe/<date>/ (the log holds the chip's ME_ID, so it stays private).
@@ -45,8 +64,7 @@ def run_mtk(args, logname):
     already on USB); plug its power in once mtkclient says it is waiting."""
     if not MTK.exists():
         sys.exit("mtkclient not installed: run tools/recovery/setup_mtkclient.py")
-    out = PRIVATE / "usb-probe" / datetime.date.today().strftime("%Y%m%d")
-    out.mkdir(mode=0o700, parents=True, exist_ok=True)
+    out = probe_dir()
     print(f"modem power must be OFF now; plug it in when mtkclient is waiting (log: {out / logname})",
           flush=True)
     proc = subprocess.Popen([str(MTK), *args], cwd=out, text=True,
