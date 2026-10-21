@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-from common import DEFAULT_BACKUP, MTK, backup_partition, probe_dir, sha256_file
+from common import DEFAULT_BACKUP, MTK, VENDOR_DA, backup_partition, probe_dir, sha256_file
 
 # mtkclient lives in the private venv; re-run there if started with another interpreter
 VENV_PY = MTK.with_name("python")
@@ -33,10 +33,12 @@ from mtkclient.Library.Partitions.gpt import GptSettings  # noqa: E402
 from mtkclient.Library.mtk_class import Mtk  # noqa: E402
 
 
-def connect(out):
+def connect(out, loader):
     """Preloader handshake (watchdog untouched) and DA upload, as `mtk` does for DA commands."""
     config = MtkConfig(loglevel=logging.INFO, gui=None, guiprogress=None)
     config.skipwdt = True
+    if loader:
+        config.loader = str(loader.resolve())
     config.gpt_settings = GptSettings(0, 0, 0)
     mtk = Mtk(config=config, loglevel=logging.INFO)
     config.set_peek(mtk.daloader.peek)
@@ -68,12 +70,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("partition", nargs="?", default="lk_b")
     ap.add_argument("--backup", type=Path, default=DEFAULT_BACKUP)
+    ap.add_argument("--loader", type=Path, default=VENDOR_DA if VENDOR_DA.is_file() else None,
+                    help="download agent file (default: the vendor DA in private/, if present)")
     args = ap.parse_args()
     part, expected = backup_partition(args.backup, args.partition)
 
+    loader = args.loader and args.loader.resolve()  # before chdir below
     out = probe_dir()
     os.chdir(out)  # mtkclient drops its hwparam/state files in the working directory
-    mtk = connect(out)
+    mtk = connect(out, loader)
     da = mtk.daloader.da
     try:
         # READ-PARTITION goes first: after a refused command this DA stops answering

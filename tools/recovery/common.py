@@ -4,6 +4,7 @@ Run `python3 tools/recovery/common.py` for the self-check.
 """
 import datetime
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -11,8 +12,12 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 PRIVATE = REPO / "private"  # git-ignored: dumps, probe logs and chip IDs live here
-MTK_HOME = PRIVATE / "mtkclient"
+# mtkclient commit that reads this board's NAND (with setup_mtkclient.py's patches); v2.1.4.1 could not
+MTKCLIENT_COMMIT = "7cb40e727727dfe3faa065eefb29b16ed29bbdf1"
+MTK_HOME = Path(os.environ.get("X28_MTKCLIENT", PRIVATE / f"mtkclient-{MTKCLIENT_COMMIT[:7]}")).resolve()
 MTK = MTK_HOME / "venv" / "bin" / "mtk"
+# Quectel T750 download agent from the community X28 package (see docs/RECOVERY.md); mtkclient's bundled one refuses reads
+VENDOR_DA = PRIVATE / "vendor-da" / "20261022-mt6890-cpe-recovery-zlt-x28" / "extracted" / "DA_BR.bin"
 
 _MTD_LINE = re.compile(r'mtd(\d+): ([0-9a-f]+) ([0-9a-f]+) "([A-Za-z0-9_]+)"')
 

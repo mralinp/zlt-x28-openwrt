@@ -8,14 +8,13 @@ access works and that the computed partition offset is right.
 
     python3 tools/recovery/read_verify.py lk_b [--backup DIR] [--loader DA.bin] [--debug]
 
---loader swaps mtkclient's bundled download agent (which refuses reads on the X28)
-for another DA file, e.g. a vendor one.
+Uses the vendor DA from private/ by default; mtkclient's bundled DA refuses reads on the X28.
 """
 import argparse
 import sys
 from pathlib import Path
 
-from common import DEFAULT_BACKUP, backup_partition, run_mtk, sha256_file
+from common import DEFAULT_BACKUP, VENDOR_DA, backup_partition, run_mtk, sha256_file
 
 
 def main():
@@ -23,7 +22,8 @@ def main():
     ap.add_argument("partition", help="name from /proc/mtd, e.g. lk_b")
     ap.add_argument("--backup", type=Path, default=DEFAULT_BACKUP,
                     help="verified backup holding mtd.txt and SHA256SUMS")
-    ap.add_argument("--loader", type=Path, help="download agent file to use instead of mtkclient's")
+    ap.add_argument("--loader", type=Path, default=VENDOR_DA if VENDOR_DA.is_file() else None,
+                    help="download agent file (default: the vendor DA in private/, if present)")
     ap.add_argument("--debug", action="store_true", help="mtkclient --debugmode (logs DA XML replies)")
     args = ap.parse_args()
 
