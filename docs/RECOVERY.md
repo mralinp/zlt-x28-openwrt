@@ -250,6 +250,25 @@ Ways to settle it:
 - enter BROM mode (key combination or test point) and retry;
 - UART (#2) for a console that does not depend on the DA at all.
 
+### BROM mode and the mtkclient version (research, 2026-10-22)
+
+- **No documented BROM entry for the X28.** The X28 package's instructions say only "able to
+  enter BROM/preloader mode". The Zyxel notes in the same project use the preloader window with
+  the tool armed first. Generic MediaTek methods (keys held at power-on, a `KPCOL0`-style test
+  point) are unverified here. Our preloader contains a key-triggered download path
+  (`download keys are pressed`), but which key it reads is not yet decoded.
+- **BROM is probably not what is missing.** [mtkclient#302](https://github.com/bkerler/mtkclient/issues/302)
+  covers the same chip with identical IDs (`0x992`, `0x8a00`, `0xca01`, all security off). There,
+  `DA_BR` did not work through mtkclient but **did** read and write partitions through SP Flash
+  Tool on Windows (some protected partitions answered "security deny").
+- **Upstream mtkclient changed exactly this path** after `v2.1.4.1` (72 commits; head
+  `7cb40e7`, 2026-10-12): `xread()` now handles the DA's unsolicited `DT_MESSAGE` log packets,
+  which `v2.1.4.1` treats as empty replies. That would explain the long timeout stalls and replies
+  arriving out of step. `SET-RUNTIME-PARAMETER` now sends `version 1.1`, `battery_exist`,
+  `initialize_dram` and a log channel. The non-GPT by-name crash is fixed. Not yet tested here.
+
+Next: try upstream mtkclient `7cb40e7` in a separate venv with the Quectel DA (read-only `lk_b`).
+
 ## Open questions
 
 - A working USB read (step 6), then a write and restore tested on recoverable hardware.
