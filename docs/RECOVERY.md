@@ -15,7 +15,7 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 | 3. Find the USB recovery port | `usb_watch.py` | ✅ preloader `0e8d:2000`, needs a USB-A-to-C cable |
 | 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient v2.1.4.1 plus 3 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
-| 6. Read a partition over USB, compare hash | `read_verify.py` | ❌ download agent loads and accepts `READ-FLASH`, but sends no data |
+| 6. Read a partition over USB, compare hash | `read_verify.py` | ❌ download agent loads, but rejects `READ-FLASH` as unsupported |
 | 7. Restore a partition over USB | none | not started |
 
 ## Safety rules
@@ -173,19 +173,25 @@ built for the **Fibocom FM350 (MT6880)** module, not this board. Observed on 202
 1. Stage 1 and stage 2 upload and run (≈1.1 MB/s).
 2. `DA.SLA` property query: empty reply, about 2 minutes of USB timeouts, then treated as SLA off.
 3. Hardware info: storage type **NAND**.
-4. One command gets `ERR!UNSUPPORTED`, most likely mtkclient's extension loader (`DA XML Extensions failed`, non-fatal).
-5. `READ-FLASH` on `NAND-WHOLE` at `0x1d800000`, length `0x200000`: the DA **acknowledges it**
-   (an `ERR!UNSUPPORTED` reply would make mtkclient print "Read flash isn't supported"), then
-   sends no data before mtkclient's read times out. mtkclient reports an empty error.
+4. With every XML command logged next to the DA's first reply:
 
-The DA's strings list `NAND-WHOLE`, `NAND-AREA0`, `NAND-BMT`, `READ-FLASH`, `READ-PARTITION`
-and `READ-PARTITION-TABLE`, so the partition type is supported. One hypothesis, not yet tested:
-the first NAND access triggers a bad-block-table scan (`nand_bbt`, `interface_nandx_init`)
-that outlasts mtkclient's timeout.
+   | Command (as sent by mtkclient) | DA reply |
+   |---|---|
+   | `SET-…`, `HOST-…` (stage 1 setup) | `ERR!UNSUPPORTED` |
+   | `NOTIFY-INIT-HW`, `SET-…`, `BOOT-TO` | `OK` |
+   | `HOST-…`, `CAN-HIGHER-USB-SPEED`, `GET-SYS-PROPERTY` (`DA.SLA`) | `ERR!UNSUPPORTED` |
+   | `GET-HW-INFO`, `EMMC-CONTROL` | `OK` |
+   | **`READ-FLASH`** (`NAND-WHOLE`, `0x1d800000`, `0x200000`) | **`ERR!UNSUPPORTED`, "Unsupported command."** |
 
-Next: log each XML command with the DA's reply (a diagnostic line in mtkclient's
-`send_command`), then try a longer read timeout, `READ-PARTITION-TABLE`, or the board
-vendor's own DA.
+   mtkclient treats that XML-wrapped rejection as a non-empty (truthy) reply, which is why it
+   printed an empty error rather than "Read flash isn't supported".
+
+So this DA speaks a smaller, older XML command set and does not take `READ-FLASH`. Its strings
+include `READ-PARTITION`, `READ-PARTITION-TABLE`, `NAND-WHOLE`, `NAND-AREA0` and `NAND-BMT`.
+
+Next: read the DA's own partition table (`READ-PARTITION-TABLE`), then read `lk_b` by name
+(`READ-PARTITION`). mtkclient's by-name path is broken for non-GPT storage, so this needs a small
+direct call. Failing that, find the board vendor's own DA.
 
 ## Open questions
 
