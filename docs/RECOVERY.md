@@ -236,14 +236,19 @@ Two different DAs refusing the same commands point at the session, not the DA:
 
 - mtkclient's DA2 patching is not the cause: none of its "Patched …" lines appear, only two
   "not patched" warnings, so stage 2 runs unmodified.
-- Open suspect: NAND init failing inside the DA (its strings include `All storage init fail`
-  and `device is not SNAND nor PNAND`), which would leave flash commands disabled while
-  hardware queries still work. The raw `GET-HW-INFO` reply would show this; mtkclient does
-  not print it.
-- Open suspect: a host-side setup step that SP Flash Tool sends and mtkclient does not
-  (several `SET-…` and `HOST-…` commands are refused before any read).
+- NAND init is not the cause. The raw `GET-HW-INFO` reply from the Quectel DA reports
+  `storage NAND`, block `0x40000`, page `0x1000`, spare `0x40`, total `0x3ff00000`, RAM
+  `0x40000000`. That matches the geometry Linux reports and covers the whole partition span.
+- Remaining suspect: the session itself. Several `SET-…` and `HOST-…` setup commands are
+  refused before any read, and we connect through the **preloader**, while the package's
+  instructions put the device into **BROM** mode for SP Flash Tool. The DA may restrict
+  commands depending on how it was loaded, or need a setup step SP Flash Tool sends and
+  mtkclient does not.
 
-The reference tool for this DA is SP Flash Tool (Windows or x86 Linux), which this Mac cannot run natively.
+Ways to settle it:
+- run SP Flash Tool's readback with this DA on a Windows or x86 Linux PC (this Mac cannot run it);
+- enter BROM mode (key combination or test point) and retry;
+- UART (#2) for a console that does not depend on the DA at all.
 
 ## Open questions
 
