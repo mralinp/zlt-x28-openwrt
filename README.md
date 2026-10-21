@@ -52,7 +52,7 @@ with local SMS and voice control for AI projects. No operator gateway in the mid
 | Voice calls | ⛔ Blocked: SIM has no VoLTE/IMS and no CS fallback on this network |
 | Stock LuCI Network/Firewall pages changing the router | 🚧 `vendorsync` adapter in progress |
 | Full NAND backup (51 partitions, hash-verified) | ✅ Done |
-| USB recovery (preloader + download agent) | 🚧 Port and security state confirmed; the bundled download agent refuses flash reads, needs the vendor's DA |
+| USB recovery (preloader + download agent) | ✅ Flash reads over USB match the backup; 🚧 restore not yet tested |
 | Custom firmware image | 🗓️ Planned: needs a proven USB restore and UART first |
 
 ## Architecture
@@ -103,7 +103,7 @@ One script per step in [`tools/recovery/`](tools/recovery). Every script only re
 | 3 | Catch the USB recovery port at power-on | `python3 tools/recovery/usb_watch.py` |
 | 4 | Install pinned, patched mtkclient | `python3.14 tools/recovery/setup_mtkclient.py` |
 | 5 | Read boot security (SBC/SLA/DAA) | `python3 tools/recovery/target_config.py` |
-| 6 | Read a partition over USB, compare hashes | `python3 tools/recovery/read_verify.py lk_b` (or `read_by_name.py lk_b`) |
+| 6 | Read a partition over USB, compare hashes | `python3 tools/recovery/read_verify.py lk_b` |
 
 > [!TIP]
 > Use a **USB-A to USB-C** cable. With USB-C to USB-C the Mac never sees the modem.
@@ -115,7 +115,7 @@ They contain the unit's identity and calibration: never publish them.
 
 | Phase | Goal | State |
 |---|---|---|
-| 0. Safety | Verified dumps, UART boot log, tested way back to stock | 🚧 Dumps done; USB access partly proven; UART pending |
+| 0. Safety | Verified dumps, UART boot log, tested way back to stock | 🚧 Dumps done; USB reads proven; restore and UART pending |
 | 1. Stabilise and cool | Measure heat, cap CPU, retire debug daemons | 🚧 Logger done |
 | 2. Stock options working | `vendorsync` adapter so stock LuCI changes the router | 🚧 In progress |
 | 3. SMS and voice | SMS API; call control and an audio path to software | 🚧 SMS works, voice blocked |

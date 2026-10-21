@@ -3,19 +3,18 @@
 How to back up the X28's NAND and reach it over USB when Linux no longer boots.
 Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 
-> **Status, 2026-10-22:** full backup taken and verified. USB recovery port, chip security
-> state and download-agent loading are confirmed. **Reading flash over USB is not working
-> yet**, and no write or restore has been attempted. Do not flash experimental firmware
-> until a USB read matches the backup and a restore has been tested.
+> **Status, 2026-10-22:** full backup taken and verified, and **flash reads over USB work**:
+> `lk_b` read through the preloader matches the backup byte for byte. No write or restore
+> has been attempted. Do not flash experimental firmware until a restore has been tested.
 
 | Step | Script | Result |
 |---|---|---|
 | 1. Back up every partition over SSH | `dump_partitions.py` | ✅ 51 partitions, 1,072,168,960 bytes (2026-10-20) |
 | 2. Verify and unpack the backup | `verify_backup.py` | ✅ all sizes and SHA-256 match |
 | 3. Find the USB recovery port | `usb_watch.py` | ✅ preloader `0e8d:2000`, needs a USB-A-to-C cable |
-| 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient v2.1.4.1 plus 3 local fixes |
+| 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient `7cb40e7` plus 3 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
-| 6. Read a partition over USB, compare hash | `read_verify.py` (offset), `read_by_name.py` (name) | ❌ bundled download agent refuses every read command; needs a different DA |
+| 6. Read a partition over USB, compare hash | `read_verify.py lk_b` | ✅ **MATCH** (`0ad94f06…7007156`) with the Quectel DA |
 | 7. Restore a partition over USB | none | not started |
 
 ## Safety rules
@@ -53,7 +52,10 @@ brew install libusb
 /opt/homebrew/bin/python3.14 tools/recovery/setup_mtkclient.py
 ```
 
-Steps 1–3 need only the Python standard library.
+Steps 5–6 also need the vendor download agent at
+`private/vendor-da/20261022-mt6890-cpe-recovery-zlt-x28/extracted/DA_BR.bin` (see
+[Candidate vendor DA](#candidate-vendor-da-community-package-2026-10-22)); mtkclient's bundled
+DA refuses flash reads on this board. Steps 1–3 need only the Python standard library.
 
 ## Procedure
 
@@ -93,15 +95,18 @@ Then cycle the modem's power. Expected:
 
 ### 4. Install mtkclient
 
-See Prerequisites. This installs `bkerler/mtkclient` at tag `v2.1.4.1`
-(`5a863eece86fcaa97cb8325cf747e0aae3c307e4`) into `private/mtkclient/venv` and patches the
-installed copy (the source checkout stays pristine):
+See Prerequisites. This installs `bkerler/mtkclient` at commit
+`7cb40e727727dfe3faa065eefb29b16ed29bbdf1` (2026-10-12) into `private/mtkclient-7cb40e7/` and
+patches the installed copy (the source checkout stays pristine). Tag `v2.1.4.1` loads the DA
+but cannot read: it mishandles the DA's log packets. Use `--commit`/`--home` to install another
+version, and `X28_MTKCLIENT=<folder>` to point the scripts at it.
 
 | Fix | Why |
 |---|---|
-| uninstall `fusepy` | without libfuse it raises `OSError` at import; mtkclient only handles `ImportError`, so every command crashed |
-| `check_sla()` returns "off" on an empty reply | this board's DA returns nothing for `DA.SLA`; mtkclient called `.decode()` on `False` (upstream `master` only guards `None`) |
+| uninstall `fusepy` / `mfusepy` | without libfuse they raise `OSError` at import; mtkclient only handles `ImportError`, so every command crashed |
+| `check_sla()` returns "off" on an empty reply | this board's DA returns nothing for `DA.SLA`; mtkclient called `.decode()` on `False` (upstream only guards `None`) |
 | empty `page_parity_size` reads as `0` | this DA reports NAND with that field empty; mtkclient never uses it |
+| DA extensions skipped when they cannot be built | on the Quectel DA a function lookup returns `None` and `7cb40e7` crashed before any read; the extensions are optional |
 
 Running it again is a no-op.
 
@@ -126,7 +131,15 @@ python3 tools/recovery/read_verify.py lk_b
 
 `lk_b` is a good first target: 2 MiB, static, no identity data, and `lk_a` has the same
 hash in the backup. The offset comes from the backup's `/proc/mtd`, the expected hash from
-its `SHA256SUMS`. Add `--debug` to log the download agent's XML replies.
+its `SHA256SUMS`. The vendor DA is used by default (`--loader` to override). Add `--debug`
+to log the download agent's XML replies. Expected end of output:
+
+```
+CMD:READ-FLASH NAND-WHOLE 0x1d800000 0x200000 -> OK
+read     0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156
+backup   0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156
+MATCH
+```
 
 To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
 
@@ -267,7 +280,15 @@ Ways to settle it:
   arriving out of step. `SET-RUNTIME-PARAMETER` now sends `version 1.1`, `battery_exist`,
   `initialize_dram` and a log channel. The non-GPT by-name crash is fixed. Not yet tested here.
 
-Next: try upstream mtkclient `7cb40e7` in a separate venv with the Quectel DA (read-only `lk_b`).
+**Result:** upstream `7cb40e7` with the Quectel DA reads `lk_b` through the **preloader**
+(no BROM needed), and it matches the backup. Upstream also needed one more local fix: its
+optional DA extensions crash on this DA, so `setup_mtkclient.py` now skips them. In this
+session `SET-HOST-INFO` returns `OK`, while `SET-RUNTIME-PARAMETER`, `HOST-SUPPORTED-COMMANDS`,
+`CAN-HIGHER-USB-SPEED` and `DA.SLA` are still refused without breaking the read. This also
+confirms the computed partition offsets (`lk_b` at `0x1d800000`).
+
+Next: read every partition over USB and compare it with the backup, then plan a tested
+restore of one non-critical partition on the inactive slot (needs a write plan and your OK).
 
 ## Open questions
 
