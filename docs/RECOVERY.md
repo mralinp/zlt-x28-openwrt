@@ -177,6 +177,13 @@ python3 tools/recovery/read_by_name.py lk_b
 | NAND | 4096-byte pages, 64-byte OOB, 256 KiB erase blocks; the 51 partitions span `0x3fe80000` (1 GiB minus 1.5 MiB) |
 | Firmware | OpenWrt 19.07-derived "usr" build: `adbd` is not started; USB is unbound shortly after boot |
 | Active slot at capture | `bootslot=b`, root `ubi.mtd=42` |
+| Kernel (both slots) | `4.19.205 (release@vm-mtk5g-96) … #0 SMP Fri Dec 22 12:10:12 UTC 2023`, OpenWrt GCC 7.5.0 `r0-f6109fc5`; Android boot header v2, page 2048, load `0x40080000`, no ramdisk |
+
+X28 units ship different firmware builds. The slot-B dump published with
+[gaglians/zlt-x28-openwrt2305](https://github.com/gaglians/zlt-x28-openwrt2305) (release
+`oem-dump-slotB`) has the same boot-header layout, but an older kernel:
+`#0 SMP Mon May 8 08:34:03 UTC 2023`, built on `release@ubt1804` with toolchain `r0-d348ed1`.
+Images and kernel modules from another unit are therefore not interchangeable with this one.
 
 Partition offsets assume the `/proc/mtd` partitions sit back to back from 0. A matching USB read
 (step 6) is what will prove this.
