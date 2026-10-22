@@ -2,7 +2,7 @@
 """Step 6b: read every partition over USB in one session and compare each with the backup.
 
 One download-agent session, one READ-FLASH per partition, each written to
-private/usb-probe/<date>/all/mtdNN-<name>.bin and compared at once. Read-only.
+private/usb-probe/<date>/all-<timestamp>/mtdNN-<name>.bin and compared at once. Read-only.
 A single ~1 GiB READ-FLASH died with a USB pipe error after 236 MiB, so the reads
 are split per partition; --from resumes at a partition after an interruption.
 DIFF is expected for partitions the firmware writes while running (nvdata,
@@ -40,15 +40,16 @@ def main():
 
     loader = args.loader and args.loader.resolve()
     out = probe_dir()
-    (out / "all").mkdir(exist_ok=True)
+    run_dir = out / time.strftime("all-%Y%m%d-%H%M%S")  # one folder per run: never overwrite an earlier read
+    run_dir.mkdir()
     os.chdir(out)
     mtk = connect(out, loader)
-    rows, report = [], out / "all" / "compare.json"
+    rows, report = [], run_dir / "compare.json"
     total, done, started = sum(p["size"] for p in parts), 0, time.monotonic()
     try:
         for i, p in enumerate(parts, 1):
             print(f"[{i}/{len(parts)}] reading {p['name']} ({p['size'] / 2**20:.1f} MiB) ...", flush=True)
-            path = out / "all" / image_name(p)
+            path = run_dir / image_name(p)
             problems.attach()
             try:
                 ok = mtk.daloader.readflash(addr=p["offset"], length=p["size"], filename=str(path),

@@ -161,6 +161,24 @@ reads. After an interruption, resume with `--from <partition>`. Results on 2026-
 Every DIFF is scattered pages in a partition that the running firmware writes. None of the
 static firmware partitions differ.
 
+A second full read on 2026-10-22 at 23:43 (after more reboots; 25.5 min, about 0.67 MB/s)
+gave the same 44 MATCH / 7 DIFF split. `misc` (A/B boot control) and `boot_para` still match the
+backup. 4 KiB pages that differ from the 2026-10-20 backup:
+
+| Partition | Run 1 (10-22 03:00) | Run 2 (10-22 23:43) |
+|---|---|---|
+| `nvdata` | 1114 | 1556 |
+| `protect1` / `protect2` | 159 / 164 | 120 / 117 |
+| `rootfs_b` (active UBI) | 2378 | 2867 |
+| `user_config` | 501 | 348 |
+| `productinfo` | 20 | 20 |
+| `user_data` | 2899 | 3587 |
+
+These partitions change between boots, so restoring them from an old backup would roll back live
+NV and config state. Restores should target static partitions; NV partitions only as a last resort.
+Each run now gets its own folder (`all-<timestamp>/`); run 1's per-partition files were overwritten
+by run 2 before that change, but both runs' statistics are in their logs.
+
 To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
 
 ```bash
