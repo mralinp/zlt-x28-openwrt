@@ -46,14 +46,20 @@ def image_name(part):
 DEFAULT_BACKUP = PRIVATE / "recovery" / "20261020-capture-prepared-20261021"
 
 
+def backup_table(backup):
+    """All partitions of a verified backup, each with its expected 'sha256' and raw 'image' path."""
+    mtd = next(p for p in (backup / "mtd.txt", backup / "metadata" / "mtd.txt") if p.exists())
+    sums = dict(reversed(l.split("  ", 1)) for l in (backup / "SHA256SUMS").read_text().splitlines())
+    return [{**p, "sha256": sums[f"images/{image_name(p)}"], "image": backup / "images" / image_name(p)}
+            for p in parse_mtd(mtd.read_text())]
+
+
 def backup_partition(backup, name):
     """Return (partition, expected SHA-256) for `name` from a verified backup."""
-    mtd = next(p for p in (backup / "mtd.txt", backup / "metadata" / "mtd.txt") if p.exists())
-    part = next((p for p in parse_mtd(mtd.read_text()) if p["name"] == name), None)
+    part = next((p for p in backup_table(backup) if p["name"] == name), None)
     if part is None:
-        sys.exit(f"no partition {name!r} in {mtd}")
-    sums = dict(reversed(l.split("  ", 1)) for l in (backup / "SHA256SUMS").read_text().splitlines())
-    return part, sums[f"images/{image_name(part)}"]
+        sys.exit(f"no partition {name!r} in {backup}")
+    return part, part["sha256"]
 
 
 def probe_dir():

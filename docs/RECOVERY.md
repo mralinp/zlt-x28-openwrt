@@ -15,6 +15,7 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 | 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient `7cb40e7` plus 3 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
 | 6. Read a partition over USB, compare hash | `read_verify.py lk_b` | ✅ **MATCH** (`0ad94f06…7007156`) with the Quectel DA |
+| 6b. Read every partition over USB, compare | `read_all.py` | ✅ all 51 read: **44 MATCH**, 7 DIFF, all in partitions written at runtime |
 | 7. Restore a partition over USB | none | not started |
 
 ## Safety rules
@@ -140,6 +141,25 @@ read     0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156
 backup   0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156
 MATCH
 ```
+
+To read **every** partition in one session (one `READ-FLASH` per partition, each compared as
+it lands in `private/usb-probe/<date>/all/`; about 0.6 MB/s, so roughly 30 minutes for 1 GiB):
+
+```bash
+python3 tools/recovery/read_all.py
+```
+
+A single 1 GiB `READ-FLASH` died with a USB pipe error after 236 MiB, hence the per-partition
+reads. After an interruption, resume with `--from <partition>`. Results on 2026-10-22
+(backup taken 2026-10-20):
+
+| Result | Partitions |
+|---|---|
+| **MATCH (44)** | `preloader`, `preloader_backup`, `proinfo`, `misc`, `para`, `expdb`, `nvcfg`, `mcf1/2_a/b`, `seccfg`, `boot_para`, `nvram`, every slot-A partition (`md1img_a` … `rootfs_a`), every slot-B partition except `rootfs_b`, `loader_ext_a/b`, `raw1`, `raw2`, `qraw` |
+| **DIFF (7), expected** | `nvdata`, `protect1`, `protect2` (modem NV/calibration), `rootfs_b` (the active slot's UBI container, which holds the writable overlay; inactive `rootfs_a` matches), `user_config`, `productinfo`, `user_data` (writable config and data) |
+
+Every DIFF is scattered pages in a partition that the running firmware writes. None of the
+static firmware partitions differ.
 
 To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
 
@@ -287,8 +307,8 @@ session `SET-HOST-INFO` returns `OK`, while `SET-RUNTIME-PARAMETER`, `HOST-SUPPO
 `CAN-HIGHER-USB-SPEED` and `DA.SLA` are still refused without breaking the read. This also
 confirms the computed partition offsets (`lk_b` at `0x1d800000`).
 
-Next: read every partition over USB and compare it with the backup, then plan a tested
-restore of one non-critical partition on the inactive slot (needs a write plan and your OK).
+Next: plan a tested restore of one non-critical partition on the inactive slot (needs a write
+plan and your OK). Every partition already reads back correctly over USB (`read_all.py`, above).
 
 ## Open questions
 

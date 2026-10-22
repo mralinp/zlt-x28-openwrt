@@ -52,7 +52,7 @@ with local SMS and voice control for AI projects. No operator gateway in the mid
 | Voice calls | ⛔ Blocked: SIM has no VoLTE/IMS and no CS fallback on this network |
 | Stock LuCI Network/Firewall pages changing the router | 🚧 `vendorsync` adapter in progress |
 | Full NAND backup (51 partitions, hash-verified) | ✅ Done |
-| USB recovery (preloader + download agent) | ✅ Flash reads over USB match the backup; 🚧 restore not yet tested |
+| USB recovery (preloader + download agent) | ✅ All 51 partitions read over USB; every static one matches the backup. 🚧 Restore not yet tested |
 | Custom firmware image | 🗓️ Planned: needs a proven USB restore and UART first |
 
 ## Architecture
@@ -104,6 +104,7 @@ One script per step in [`tools/recovery/`](tools/recovery). Every script only re
 | 4 | Install pinned, patched mtkclient | `python3.14 tools/recovery/setup_mtkclient.py` |
 | 5 | Read boot security (SBC/SLA/DAA) | `python3 tools/recovery/target_config.py` |
 | 6 | Read a partition over USB, compare hashes | `python3 tools/recovery/read_verify.py lk_b` |
+| 6b | Read all 51 partitions over USB, compare each | `python3 tools/recovery/read_all.py` |
 
 > [!TIP]
 > Use a **USB-A to USB-C** cable. With USB-C to USB-C the Mac never sees the modem.
