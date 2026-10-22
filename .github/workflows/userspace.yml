@@ -1,0 +1,39 @@
+# Builds the open half of the X28 image: OpenWrt 23.05 userspace from official packages.
+# Vendor kernel, modules and blobs must never enter this workflow (public repo): see docs/BUILD.md.
+name: userspace
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/build/**"
+      - ".github/workflows/userspace.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tools for ImageBuilder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential libncurses-dev zlib1g-dev \
+            gawk git gettext libssl-dev xsltproc rsync wget unzip python3 python3-distutils file xz-utils zstd
+
+      - name: Build userspace rootfs
+        run: tools/build/userspace.sh out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x28-userspace-23.05.5
+          path: |
+            out/*rootfs.tar.gz
+            out/*.manifest
+            out/sha256sums
+          retention-days: 14
+          if-no-files-found: error
