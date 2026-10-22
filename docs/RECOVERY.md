@@ -16,7 +16,7 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
 | 6. Read a partition over USB, compare hash | `read_verify.py lk_b` | ✅ **MATCH** (`0ad94f06…7007156`) with the Quectel DA |
 | 6b. Read every partition over USB, compare | `read_all.py` | ✅ all 51 read: **44 MATCH**, 7 DIFF, all in partitions written at runtime |
-| 7. Restore a partition over USB | none | not started |
+| 7. Restore a partition over USB | `write_verify.py` | ⏸️ script ready (dry run only); safety audit says NO-GO on this unit until UART or a spare unit |
 
 ## Safety rules
 
@@ -160,6 +160,31 @@ reads. After an interruption, resume with `--from <partition>`. Results on 2026-
 
 Every DIFF is scattered pages in a partition that the running firmware writes. None of the
 static firmware partitions differ.
+
+### 7. Restore one inactive-slot partition (not run yet)
+
+```bash
+python3 tools/recovery/write_verify.py lk_a            # dry run: plan, live slot check, guards
+python3 tools/recovery/write_verify.py lk_a --write    # writes; modem must be up for the SSH check
+```
+
+The only script that writes flash. It accepts only `*_a` partitions (with a denylist), and only
+while the router reports `bootslot=b`. The source is always the verified backup image. In one
+session it reads the target plus **guard partitions** (its neighbours, its slot-B twin, `misc`,
+`boot_para`), which must all match the backup. It then writes and reads everything back. A
+changed guard stops it immediately. Afterwards, confirm without the DA:
+`ssh router 'cat /proc/cmdline; sha256sum /dev/mtd25'`.
+
+**Safety audit (`router-safety-auditor`, 2026-10-22): NO-GO on the only unit for now.**
+- Writing back identical bytes proves the protocol and the address range, **not** that the DA
+  erases before programming: re-programming identical data passes the read-back either way.
+- The project rules require UART (#2) and a tested way back before `risk/brick` work.
+- If slot A were broken and the A/B rollback or a vendor FOTA ever switched to it, the unit
+  would need BROM or UART recovery, neither of which is proven.
+
+Plan: on a **spare X28**, first write *different* content to a slot-A partition and restore it
+(this proves erase and restore). Only then run the identical-bytes test on this unit, with UART
+attached. Units ship different firmware builds, so each unit restores only from its own backup.
 
 To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
 
