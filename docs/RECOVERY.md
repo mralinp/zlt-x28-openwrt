@@ -128,6 +128,47 @@ python3 tools/recovery/read_verify.py lk_b
 hash in the backup. The offset comes from the backup's `/proc/mtd`, the expected hash from
 its `SHA256SUMS`. Add `--debug` to log the download agent's XML replies.
 
+## UART (debug console, #2): in progress
+
+The kernel console is on `ttyS0` at **921600 8N1** (`console=ttyS0,921600n1` in the boot
+command line). No labelled header was found. Board silkscreen: **`TZ7.823.432 X28`**.
+
+| Back of the board | Candidate footprint (top-left corner) |
+|---|---|
+| ![X28 board, back side](images/x28-board-back.jpg) | ![3-hole footprint](images/x28-uart-candidate.jpg) |
+
+- **Candidate:** an unpopulated **3-hole footprint** with a white outline in the top-left corner
+  of the back side. A trace runs from it to a small 3–4-pad part next to it (likely series
+  resistors or ESD protection), which is typical of a debug UART.
+- **Measured (2026-10-23):** none of the three holes has continuity to ground. A header can be
+  TX/RX/VCC with GND taken elsewhere, so it is still a candidate. Not confirmed.
+- **The other features are not UART:** the outlined copper-pad grid (bottom left) is the
+  underside of a chip on the other side, the long outline next to the silkscreen is a mounting
+  slot, and the parts on the right are connectors and Ethernet magnetics.
+- **Logic level unknown.** The [mt6890-cpe-recovery](https://github.com/mt6890-cpe-recovery/mt6890-cpe-recovery)
+  project reports **1.8 V** with its `J28` photo, but that photo appears to be a different board
+  (silkscreen "ETON ET866").
+
+Next measurement, with the X28 powered and the multimeter's black probe on a shield or the
+power jack's outer ring, on each hole during the first ~20 s of boot and again when idle:
+
+| Reading | Means |
+|---|---|
+| idles at 1.8 or 3.3 V and **flickers while booting** | **TX** (its idle level is the UART voltage) |
+| steady at the same level | **RX** (pulled up), or a supply |
+| rock-steady and continuous with a regulator or large copper | **VCC**: never connect it to an adapter |
+
+Adapter on hand: an Adafruit **CP2102** (3.3 V logic). **Do not wire it straight to a 1.8 V
+UART.** Its TX would drive 3.3 V into a 1.8 V pin (above the ~2.1 V maximum), and its RX may not
+read 1.8 V highs (it needs about 2.0–2.3 V).
+- If TX idles at 3.3 V: connect GND, adapter RX ← board TX, adapter TX → board RX. Never
+  connect the adapter's 5 V or 3.3 V pins.
+- If it idles at 1.8 V: start read-only (GND plus board TX → adapter RX; it cannot damage
+  anything, though the CP2102 may not decode it). For writing, put a divider on the adapter's
+  TX (1 kΩ series, then 1.2 kΩ to GND, ≈1.8 V; keep the values low at 921600 baud). For reading,
+  use a 1.8 V-capable adapter or level shifter (a CH343 with a 1.8 V setting, a TXB0104, or a
+  CP2104/CP2102N with its VIO pin fed from the board's 1.8 V).
+
 ## Device facts
 
 | | |
@@ -183,4 +224,5 @@ partition type or address form, a newer DA, or the board vendor's own DA.
 - A working USB read (step 6), then a write and restore tested on recoverable hardware.
 - Entering BROM if the preloader itself is damaged (key combination or test point).
 - How OOB/YAFFS2 metadata and bad blocks must be handled on restore (the backup has no OOB).
-- UART access (#2) and the A/B rollback rules (#3).
+- UART access (#2): confirm the candidate footprint and its logic level (see [UART](#uart-debug-console-2-in-progress)),
+  and the A/B rollback rules (#3).
