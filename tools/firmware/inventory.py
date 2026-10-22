@@ -19,6 +19,50 @@ import sys
 import zlib
 
 MODINFO = re.compile(rb"(?:^|\x00)(name|vermagic|depends|license|description|srcversion)=([^\x00]*)")
+BINARY = re.compile(r"(?<![\w/.-])(/(?:usr/)?s?bin/[\w.+-]+|/usr/lib/[\w./+-]+\.sh)")
+
+
+def elf_dynamic(data):
+    """(SONAME, [DT_NEEDED]) of a little-endian ELF64 file, read from its dynamic section."""
+    if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
+        return None, []
+    phoff, = struct.unpack_from("<Q", data, 0x20)
+    phentsize, phnum = struct.unpack_from("<HH", data, 0x36)
+    loads, dyn = [], None
+    for i in range(phnum):
+        p_type, _, p_offset, p_vaddr, _, p_filesz = struct.unpack_from("<IIQQQQ", data, phoff + i * phentsize)
+        if p_type == 1:
+            loads.append((p_vaddr, p_offset, p_filesz))
+        elif p_type == 2:
+            dyn = (p_offset, p_filesz)
+    if not dyn:
+        return None, []  # static binary
+    entries = [struct.unpack_from("<qQ", data, dyn[0] + o) for o in range(0, dyn[1], 16)]
+    strtab = next((v for t, v in entries if t == 5), None)
+    off = next((o + strtab - va for va, o, sz in loads if va <= strtab < va + sz), None) if strtab else None
+    if off is None:
+        return None, []
+
+    def s(i):
+        return data[off + i:data.index(b"\0", off + i)].decode(errors="replace")
+    return (next((s(v) for t, v in entries if t == 14), None), [s(v) for t, v in entries if t == 1])
+
+
+def services(root):
+    """Enabled init scripts in start order, with the binaries each one launches."""
+    rcd = os.path.join(root, "etc/rc.d")
+    out = []
+    for link in sorted(os.listdir(rcd)) if os.path.isdir(rcd) else []:
+        # names may start with digits (`3ccci_mdinit`): try every split of the number prefix
+        m = next((m for m in (re.fullmatch(rf"S(\d{{{n}}})(.+)", link) for n in range(1, 4))
+                  if m and os.path.isfile(os.path.join(root, "etc/init.d", m[2]))), None)
+        if not m:
+            continue
+        script = os.path.join(root, "etc/init.d", m[2])
+        text = open(script, errors="replace").read()
+        out.append({"order": int(m[1]), "name": m[2], "procd": "USE_PROCD=1" in text,
+                    "runs": sorted(set(BINARY.findall(text)))})
+    return out
 
 
 def kconfig(boot_img, out):
@@ -65,17 +109,45 @@ def rootfs(root):
             pkg = owner.get(path)
             if pkg in packages:
                 packages[pkg]["files"] += 1
-            files.append({"path": path, "size": len(data), "pkg": pkg, "elf": data[:4] == b"\x7fELF"})
+            entry = {"path": path, "size": len(data), "pkg": pkg, "elf": data[:4] == b"\x7fELF"}
+            if entry["elf"]:
+                entry["soname"], entry["needed"] = elf_dynamic(data)
+            files.append(entry)
             if n.endswith(".ko"):
                 mi = {}
                 for m in MODINFO.finditer(data):
                     mi.setdefault(m[1].decode(), m[2].decode(errors="replace"))
                 modules.append({"path": path, "size": len(data), "pkg": pkg, **mi})
-    json.dump({"packages": packages, "modules": modules, "files": files}, sys.stdout, indent=0)
+    autoload = {}
+    for d in ("etc/modules-boot.d", "etc/modules.d"):
+        for f in sorted(os.listdir(os.path.join(root, d))) if os.path.isdir(os.path.join(root, d)) else []:
+            lines = open(os.path.join(root, d, f), errors="replace").read().split("\n")
+            autoload[f"{d}/{f}"] = [l.split()[0] for l in lines if l.strip() and not l.startswith("#")]
+    json.dump({"packages": packages, "modules": modules, "files": files,
+               "services": services(root), "autoload": autoload}, sys.stdout, indent=0)
+
+
+def selftest():
+    import subprocess, tempfile
+    so, needed = elf_dynamic(open(sys.executable, "rb").read())
+    if open(sys.executable, "rb").read(6)[4:6] == b"\x02\x01":  # an ELF64 LE interpreter (Linux)
+        assert any("libc" in n or "python" in n for n in needed), needed
+    assert elf_dynamic(b"not an elf") == (None, [])
+    with tempfile.TemporaryDirectory() as t:
+        os.makedirs(f"{t}/etc/init.d"); os.makedirs(f"{t}/etc/rc.d")
+        open(f"{t}/etc/init.d/demo", "w").write("USE_PROCD=1\nprocd_set_param command /usr/bin/demo_d -f\n")
+        os.symlink("../init.d/demo", f"{t}/etc/rc.d/S42demo")
+        open(f"{t}/etc/init.d/3ccci_mdinit", "w").write("start() { /usr/bin/ccci_mdinit 0; }\n")
+        os.symlink("../init.d/3ccci_mdinit", f"{t}/etc/rc.d/S113ccci_mdinit")
+        assert services(t) == [{"order": 11, "name": "3ccci_mdinit", "procd": False, "runs": ["/usr/bin/ccci_mdinit"]},
+                               {"order": 42, "name": "demo", "procd": True, "runs": ["/usr/bin/demo_d"]}], services(t)
+    print("inventory.py self-check OK")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 4 and sys.argv[1] == "kconfig":
+    if sys.argv[1:] == ["selftest"]:
+        selftest()
+    elif len(sys.argv) == 4 and sys.argv[1] == "kconfig":
         kconfig(sys.argv[2], sys.argv[3])
     elif len(sys.argv) == 3 and sys.argv[1] == "rootfs":
         rootfs(sys.argv[2])
