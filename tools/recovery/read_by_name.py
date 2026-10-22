@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-from common import DEFAULT_BACKUP, MTK, VENDOR_DA, backup_partition, probe_dir, sha256_file
+from common import DEFAULT_BACKUP, MTK, VENDOR_DA, Problems, backup_partition, probe_dir, sha256_file
 
 # mtkclient lives in the private venv; re-run there if started with another interpreter
 VENV_PY = MTK.with_name("python")
@@ -32,9 +32,12 @@ from mtkclient.Library.DA.xmlflash.xml_lib import UpFile  # noqa: E402
 from mtkclient.Library.Partitions.gpt import GptSettings  # noqa: E402
 from mtkclient.Library.mtk_class import Mtk  # noqa: E402
 
+problems = Problems()  # after the mtkclient imports, which reset the root logger's handlers
+
 
 def connect(out, loader):
     """Preloader handshake (watchdog untouched) and DA upload, as `mtk` does for DA commands."""
+    problems.attach()
     config = MtkConfig(loglevel=logging.INFO, gui=None, guiprogress=None)
     config.skipwdt = True
     if loader:
@@ -96,6 +99,7 @@ def main():
     finally:
         print("cycle the modem's power to boot it normally")
         mtk.port.close()
+        problems.report()
 
     if data is None:
         sys.exit(1)

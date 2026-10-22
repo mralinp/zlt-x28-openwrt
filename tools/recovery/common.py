@@ -4,6 +4,7 @@ Run `python3 tools/recovery/common.py` for the self-check.
 """
 import datetime
 import hashlib
+import logging
 import os
 import re
 import subprocess
@@ -68,23 +69,75 @@ def probe_dir():
     return out
 
 
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# mtkclient prints warnings/errors as "<Class> - [LIB]: ...", plus Python tracebacks and USB errors
+PROBLEM = re.compile(r"\[LIB\]|Traceback|Error|[Ff]ailed")
+PROGRESS = re.compile(r"^\s*(Progress:|Done \||Read:|Write:)|\d+(\.\d+)?% ")
+BAR_PREFIX = re.compile(r"^.*\d+(\.\d+)?% [^()]*\([^)]*\)[^A-Za-z]*")  # a progress bar glued to a message
+
+
+def report_problems(found):
+    """Print a warnings/errors summary: each distinct message once, with a count."""
+    counts = {}
+    for msg in found:
+        counts[msg] = counts.get(msg, 0) + 1
+    print(f"warnings/errors: {sum(counts.values()) or 'none'}")
+    for msg, n in counts.items():
+        print(f"  x{n}  {msg[:200]}")
+
+
+class Problems(logging.Handler):
+    """Collects mtkclient warnings and errors in-process; its loggers all propagate to root."""
+
+    def __init__(self):
+        super().__init__(logging.WARNING)
+        self.found = []
+        self.attach()
+
+    def attach(self):
+        # ponytail: mtkclient re-runs logging.dictConfig when it defines classes, which drops root
+        # handlers; re-attach before each step. A warning in that window could be missed.
+        if self not in logging.getLogger().handlers:
+            logging.getLogger().addHandler(self)
+
+    def emit(self, record):
+        self.found.append(f"{record.levelname} {record.name}: {ANSI.sub('', record.getMessage())}".strip())
+
+    def report(self):
+        report_problems(self.found)
+
+
+def fmt_eta(seconds):
+    return f"{int(seconds) // 60}:{int(seconds) % 60:02d}"
+
+
 def run_mtk(args, logname):
-    """Run mtkclient, echo its output, and save a colour-free copy under
-    private/usb-probe/<date>/ (the log holds the chip's ME_ID, so it stays private).
-    The modem must be unpowered when this starts (mtkclient rejects a device that is
-    already on USB); plug its power in once mtkclient says it is waiting."""
+    """Run mtkclient with its live output (progress bars update in place), save a colour-free
+    log under private/usb-probe/<date>/ (it holds the chip's ME_ID, so it stays private), and
+    finish with a warnings/errors summary. The modem must be unpowered when this starts
+    (mtkclient rejects a device already on USB); plug it in once mtkclient is waiting."""
     if not MTK.exists():
         sys.exit("mtkclient not installed: run tools/recovery/setup_mtkclient.py")
     out = probe_dir()
     print(f"modem power must be OFF now; plug it in when mtkclient is waiting (log: {out / logname})",
           flush=True)
-    proc = subprocess.Popen([str(MTK), *args], cwd=out, text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.Popen([str(MTK), *args], cwd=out, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    found, buf = [], b""
     with open(out / logname, "w") as log:
-        for line in proc.stdout:
-            sys.stdout.write(line)
-            log.write(re.sub(r"\x1b\[[0-9;]*m", "", line))
-    return proc.wait(), out
+        while chunk := proc.stdout.read1(4096):
+            sys.stdout.buffer.write(chunk)
+            sys.stdout.flush()
+            *lines, buf = re.split(rb"[\r\n]", buf + chunk)
+            for raw in lines:
+                line = ANSI.sub("", raw.decode(errors="replace")).rstrip()
+                if PROBLEM.search(line):  # before the progress filter: a message can share a bar's line
+                    found.append(BAR_PREFIX.sub("", line))
+                if line and (PROBLEM.search(line) or not PROGRESS.search(line)):
+                    log.write(line + "\n")
+    code = proc.wait()
+    print()
+    report_problems(found)
+    return code, out
 
 
 def sha256_file(path):
@@ -107,6 +160,10 @@ if __name__ == "__main__":
         except ValueError:
             continue
         raise AssertionError(bad)
+    assert PROBLEM.search("DAXML - [LIB]: xread: Wrong length") and PROBLEM.search("USBError(32, 'Pipe error')")
+    assert not PROBLEM.search("DAXML - DA Stage 1 successfully loaded.")
+    assert PROGRESS.search("Progress: |███| 42.0% Read: (0x1000/0x2000)") and fmt_eta(125) == "2:05"
+    assert BAR_PREFIX.sub("", "Progress: |#| 100.0% Read: (0x64/0x64)DAXML - [LIB]: x") == "DAXML - [LIB]: x"
     mtd = PRIVATE / "recovery/20261020-capture-prepared-20261021/metadata/mtd.txt"
     if mtd.exists():  # the real X28 table, when the private backup is present
         lk_b = next(x for x in parse_mtd(mtd.read_text()) if x["name"] == "lk_b")

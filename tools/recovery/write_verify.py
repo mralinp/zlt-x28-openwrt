@@ -27,7 +27,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from read_by_name import connect  # re-runs this script under the mtkclient venv
+from read_by_name import connect, problems  # re-runs this script under the mtkclient venv
 from common import DEFAULT_BACKUP, VENDOR_DA, backup_table, probe_dir, sha256_file
 from read_verify import compare
 
@@ -113,6 +113,7 @@ def main():
     finally:
         print("cycle the modem's power to boot it normally")
         mtk.port.close()
+        problems.report()
     print(f"RESTORE {'VERIFIED' if ok else 'NOT VERIFIED: do not rely on slot A; see the log'}")
     print(f"after it boots, confirm without the DA: ssh router 'cat /proc/cmdline; "
           f"sha256sum /dev/mtd{part['index']}'  (expect bootslot=b and {part['sha256'][:16]}...)")
