@@ -48,6 +48,55 @@ def elf_dynamic(data):
     return (next((s(v) for t, v in entries if t == 14), None), [s(v) for t, v in entries if t == 1])
 
 
+def elf_symbols(data):
+    """(defined, undefined) global/weak dynamic symbol names of an ELF64 LE file.
+
+    Read through the dynamic segment like the dynamic linker does, because OpenWrt's
+    sstrip removes section headers (and with them the .dynsym section entry)."""
+    if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
+        return set(), set()
+    phoff, = struct.unpack_from("<Q", data, 0x20)
+    phentsize, phnum = struct.unpack_from("<HH", data, 0x36)
+    loads, dyn = [], None
+    for i in range(phnum):
+        p_type, _, p_offset, p_vaddr, _, p_filesz = struct.unpack_from("<IIQQQQ", data, phoff + i * phentsize)
+        if p_type == 1:
+            loads.append((p_vaddr, p_offset, p_filesz))
+        elif p_type == 2:
+            dyn = (p_offset, p_filesz)
+    if not dyn:
+        return set(), set()
+    tags = dict(struct.unpack_from("<qQ", data, dyn[0] + o) for o in range(0, dyn[1], 16))
+
+    def off(vaddr):
+        return next((o + vaddr - va for va, o, sz in loads if va <= vaddr < va + sz), None)
+    symtab, strtab = off(tags.get(6, 0)), off(tags.get(5, 0))
+    if symtab is None or strtab is None:
+        return set(), set()
+    if 4 in tags:  # DT_HASH: nchain is the symbol count
+        count = struct.unpack_from("<I", data, off(tags[4]) + 4)[0]
+    elif 0x6FFFFEF5 in tags:  # DT_GNU_HASH: walk the last bucket's chain
+        h = off(tags[0x6FFFFEF5])
+        nbuckets, symoffset, bloom_size, _ = struct.unpack_from("<IIII", data, h)
+        buckets = struct.unpack_from(f"<{nbuckets}I", data, h + 16 + 8 * bloom_size)
+        count = max(buckets + (symoffset,))
+        chains = h + 16 + 8 * bloom_size + 4 * nbuckets
+        if count > symoffset:
+            while not struct.unpack_from("<I", data, chains + 4 * (count - symoffset))[0] & 1:
+                count += 1
+            count += 1
+    else:
+        return set(), set()
+    defined, undefined = set(), set()
+    for i in range(1, count):  # entry 0 is the null symbol
+        name, info, _, shndx = struct.unpack_from("<IBBH", data, symtab + 24 * i)
+        if info >> 4 not in (1, 2) or not name:  # GLOBAL or WEAK only
+            continue
+        n = data[strtab + name:data.index(b"\0", strtab + name)].decode(errors="replace")
+        (undefined if shndx == 0 else defined).add(n)
+    return defined, undefined
+
+
 def services(root):
     """Enabled init scripts in start order, with the binaries each one launches."""
     rcd = os.path.join(root, "etc/rc.d")
@@ -132,6 +181,9 @@ def selftest():
     so, needed = elf_dynamic(open(sys.executable, "rb").read())
     if open(sys.executable, "rb").read(6)[4:6] == b"\x02\x01":  # an ELF64 LE interpreter (Linux)
         assert any("libc" in n or "python" in n for n in needed), needed
+        defined, undefined = elf_symbols(open(sys.executable, "rb").read())
+        assert defined | undefined, "no dynamic symbols read"
+    assert elf_symbols(b"not an elf") == (set(), set())
     assert elf_dynamic(b"not an elf") == (None, [])
     with tempfile.TemporaryDirectory() as t:
         os.makedirs(f"{t}/etc/init.d"); os.makedirs(f"{t}/etc/rc.d")

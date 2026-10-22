@@ -111,3 +111,42 @@ Checked against the kernel config and the 146 stock modules (`firewall4` is rule
 **Verdict:** fw3 with iptables-legacy runs on the stock modules, with only the three gaps above.
 The kernel also carries OpenWrt netfilter patches (`nf_conntrack_rtcache`). Not yet tested on
 the device.
+
+## Vendor binaries on an OpenWrt 23.05 userspace (ABI check)
+
+Can the vendor modem, cellular and switch stack (`nvram_daemon`, `ccci_fsd`, `ccci_mdinit`,
+`mtk_netagent`, `mipc_wan_cli`, `ql_netd`, `ql_ril_service`, `mipc_submonitor`, `hwnat`,
+`switch`, plus their 9 vendor libraries: 19 files in all) run unchanged on 23.05.5? Checked with
+[`tools/firmware/abi_check.py`](../tools/firmware/abi_check.py). For every stock library they
+import, it compares the soname and every symbol they take from it against the official
+23.05.5 `armsr/armv8` rootfs and the `libstdcpp6`, `libnl-tiny1` and `alsa-lib` packages
+(all SHA-256 verified on download).
+
+| Library they ask for | In 23.05.5 | Plan |
+|---|---|---|
+| `libc.so` (musl 1.1.24 → 1.2.x) | same file name; all 200 imported symbols present; no LFS64 `*64` calls | use 23.05's |
+| `libgcc_s.so.1`, `libstdc++.so.6` (GCC 7.5 → 12.3), `libasound.so.2` | same names, all symbols present | use 23.05's |
+| `libuci.so` | same name and same ABI version (`20130104`) | use 23.05's |
+| `libubox.so` | only `libubox.so.20230523` | ship the 19.07 copy |
+| `libubus.so.20210603` | only `libubus.so.20230605` | ship the 19.07 copy |
+| `libjson-c.so.2` | only `libjson-c.so.5` | ship the 19.07 copy |
+| `libnl-tiny.so` | only `libnl-tiny.so.1` | ship the 19.07 copy |
+
+The four 19.07 compatibility libraries (about 168 KB) depend only on `libc.so`, `libgcc_s.so.1`
+and each other, and their file names do not collide with 23.05's. Every needed symbol name also
+exists in the newer versions, but an ABI-version bump can change struct layouts, so symlinking
+the new libraries to the old names is not safe.
+
+**Verdict:** the vendor modem/cellular stack can run on a 23.05 userspace by adding four
+19.07 libraries, with no rebuild of vendor code. This is a static check of names and symbols;
+symbol versions (`GLIBCXX_*`) and runtime behaviour are not yet tested.
+
+Reproduce (downloads into `private/third-party/openwrt-23.05.5/`):
+
+```bash
+docker run --rm --network none -v x28-rootfs-b-analysis-20261021:/r:ro -v "$PWD/tools/firmware:/t:ro" \
+  -v "$PWD/private/third-party/openwrt-23.05.5/dl:/n:ro" -w /t x28-firmware-tools:local \
+  python3 /t/abi_check.py /r/rootfs /n/openwrt-23.05.5-armsr-armv8-rootfs.tar.gz /n/*.ipk -- \
+  /usr/bin/nvram_daemon /usr/bin/ccci_fsd /usr/bin/ccci_mdinit /usr/bin/mtk_netagent /usr/bin/mipc_wan_cli \
+  /usr/bin/ql_netd /usr/bin/ql_ril_service /usr/bin/mipc_submonitor /usr/bin/hwnat /usr/bin/switch
+```
