@@ -73,3 +73,41 @@ docker run --rm --network none -v x28-rootfs-b-analysis-20261021:/r:ro -v "$PWD/
 
 All of this is proprietary: a port reuses these binaries from the unit's own firmware (they
 must match this kernel build) and must not redistribute them.
+
+## Runtime dependencies (what actually starts and links)
+
+From the enabled init scripts (`/etc/rc.d`, 48 services), the binaries each script calls, and
+each binary's ELF `DT_NEEDED` closure (`inventory.py rootfs` records `needed`, `soname` and
+`services`):
+
+| Stage | Started by | Vendor packages in the closure |
+|---|---|---|
+| **Modem bring-up** | `S00` `0mount_all` (`ubiattach`/`ubimkvol`/`dd`/`mtd`), `1nvram_daemon`, `1restore`, `2ccci_fsd`, `3ccci_mdinit` | `mtk_nvram` (`libnvram`, `libfile_op`), `ccci_fsd`, `ccci_mdinit`, `libccci`: 4 packages, the rest stock |
+| **Cellular data** | netifd protos `mipc.sh`/`ql_mipc.sh` → `mipc_wan_cli`, `mtk_netagent` (`S22`); `mipc_wan.init` (APN from SIM); `ql_netd`, `ql_ril_service` (`S85`); `mipc_submonitor` (`S99`) | `mipc` (`libmipc_msg`), `mipc-wan`, `mtk_netagent`, `libql_mipc`, `libql_at`, `libql_qlog`, **`libdtmf_detect`** (linked by `mipc_wan_cli`); `mipc_submonitor` also pulls `libmtk_audio_mixer_ctrl` |
+| **Wi-Fi** | `/sbin/wifi` → `lib/wifi/mt7615e.lua` (`modprobe`, `iwpriv`, `brctl`, `hwnat`) | `kmod-mt_wifi`, `kmod-warp`, `datconf`, `hwnat`, **plus Tozed `lan_mgr` and `devinfo`**, which pull `libtzproc` (16 vendor libs) |
+| **Switch** | `network` → `lib/network/switch.sh` (`swconfig`, `switch`) | `switch` only (stock libraries) |
+| Tozed apps | `tzproc` (`S99`) starts ~20 services by script (`lan_mgr`, `sms_mgr`, `firewalltools`, `mini_httpd`, `wan_mgr`, `dialer`, …) | `apptzporc`, `libtzproc` |
+
+Consequences for a port:
+- Cellular data needs about 11 vendor packages, none of them Tozed. `ql_netd`/`ql_ril_service`
+  serve the Tozed apps and may be droppable; to be confirmed on the device.
+- The stock Wi-Fi script is tied to the Tozed apps (`lan_mgr`, `devinfo`). A port needs its own
+  `mt_wifi` bring-up (`.dat` + `iwpriv`), not `mt7615e.lua` as shipped.
+- The modem must be up before networking: the vendor runs its bring-up at `S00`, before `network` (`S20`).
+
+## Firewall: OpenWrt 23.05 `firewall` (fw3, iptables) on this kernel
+
+Checked against the kernel config and the 146 stock modules (`firewall4` is ruled out: no `nf_tables`):
+
+| Needed by fw3 | Status |
+|---|---|
+| `ip_tables`/`ip6_tables`, `iptable_{filter,mangle,raw,nat}`, `ip6table_{filter,mangle,nat}` | modules present |
+| `nf_conntrack` (IPv6 included since 4.19), `nf_nat`, `xt_conntrack`, `xt_comment`, `xt_multiport`, `xt_limit`, `xt_mac`, `xt_mark`, `xt_CT`, `xt_TCPMSS`, `xt_LOG`, `xt_time`, `xt_iprange` | modules present |
+| MASQUERADE (`ipt_MASQUERADE`, `ip6t_MASQUERADE`), REJECT (`ipt_REJECT`, `ip6t_REJECT`, `nf_reject_ipv4/6`) | modules present |
+| `ip6table_raw` | **missing** (`IP6_NF_RAW` not set): no IPv6 conntrack helpers or notrack rules |
+| `xt_hashlimit` | **missing**: optional (fw3's SYN-flood rule uses `xt_limit`) |
+| `nf_flow_table` / `xt_FLOWOFFLOAD` | **missing**: no software flow offloading; the vendor's `hw_nat` is the offload path |
+
+**Verdict:** fw3 with iptables-legacy runs on the stock modules, with only the three gaps above.
+The kernel also carries OpenWrt netfilter patches (`nf_conntrack_rtcache`). Not yet tested on
+the device.
