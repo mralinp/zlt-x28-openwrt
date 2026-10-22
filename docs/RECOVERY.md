@@ -161,6 +161,12 @@ reads. After an interruption, resume with `--from <partition>`. Results on 2026-
 Every DIFF is scattered pages in a partition that the running firmware writes. None of the
 static firmware partitions differ.
 
+To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
+
+```bash
+python3 tools/recovery/read_by_name.py lk_b
+```
+
 ### 7. Restore one inactive-slot partition (not run yet)
 
 ```bash
@@ -185,12 +191,6 @@ changed guard stops it immediately. Afterwards, confirm without the DA:
 Plan: on a **spare X28**, first write *different* content to a slot-A partition and restore it
 (this proves erase and restore). Only then run the identical-bytes test on this unit, with UART
 attached. Units ship different firmware builds, so each unit restores only from its own backup.
-
-To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`):
-
-```bash
-python3 tools/recovery/read_by_name.py lk_b
-```
 
 ## Device facts
 
