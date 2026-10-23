@@ -35,7 +35,7 @@ docs/
 |---|---|
 | `tools/recovery/` | backup, verify, USB watch, mtkclient setup, security check, USB reads, guarded restore |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
-| `tools/build/` | `userspace.sh` (ImageBuilder), `link_check.py` (musl link test of the vendor stack) |
+| `tools/build/` | `userspace.sh` (ImageBuilder), `qemu_boot_test.py` (boot + 12 checks, runs in CI), `link_check.py` (musl link test of the vendor stack) |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |
 | `scripts/` | `release.py` (version and PR-title rules), `install.sh` (deploy the overlay), label sync |
 | `router/` | Stage 1 overlay for the stock firmware: vendor bridge, LuCI pages, `vendorsync`, `templog` |
