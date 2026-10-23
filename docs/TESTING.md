@@ -31,6 +31,7 @@ Conventions:
 | 14 | musl link test of the vendor stack on `v0.1.0` | 2026-10-23 | ✅ 10/10 binaries resolve | this page |
 | 15 | UART console | — | 🚧 candidate pads found, unconfirmed | [RECOVERY](RECOVERY.md#uart-debug-console-2-in-progress) |
 | 16 | 23.05 userspace boots and works (QEMU) | 2026-10-23 | ✅ 12/12: procd, netifd, fw3 ruleset, ubus, LuCI | this page |
+| 17 | 23.05 userspace runs on the X28 (RAM chroot, stock 4.19) | 2026-10-23 | ✅ 10/10: musl, uci, iptables-legacy, fw3 print, ubus/rpcd, LuCI; router state unchanged | this page |
 
 Nothing has been **written** to the device's flash by this project, and no native image has booted yet.
 
@@ -223,3 +224,36 @@ level shifter. **Do not wire a 3.3 V adapter's TX directly.**
   `-br`; `uclient-fetch` discards the body on HTTP 403.
 - **Not proven**: anything about the X28's own **4.19 kernel** or hardware (QEMU runs 23.05's 5.15 kernel).
   That needs the on-device test (a RAM-only chroot on the running X28) or a flashed slot.
+
+## 17. The 23.05 userspace runs on the X28 (RAM chroot, stock kernel)
+
+- **Question**: do the binaries and services we build work on the X28's own **4.19** kernel, without flashing?
+- **Why a chroot**: the stock kernel has no kexec and no net/pid namespaces (only `cgroup`, `mnt`), so a RAM
+  boot is impossible and the chroot shares the live network stack. So netifd, `firewall restart` and dnsmasq
+  are **not** run (they would take over the router), fw3 only `print`s, uhttpd listens on 127.0.0.1 only, and
+  root in the chroot is locked (an rpcd login could reboot or reconfigure the host). An rpcd plugin stands in
+  for procd's `system board`, which LuCI's header needs. Reviewed by `router-safety-auditor` before the run.
+- **Run** (everything under `/tmp`; the script deletes its tree and the tarball on exit):
+  ```bash
+  ssh router 'cat > /tmp/x28-rootfs.tar.gz' < private/build/out/openwrt-23.05.5-armsr-armv8-generic-rootfs.tar.gz
+  ssh router 'sh -s' < tools/build/device_ram_test.sh
+  ```
+- **Result** (2026-10-23, OEM 1.5.13, kernel 4.19.205, 268 MB available, SoC 50 °C before and after):
+  **10/10 checks passed**, twice:
+
+  | Check | Result |
+  |---|---|
+  | musl binaries on 4.19 | run; release `23.05.5` |
+  | uci, opkg | firewall config readable; no `firewall4`/`nftables`/`kmod-nft` installed |
+  | iptables | `v1.8.8 (legacy)`, reads the live kernel tables |
+  | fw3 | `fw3 -4 print` rc=0, builds the zone chains (`zone_lan_input`, ...) |
+  | ubus/rpcd | `session` and `uci` objects answer on the chroot's own socket |
+  | web | uhttpd serves LuCI's login page (HTTP 403, `<title>… - LuCI</title>`) |
+
+  Router fingerprint before and after the second run (iptables rules without counters and timestamps, routes,
+  addresses, listening ports): **identical**; no files, mounts or processes left; internet up.
+- **Gotchas**: `fw3 print` emits `iptables ...` shell commands (running them would apply the ruleset);
+  `$!` of a backgrounded shell function is a subshell, not the daemon; under `sh -s` a child reading stdin eats
+  the script; `iptables-save` output changes every second (timestamp comment, counters), so strip both to compare.
+- **Not proven**: netifd, fw3 *applying* rules, dnsmasq and procd as init on 4.19 (they need the device's network
+  to themselves: a flashed inactive slot); Wi-Fi, modem, switch; long-running stability and heat.
