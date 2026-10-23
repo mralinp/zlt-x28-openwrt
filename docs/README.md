@@ -17,6 +17,7 @@ docs/
 ├── TESTING.md                test log: every test, result, reproduce command, what is not proven
 ├── PROJECT-PLAN.md           goal, strategy, phases 0–6, risks, operating rules
 ├── RECOVERY.md               NAND backup, USB preloader/DA access, full USB reads, restore plan, UART
+├── BOOT-FLOW.md              A/B slots (current slot, selection candidates) and the rootfs signature check
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── BUILD.md                  open userspace (ImageBuilder, CI) vs vendor half (local only)
 ├── WORKFLOW.md               trunk-based flow, labels, Conventional Commits, release rules
