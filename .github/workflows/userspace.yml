@@ -29,6 +29,13 @@ jobs:
       - name: Build userspace rootfs
         run: tools/build/userspace.sh out
 
+      # Boot the image (armsr 5.15 kernel) and check procd, netifd, fw3, ubus and LuCI.
+      # A failure here blocks the release, which calls this workflow.
+      - name: Boot test in QEMU
+        run: |
+          sudo apt-get install -y --no-install-recommends qemu-system-arm
+          python3 -u tools/build/qemu_boot_test.py out/*-generic-kernel.bin out/*-generic-ext4-rootfs.img.gz
+
       - uses: actions/upload-artifact@v4
         with:
           name: x28-userspace-23.05.5

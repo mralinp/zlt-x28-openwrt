@@ -30,6 +30,7 @@ Conventions:
 | 13 | Automatic release | 2026-10-23 | ✅ `v0.1.0` pre-release with verified assets | [WORKFLOW](WORKFLOW.md) |
 | 14 | musl link test of the vendor stack on `v0.1.0` | 2026-10-23 | ✅ 10/10 binaries resolve | this page |
 | 15 | UART console | — | 🚧 candidate pads found, unconfirmed | [RECOVERY](RECOVERY.md#uart-debug-console-2-in-progress) |
+| 16 | 23.05 userspace boots and works (QEMU) | 2026-10-23 | ✅ 12/12: procd, netifd, fw3 ruleset, ubus, LuCI | this page |
 
 Nothing has been **written** to the device's flash by this project, and no native image has booted yet.
 
@@ -184,6 +185,38 @@ All in [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md), each with its reproduce comm
   All four exist there and belong to the long-stable blobmsg API, but exercise a UCI path on the device.
 - **Not proven**: running the programs (they need the modem's `/dev/ccci*` devices), `dlopen` and Lua
   `require` dependencies, symbol versions (`GLIBCXX_*`).
+
+## 16. The 23.05 userspace boots and works (QEMU)
+
+- **Question**: does the userspace we build (fw3 + iptables-legacy instead of firewall4, LuCI from parts)
+  actually boot and run, before any device test?
+- **Run**: `tools/build/qemu_boot_test.py KERNEL ROOTFS` boots the ImageBuilder's `*-generic-kernel.bin` and
+  `*-generic-ext4-rootfs.img.gz` on QEMU `virt` (Cortex-A53, 2 CPUs, 512 MB) over a serial console. In CI it
+  runs after every userspace build (so every release is boot-tested). Locally on a Mac:
+  ```bash
+  docker run --rm -v "$PWD/tools/build:/t:ro" -v "$PWD/private/build/out:/img:ro" debian:bookworm-slim \
+    bash -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends qemu-system-arm curl python3 && \
+             python3 -u /t/qemu_boot_test.py /img/openwrt-23.05.5-armsr-armv8-generic-kernel.bin \
+                                             /img/openwrt-23.05.5-armsr-armv8-generic-ext4-rootfs.img.gz'
+  ```
+- **Result** (2026-10-23, Docker on an M-series Mac, software-emulated CPU): booted to the console in 4 s;
+  **12/12 checks passed** in 25 s in total:
+
+  | Check | Result |
+  |---|---|
+  | release, kernel | `armsr/armv8`, `5.15.167` |
+  | init | `procd` |
+  | netifd | `lan` up, `br-lan` `192.168.1.1/24` |
+  | firewall | `/etc/init.d/firewall restart` → `rc=0`; **38** fw3 zone chains |
+  | iptables | `iptables v1.8.8 (legacy)`; no `nft` or `fw4` binaries |
+  | ubus/rpcd | `system board` reports `23.05.5` |
+  | web | `uhttpd` running; LuCI's login page (`<title>OpenWrt - LuCI</title>`, HTTP 403 as LuCI answers unauthenticated requests) through a forwarded port |
+
+- **Gotchas found while writing it**: QEMU's virtio NIC wants a PXE ROM (`efi-virtio.rom`) unless `romfile=`
+  is empty; the serial console echoes commands (use `stty -echo` and a split end-marker); OpenWrt's `ip` has no
+  `-br`; `uclient-fetch` discards the body on HTTP 403.
+- **Not proven**: anything about the X28's own **4.19 kernel** or hardware (QEMU runs 23.05's 5.15 kernel).
+  That needs the on-device test (a RAM-only chroot on the running X28) or a flashed slot.
 
 ## 15. UART
 
