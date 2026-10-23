@@ -1,0 +1,7 @@
+ubi-reader==0.8.16
+cffi==2.1.1
+cryptography==50.0.2
+lzallright==0.2.6
+pycparser==3.11
+zstandard==0.25.0
+# apt: squashfs-tools 1:4.6.1-1+b1

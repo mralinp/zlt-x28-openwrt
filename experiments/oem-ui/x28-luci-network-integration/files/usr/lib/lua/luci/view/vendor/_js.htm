@@ -1,0 +1,18 @@
+<script>
+// vcall({cmd:172,method:'GET',subcmd:6}).then(reply => ...)
+// The vendor CGI can return incomplete replies when a page calls it concurrently.
+let vendorQueue = Promise.resolve();
+function vcall(b) {
+ const body = JSON.stringify(b);
+ const result = vendorQueue.then(() => fetch('<%=luci.dispatcher.build_url("admin/vendor/call")%>?token=<%=token%>', {
+  method: 'POST', headers: {'Content-Type': 'application/json'}, body: body
+ }).then(r => {
+  if (!r.ok) throw new Error('Modem request failed (HTTP ' + r.status + ')');
+  return r.json();
+ }));
+ vendorQueue = result.catch(() => {});
+ return result;
+}
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+const unb64 = s => decodeURIComponent(escape(atob(s)));
+</script>

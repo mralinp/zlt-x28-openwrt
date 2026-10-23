@@ -1,0 +1,9 @@
+# Documentation only: do not apply to the active gateway.
+config interface 'cellular'
+	option proto 'x28_mipc'
+	option auto '0'
+	option apn 'REPLACE_WITH_OPERATOR_APN'
+	option iptype '1'
+	option mtu '1500'
+	option defaultroute '1'
+	option peerdns '1'

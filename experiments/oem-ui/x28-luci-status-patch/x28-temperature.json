@@ -1,0 +1,12 @@
+{
+	"x28-temperature-status": {
+		"description": "Read X28 temperatures on the LuCI status page",
+		"read": {
+			"file": {
+				"/sys/class/thermal/thermal_zone0/temp": [ "read" ],
+				"/sys/class/thermal/thermal_zone9/temp": [ "read" ],
+				"/sys/class/thermal/thermal_zone16/temp": [ "read" ]
+			}
+		}
+	}
+}
