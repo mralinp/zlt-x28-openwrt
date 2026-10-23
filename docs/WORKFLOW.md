@@ -17,23 +17,33 @@ Every piece of work starts as a GitHub issue (use the Task template). No issue, 
 
 An issue is ready when it has: a goal, acceptance criteria (checkboxes), priority, type, area, milestone.
 
-## Branches: GitFlow, no `develop` until the first release
+## Branches: trunk-based, every merge to `main` is a release
 
-Until **v0.1.0** exists there is only `main`:
+There is only `main` (no `develop`, no `release/*` branches):
 
 ```
-main ── feature/12-vendorsync-dhcp ──► PR ──► main
-     └─ fix/20-lan-lockout ─────────► PR ──► main
+main ── feature/12-vendorsync-dhcp ──► PR ──► main ──► tag vX.Y.Z + GitHub release
+     └─ fix/20-lan-lockout ─────────► PR ──► main ──► tag vX.Y.Z + GitHub release
 ```
 
-- `main` is always deployable to a test unit. Tag releases from it.
+- `main` is always deployable to a test unit.
 - Branch names: `feature/<issue>-slug`, `fix/<issue>-slug`, `chore/<issue>-slug`, `docs/<issue>-slug`, `research/<issue>-slug`.
 - Branch from `main`, keep branches short-lived, rebase on `main` before opening the PR.
 - No direct pushes to `main` after the initial commit; everything goes through a PR.
 
-**At the first release** (v0.1.0): cut `develop` from `main`, then standard GitFlow applies:
-`feature/*` branch from and merge into `develop`; `release/x.y.z` from `develop` to `main` (+ tag, merge back);
-`hotfix/*` from `main` to `main` and `develop`. Update this file and `CLAUDE.md` in that release PR.
+## Releases: automatic, from the PR title
+
+`.github/workflows/release.yml` runs on every push to `main` (the same flow as the maintainer's other projects):
+
+1. CI (`ci.yml`) and the userspace build (`userspace.yml`) run.
+2. `scripts/release.py next-version` derives the next SemVer from the Conventional Commits since the last
+   `vX.Y.Z` tag: `type!:` or a `BREAKING CHANGE:` footer → major (minor while on 0.x), `feat` → minor,
+   anything else → patch. The first release is **v0.1.0**.
+3. The tag and a GitHub release are created, with generated notes. **Every 0.x release is a pre-release**
+   (beta). Assets are the open userspace rootfs, its manifest and `SHA256SUMS`, never vendor files.
+
+Because PRs are squash-merged, the **PR title becomes the commit and decides the version bump**. CI rejects
+PR titles that are not Conventional Commits (`scripts/release.py check-title`).
 
 ## Commits
 Conventional Commits: `type(scope): summary`, e.g. `feat(adapter): sync dhcp range from vendor`. Reference the issue in the body (`Refs #12`).

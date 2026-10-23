@@ -4,6 +4,7 @@ name: userspace
 
 on:
   workflow_dispatch:
+  workflow_call:  # used by release.yml
   pull_request:
     paths:
       - "tools/build/**"

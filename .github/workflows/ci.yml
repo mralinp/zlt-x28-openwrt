@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pr-title:
+    name: PR title is a Conventional Commit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: python3 scripts/release.py check-title "$TITLE"
+
+  selfcheck:
+    name: Self-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/release.py selftest
+      - run: python3 tools/firmware/inventory.py selftest
+      - run: python3 tools/recovery/common.py
