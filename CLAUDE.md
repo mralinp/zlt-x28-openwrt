@@ -5,8 +5,8 @@ with working stock LuCI, cooler operation, and local SMS/voice for AI projects. 
 
 ## Workflow (non-negotiable)
 - **Everything is an issue.** No issue, no branch. Use labels: one priority (`P0`-`P3`), one `type/*`, one or more `area/*`, `risk/*` when relevant, and a phase milestone.
-- **GitFlow, no `develop` branch until the first release (v0.1.0).** Only `main` exists. Work on `feature|fix|chore|docs|research/<issue>-slug` branched from `main`; open a PR into `main`; squash-merge. Never push to `main` directly (the initial commit is the only exception).
-- At the first release, cut `develop` from `main` and switch to full GitFlow (`release/*`, `hotfix/*`), updating `docs/WORKFLOW.md` and this file in that PR.
+- **Trunk-based: only `main`; every merge to `main` is a release.** Work on `feature|fix|chore|docs|research/<issue>-slug` branched from `main`; open a PR into `main`; squash-merge. Never push to `main` directly (the initial commit is the only exception).
+- `release.yml` tags `vX.Y.Z` and publishes a GitHub release automatically (0.x = pre-release, first is v0.1.0). The **PR title** decides the bump (`feat` minor, `type!`/`BREAKING CHANGE` major (minor on 0.x), else patch), so it must be a Conventional Commit; CI checks it.
 - Conventional Commits (`feat(adapter): ...`), issue referenced in the body. End commits with the attribution line the session provides.
 - PRs follow `.github/PULL_REQUEST_TEMPLATE.md`: what/why, `Closes #n`, test evidence from a real unit, safety note + rollback for `risk/*`, and an explicit "not verified" list.
 - Never merge, force-push, create or delete repos/branches on the remote, or change repo settings without the user's explicit OK.
