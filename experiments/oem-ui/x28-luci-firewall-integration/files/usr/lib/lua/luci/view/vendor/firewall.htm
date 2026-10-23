@@ -1,0 +1,76 @@
+<%+header%>
+<h2>Firewall</h2>
+<div class="cbi-map">
+<p>These controls use the router's existing firewall service. Port forwarding and DMZ are available in the tabs above.</p>
+<p id="firewall-message" role="status">Loading firewall state…</p>
+<div class="cbi-section"><h3>Protection</h3>
+<div class="cbi-value"><span class="cbi-value-title">Vendor firewall</span><span id="vendor-firewall">Loading…</span></div>
+<div class="cbi-value"><span class="cbi-value-title">ACK flood protection</span><span id="ack-protection">Loading…</span></div>
+<div class="cbi-value"><label for="dos-protection" class="cbi-value-title">DoS protection</label><input id="dos-protection" type="checkbox" disabled></div>
+<div class="cbi-page-actions"><button type="button" class="cbi-button cbi-button-save" id="apply-protection" disabled>Apply protection setting</button> <button type="button" class="cbi-button" id="refresh-firewall">Refresh</button></div>
+</div>
+<div class="cbi-section"><h3>Live rule policies</h3>
+<p>These are the kernel chain defaults. Individual rules below can still block traffic. The stock OpenWrt zone editor does not control this firmware's firewall.</p>
+<table class="table"><thead><tr class="tr table-titles"><th class="th">Protocol</th><th class="th">Input</th><th class="th">Forward</th><th class="th">Output</th></tr></thead><tbody id="firewall-policies"></tbody></table>
+<p>Custom traffic-rule editing is unavailable here until it can preserve and safely restore the vendor rules.</p>
+<details><summary>Active IPv4 filter and NAT rules</summary><pre id="ipv4-rules" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+<details><summary>Active IPv6 filter and NAT rules</summary><pre id="ipv6-rules" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+</div>
+</div>
+<script>
+const get = id => document.getElementById(id);
+const statusURL = '<%=luci.dispatcher.build_url("admin/network/firewall/status")%>';
+const applyURL = '<%=luci.dispatcher.build_url("admin/network/firewall/protection")%>?token=<%=token%>';
+const msg = text => get('firewall-message').textContent = text;
+let currentProtection = null;
+function stateText(reply, key) {
+ if (reply.success !== true && reply.success !== 1) return 'Unavailable';
+ return reply[key] === '1' ? 'Enabled' : reply[key] === '0' ? 'Disabled' : 'Not reported by firmware';
+}
+async function readJSON(url, options) {
+ const response = await fetch(url, options);
+ if (!response.ok) throw new Error('Request failed (HTTP ' + response.status + ')');
+ return response.json();
+}
+async function loadFirewall() {
+ currentProtection = null; get('apply-protection').disabled = get('dos-protection').disabled = true;
+ get('refresh-firewall').disabled = true;
+ try {
+  const data = await readJSON(statusURL, {cache:'no-store'});
+  if (!data.firewall || !data.protection || !data.ipv4 || !data.ipv6) throw new Error('The router returned an incomplete firewall status');
+  get('vendor-firewall').textContent = stateText(data.firewall, 'enabled') + (data.firewall.level ? ' · ' + data.firewall.level : '');
+  get('ack-protection').textContent = stateText(data.protection, 'ack');
+  if ((data.protection.success === true || data.protection.success === 1) && ['0','1'].includes(data.protection.enabled)) {
+   currentProtection = data.protection.enabled === '1'; get('dos-protection').checked = currentProtection;
+   get('dos-protection').disabled = get('apply-protection').disabled = false;
+  }
+  const table = get('firewall-policies'); table.textContent = '';
+  [['IPv4',data.ipv4],['IPv6',data.ipv6]].forEach(([name,rules]) => {
+   const row = document.createElement('tr'); row.className = 'tr';
+   [name,...['INPUT','FORWARD','OUTPUT'].map(k => rules.available ? rules.policies[k] || 'Not reported' : 'Unavailable')].forEach(value => {
+    const cell = document.createElement('td'); cell.className = 'td'; cell.textContent = value; row.appendChild(cell);
+   }); table.appendChild(row);
+   get(name.toLowerCase()+'-rules').textContent = rules.available ? ['Filter rules',...(rules.filter || []),'','NAT rules',...(rules.nat || [])].join('\n') : 'Rules unavailable';
+  });
+  msg(currentProtection === null ? 'Live rules loaded; the protection control is unavailable.' : 'Live firewall state loaded.');
+ } catch (e) { msg(e.message); }
+ finally { get('refresh-firewall').disabled = false; }
+}
+get('apply-protection').onclick = async () => {
+ const enabled = get('dos-protection').checked;
+ if (currentProtection === null) return msg('Refresh before applying a change.');
+ if (enabled === currentProtection) return msg('No protection change to apply.');
+ if (!confirm(enabled ? 'Enable vendor DoS protection? Applying firewall changes may briefly interrupt traffic.' : 'Disable vendor DoS protection? This removes its flood protection and may briefly interrupt traffic.')) return;
+ get('apply-protection').disabled = get('dos-protection').disabled = get('refresh-firewall').disabled = true;
+ msg('Applying…');
+ try {
+  const reply = await readJSON(applyURL, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:enabled})});
+  if (!reply.success) throw new Error(reply.message || 'Protection update failed');
+  await loadFirewall(); msg(reply.message);
+ } catch (e) { currentProtection = null; msg(e.message); }
+ finally { get('refresh-firewall').disabled = false; }
+};
+get('refresh-firewall').onclick = loadFirewall;
+loadFirewall();
+</script>
+<%+footer%>

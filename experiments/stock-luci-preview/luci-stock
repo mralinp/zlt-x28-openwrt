@@ -1,0 +1,28 @@
+#!/usr/bin/lua
+package.path = "/tmp/x28-stock-luci/?.lua;" .. package.path
+local method, path = os.getenv("REQUEST_METHOD"), os.getenv("PATH_INFO") or ""
+local rpc = path == "/admin/ubus"
+local login = path == "" or path == "/" or path == "/admin"
+if (method ~= "GET" and not (method == "POST" and (rpc or login))) or
+   tonumber(os.getenv("CONTENT_LENGTH") or "0") > 131072 then
+ io.write("Status: 405 Method Not Allowed\r\nContent-Type: text/plain\r\n\r\nRead-only instance\n")
+ return
+end
+require "luci.sgi.cgi"
+require "luci.config"
+require "luci.template"
+require "luci.jsonc"
+local stock = require "stock"
+luci.dispatcher.menu_json = stock.menu
+luci.config.main.resourcebase = "/stock-resources"
+luci.config.main.ubuspath = "/cgi-bin/luci-stock/admin/ubus"
+luci.dispatcher.indexcache = "/tmp/x28-stock-luci/indexcache"
+local render = luci.template.render
+luci.template.render = function(name, scope)
+ if name ~= "view" then return render(name, scope) end
+ render("header")
+ luci.http.write([[<div class="alert-message warning"><strong>READ-ONLY — stock LuCI views.</strong> Runtime LAN/WAN mappings are observational projections, not netifd ownership. Wireless uses redacted vendor-profile observations; firewall/DHCP/system pages show stored UCI, which may differ from vendor runtime. All writes and commands are rejected by this instance.</div><script src="/preview-guard.js"></script>]])
+ luci.http.write('<div id="view"><div class="spinning">Loading view…</div><script>L.require("ui").then(function(ui){ui.instantiateView(' .. luci.jsonc.stringify(scope.view) .. ');});</script></div>')
+ return render("footer")
+end
+luci.sgi.cgi.run()

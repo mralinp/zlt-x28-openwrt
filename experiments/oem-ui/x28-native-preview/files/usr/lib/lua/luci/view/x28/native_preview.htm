@@ -1,0 +1,105 @@
+<%+header%>
+<!-- x28-preview-start -->
+<h2>Native OpenWrt preview</h2>
+<div class="cbi-map">
+<p><strong>Read-only throughout this page.</strong> Live information is read from the running system. Proposed settings are examples, not imported configuration. All fields and Save / Apply actions are disabled. No native networking service is activated.</p>
+<nav aria-label="Preview sections"><p>
+<a href="#interfaces">Interfaces</a> · <a href="#lan">LAN / DHCP</a> · <a href="#cellular">Cellular</a> · <a href="#wireless">Wireless</a> · <a href="#firewall">Firewall / NAT</a> · <a href="#routing">Routing / DNS</a> · <a href="#vpn">VPN / proxy</a> · <a href="#system">System / services</a>
+</p></nav>
+<section class="cbi-section" id="interfaces"><h3>Interfaces</h3><p>Live addresses and devices. Vendor services still own the running network; these rows do not prove native netifd ownership.</p>
+<div style="overflow-x:auto"><table class="table"><thead><tr class="tr table-titles"><th class="th">Device</th><th class="th">IP address / prefix</th></tr></thead><tbody>
+<% for _, item in ipairs(addresses) do %>
+<tr class="tr"><td class="td"><%=pcdata(item.name)%></td><td class="td"><%=pcdata(item.address .. "/" .. tostring(item.prefix))%></td></tr><% end %></tbody></table></div>
+<div style="overflow-x:auto"><table class="table"><thead><tr class="tr table-titles"><th class="th">Device</th><th class="th">Administrative state</th><th class="th">MTU</th></tr></thead><tbody>
+<% for _, item in ipairs(devices) do %>
+<tr class="tr"><td class="td"><%=pcdata(item.name)%></td><td class="td"><%=pcdata(item.up and "Up" or "Down")%></td><td class="td"><%=pcdata(item.mtu)%></td></tr><% end %></tbody></table></div>
+<p><strong>Proposed:</strong> ordinary OpenWrt Interfaces and Devices pages backed by netifd. No ifup, ifdown, restart or delete action is available here.</p>
+</section>
+<section class="cbi-section" id="lan"><h3>LAN / DHCP</h3><p>Live bridge membership is shown below. Physical Ethernet port / VLAN mapping still needs measurement. DHCP lease count reflects the current lease file, not a count of online clients.</p>
+<div style="overflow-x:auto"><table class="table"><thead><tr class="tr table-titles"><th class="th">Bridge</th><th class="th">Members</th></tr></thead><tbody>
+<% for _, item in ipairs(bridges) do %>
+<tr class="tr"><td class="td"><%=pcdata(item.name)%></td><td class="td"><%=pcdata(item.members ~= "" and item.members or "None reported")%></td></tr><% end %></tbody></table></div>
+<p>Current DHCP lease entries: <strong><%=pcdata(tostring(lease_count))%></strong></p>
+<fieldset disabled aria-label="Proposed LAN and DHCP settings">
+<div class="cbi-value"><label class="cbi-value-title" for="lan-proto">Protocol</label><div class="cbi-value-field"><input id="lan-proto" value="Static address" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="lan-device">Device</label><div class="cbi-value-field"><input id="lan-device" value="To be mapped to verified LAN bridge" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="lan-ip">IPv4 address</label><div class="cbi-value-field"><input id="lan-ip" value="Preserve current LAN address after verification" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="lan-mask">IPv4 netmask</label><div class="cbi-value-field"><input id="lan-mask" value="To be verified" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dhcp-start">DHCP start offset</label><div class="cbi-value-field"><input id="dhcp-start" value="Example: 100" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dhcp-limit">DHCP address limit</label><div class="cbi-value-field"><input id="dhcp-limit" value="Example: 150" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dhcp-lease">Lease time</label><div class="cbi-value-field"><input id="dhcp-lease" value="Example: 12h" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="lan-ra">IPv6 RA / DHCPv6</label><div class="cbi-value-field"><input id="lan-ra" value="Pending native IPv6 validation" /></div></div>
+</fieldset>
+</section>
+<section class="cbi-section" id="cellular"><h3>Cellular</h3><p>Proposed x28_mipc protocol fields. APN and DNS are placeholders. Source prototype: 31 mocked lifecycle cases passed; real modem setup and teardown are unverified.</p>
+<fieldset disabled aria-label="Proposed native cellular settings">
+<div class="cbi-value"><label class="cbi-value-title" for="cell-proto">Protocol</label><div class="cbi-value-field"><input id="cell-proto" value="X28 MIPC (experimental IPv4)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-apn">APN</label><div class="cbi-value-field"><input id="cell-apn" value="example.invalid" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-mtu">MTU</label><div class="cbi-value-field"><input id="cell-mtu" value="1500" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-route">Use default gateway</label><div class="cbi-value-field"><input id="cell-route" value="Enabled (example)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-peerdns">Use peer DNS</label><div class="cbi-value-field"><input id="cell-peerdns" value="Enabled (example)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-dns">Custom DNS</label><div class="cbi-value-field"><input id="cell-dns" value="None (example)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="cell-metric">Gateway metric</label><div class="cbi-value-field"><input id="cell-metric" value="0" /></div></div>
+</fieldset>
+<p>Requires a pre-initialized modem. Native setup refuses to run while the vendor WAN manager is active. No connect, disconnect, SIM PIN or radio reset control is exposed.</p>
+</section>
+<section class="cbi-section" id="wireless"><h3>Wireless</h3><p>Live wireless device names and states are listed below. SSIDs, passwords and radio settings are not read. Native netifd wireless integration has not been implemented.</p>
+<ul><% for _, item in ipairs(devices) do if item.wireless then %><li><%=pcdata(item.name)%>: <%=item.up and "administratively up" or "administratively down"%></li><% end end %></ul>
+<fieldset disabled aria-label="Proposed wireless settings">
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-radio">Radio / band</label><div class="cbi-value-field"><input id="wifi-radio" value="Hardware mapping pending" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-ssid">SSID</label><div class="cbi-value-field"><input id="wifi-ssid" value="Example: OpenWrt-X28" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-mode">Mode</label><div class="cbi-value-field"><input id="wifi-mode" value="Access point (proposed)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-network">Network</label><div class="cbi-value-field"><input id="wifi-network" value="LAN (proposed)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-country">Country</label><div class="cbi-value-field"><input id="wifi-country" value="Select the actual deployment country" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-channel">Channel / width</label><div class="cbi-value-field"><input id="wifi-channel" value="Pending driver capability validation" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-security">Encryption</label><div class="cbi-value-field"><input id="wifi-security" value="WPA2-PSK (example; verify driver support)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="wifi-key">Wireless key</label><div class="cbi-value-field"><input id="wifi-key" value="Not read or displayed" /></div></div>
+</fieldset>
+</section>
+<section class="cbi-section" id="firewall"><h3>Firewall / NAT</h3><p>Live kernel table names and connection tracking counts are shown. No rule dump, firewall reload or policy change is performed. Loaded tables alone do not establish the active filtering policy.</p>
+<p>Connection tracking: <%=pcdata(connections)%> / <%=pcdata(connection_limit)%></p><h4>Loaded IPv4 iptables tables</h4><pre><%=pcdata(tables ~= "" and tables or "None reported")%></pre>
+<fieldset disabled aria-label="Proposed firewall and NAT settings">
+<div class="cbi-value"><label class="cbi-value-title" for="fw-lan">LAN zone</label><div class="cbi-value-field"><input id="fw-lan" value="Proposed: input ACCEPT, output ACCEPT, forward ACCEPT" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="fw-wan">WAN zone</label><div class="cbi-value-field"><input id="fw-wan" value="Proposed: input REJECT, output ACCEPT, forward REJECT" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="fw-forward">Zone forwarding</label><div class="cbi-value-field"><input id="fw-forward" value="Proposed: LAN to WAN" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="fw-nat">IPv4 masquerading</label><div class="cbi-value-field"><input id="fw-nat" value="Proposed: WAN only" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="fw-ports">Port forwards</label><div class="cbi-value-field"><input id="fw-ports" value="None in example; existing rules not imported" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="fw-dmz">Exposed host / DMZ</label><div class="cbi-value-field"><input id="fw-dmz" value="Disabled in example" /></div></div>
+</fieldset>
+<p>Implementation must match the selected kernel and OpenWrt release. Existing vendor firewall rules remain untouched.</p>
+</section>
+<section class="cbi-section" id="routing"><h3>Routing / DNS</h3><p>Live resolver addresses and raw kernel route snapshots. IPv4 route addresses use the kernel’s hexadecimal representation. These are not editable static routes.</p>
+<h4>Current DNS resolvers</h4><ul><% for _, server in ipairs(dns) do %><li><%=pcdata(server)%></li><% end %></ul><details><summary>IPv4 kernel routes</summary><pre style="overflow-x:auto"><%=pcdata(routes ~= "" and routes or "Unavailable")%></pre></details><details><summary>IPv6 kernel routes</summary><pre style="overflow-x:auto"><%=pcdata(ipv6routes ~= "" and ipv6routes or "Unavailable")%></pre></details>
+<fieldset disabled aria-label="Proposed routing and DNS settings">
+<div class="cbi-value"><label class="cbi-value-title" for="route-target">Static route target</label><div class="cbi-value-field"><input id="route-target" value="No example route" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="route-gateway">Gateway / interface</label><div class="cbi-value-field"><input id="route-gateway" value="Runtime bearer device from modem" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="route-metric">Route metric</label><div class="cbi-value-field"><input id="route-metric" value="0 (example)" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dns-owner">DHCP / DNS service</label><div class="cbi-value-field"><input id="dns-owner" value="Proposed: standard dnsmasq / odhcpd" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dns-forward">DNS forwarding</label><div class="cbi-value-field"><input id="dns-forward" value="Peer DNS or explicitly configured servers" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="dns-policy">VPN / proxy DNS policy</label><div class="cbi-value-field"><input id="dns-policy" value="Not configured; requires leak and routing tests" /></div></div>
+</fieldset>
+</section>
+<section class="cbi-section" id="vpn"><h3>VPN / proxy</h3><p>Capability checks below report only the presence of files or a loaded module. They do not establish compatibility, configuration, performance or a working tunnel.</p>
+<div style="overflow-x:auto"><table class="table"><thead><tr class="tr table-titles"><th class="th">Capability</th><th class="th">Observed now</th></tr></thead><tbody>
+<% for _, item in ipairs(capabilities) do %>
+<tr class="tr"><td class="td"><%=pcdata(item.name)%></td><td class="td"><%=pcdata(item.present and "Present" or "Not found at checked path")%></td></tr><% end %></tbody></table></div>
+<fieldset disabled aria-label="Proposed VPN and proxy settings">
+<div class="cbi-value"><label class="cbi-value-title" for="vpn-wg">WireGuard</label><div class="cbi-value-field"><input id="vpn-wg" value="Pending matching kernel support and packages" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="vpn-ovpn">OpenVPN</label><div class="cbi-value-field"><input id="vpn-ovpn" value="Binary presence does not verify a usable tunnel" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="vpn-passwall">Passwall2</label><div class="cbi-value-field"><input id="vpn-passwall" value="Pending package, core, firewall and DNS compatibility" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="vpn-policy">Selective routing</label><div class="cbi-value-field"><input id="vpn-policy" value="Not configured" /></div></div>
+<div class="cbi-value"><label class="cbi-value-title" for="vpn-start">Automatic startup</label><div class="cbi-value-field"><input id="vpn-start" value="Disabled in preview" /></div></div>
+</fieldset>
+</section>
+<section class="cbi-section" id="system"><h3>System / services</h3><p>Live process counts and system snapshots. Zero means no process with that exact name was observed. No service start, stop, restart, enable, package install, reboot, reset or flash control is provided.</p>
+<div style="overflow-x:auto"><table class="table"><thead><tr class="tr table-titles"><th class="th">Service / process</th><th class="th">Observed processes</th></tr></thead><tbody>
+<% for _, item in ipairs(services) do %>
+<tr class="tr"><td class="td"><%=pcdata(item.name)%></td><td class="td"><%=pcdata(tostring(item.count))%></td></tr><% end %></tbody></table></div>
+<p>Load averages and scheduler snapshot: <%=pcdata(load)%></p><details><summary>Kernel memory accounting</summary><pre><%=pcdata(memory)%></pre></details><details><summary>Mounted filesystems</summary><pre style="overflow-x:auto"><%=pcdata(mounts)%></pre></details><p>The existing Status overview contains the RAM, swap, storage and temperature displays. Optimizing resource usage requires profiling and validated service ownership first.</p>
+</section>
+<div class="cbi-section"><h3>Port status</h3><p>This page is a preview only, separate from the source prototype. A clean rootfs, modem cold-start, native wired and wireless ownership, IPv6, recovery and a flashable firmware image remain unfinished. No OEM CGI is called.</p></div>
+<div class="cbi-page-actions" aria-label="Unavailable preview actions">
+<button type="button" class="cbi-button cbi-button-save" disabled>Save (disabled)</button>
+<button type="button" class="cbi-button cbi-button-apply" disabled>Save &amp; Apply (disabled)</button>
+</div></div><!-- x28-preview-end -->
+<%+footer%>

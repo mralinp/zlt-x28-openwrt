@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-21",
+  "source_workspace": "<previous local workspace, not public>",
+  "destination": ".",
+  "copied_files_initial_hashes": [
+    {
+      "source": "work/x28-openwrt-port/package/luci-proto-x28-mipc/Makefile",
+      "destination": "package/luci-proto-x28-mipc/Makefile",
+      "sha256": "071a1351013698042c9a92d6c88b76c0624fbe9611577bc2735892cb1b5cf3d8"
+    },
+    {
+      "source": "work/x28-openwrt-port/package/luci-proto-x28-mipc/htdocs/luci-static/resources/protocol/x28_mipc.js",
+      "destination": "package/luci-proto-x28-mipc/htdocs/luci-static/resources/protocol/x28_mipc.js",
+      "sha256": "018c6f256b3c685cc47d0741d20d427ccce4a31a4096c9ce9a5a50ce04e0a74b"
+    },
+    {
+      "source": "work/x28-openwrt-port/package/x28-mipc/Makefile",
+      "destination": "package/x28-mipc/Makefile",
+      "sha256": "8813619878e686bc47970b3797ad9119b2ac2f60f561f07285bd4d84904b5309"
+    },
+    {
+      "source": "work/x28-openwrt-port/package/x28-mipc/files/x28_mipc.sh",
+      "destination": "package/x28-mipc/files/x28_mipc.sh",
+      "sha256": "1ed8a3cd1716dc3222ee292fd6f861261e30768b677ca413dd3717c6f7c441f2"
+    },
+    {
+      "source": "work/x28-openwrt-port/tests/run-case.sh",
+      "destination": "tests/run-case.sh",
+      "sha256": "954dbc15166624708bcc7f88e3f32248f7ec2fd8ebefab9d0f4b2e1c951e528c"
+    },
+    {
+      "source": "work/x28-openwrt-port/tests/test_luci.cjs",
+      "destination": "tests/test_luci.cjs",
+      "sha256": "11ea1c5eeae8c6c8313c3b77bc995be6ed0c49794a2f19abb4dc010b32c4cb29"
+    },
+    {
+      "source": "work/x28-openwrt-port/tests/test_native.py",
+      "destination": "tests/test_native.py",
+      "sha256": "d5035e915d0662cd409f2c2327c4be33429099600540824b42442b8f988cc747"
+    },
+    {
+      "source": "work/x28-openwrt-port/examples/network.disabled",
+      "destination": "examples/network.disabled",
+      "sha256": "e9b95069239bb88c1a53aa20b067178ccef502b2762261be9f2cfb1d8f5b763a"
+    },
+    {
+      "source": "work/x28-openwrt-port/README.md",
+      "destination": "docs/NATIVE-CELLULAR.md",
+      "sha256": "2df44caee8da2dfd617df910449890806c3ee038e5de4113fd193d345b6e1f08"
+    },
+    {
+      "source": "outputs/x28-tasks.md",
+      "destination": "docs/TASKS.md",
+      "sha256": "abe284b7d93e822705877944da3d0f02cd4ae46126aba2f9d9f04c98e81c1b9c"
+    },
+    {
+      "source": "outputs/x28-native-port-audit.md",
+      "destination": "docs/DEVICE-AUDIT.md",
+      "sha256": "8a3df2dc697eed8c8c6d27e65f8752446b1c22fde8bb6d35f061f707711e09a4"
+    },
+    {
+      "source": "outputs/x28-community-brief.md",
+      "destination": "docs/COMMUNITY-BRIEF.md",
+      "sha256": "f725915e34ecb6839006159d1f899b8ab4e38892587c1f503e2a557b5576c0f2"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/20_memory.js",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/20_memory.js",
+      "sha256": "135bf8170ecf7534f8ea78c3ba6660f4fa9dd837a1848945d53d22eaf7bb01ff"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/20_memory.original.js",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/20_memory.original.js",
+      "sha256": "6fd3386941eb4152f4dc07f1d91fce2bfd6662b71db4da2ba902cd4fc75e3383"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/24_storage.js",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/24_storage.js",
+      "sha256": "c1eb28bc20713286361af7e3697c55c36e0a3e7c75c972d4d9f450ddcf04f5d8"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/25_temperature.js",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/25_temperature.js",
+      "sha256": "e48e2850040d4c2f92f1ce0fef27f17199e9c386d1dee6869b32ee3ada598903"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/README.md",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/README.md",
+      "sha256": "0a5c75e356b967ac6f4819ad794c59f58b777dee0e51b212140d50a54aa8cc54"
+    },
+    {
+      "source": "outputs/x28-luci-status-patch/x28-temperature.json",
+      "destination": "experiments/oem-ui/x28-luci-status-patch/x28-temperature.json",
+      "sha256": "1d5a30d8a87a19d3a74fe0b9c3a03d7734bd675a6fab1b9d5e9d826db7558a1b"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/README.md",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/README.md",
+      "sha256": "1ed3e799f635c2c1cccb7fc17459039ff8cdbdb78629c5134b244f3651d18664"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/controller/admin/network.lua",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controller/admin/network.lua",
+      "sha256": "136c2bdb9b9337adc0a0a4fac5c13c8280b1d42a60e59370247c3bfd08fd39b2"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/controller/mtkwifi.lua",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controller/mtkwifi.lua",
+      "sha256": "809dfb0ea5098c270926ef9d5c5f1863c2b7a5f73627814d217a0f35ffed9063"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/controller/vendor.lua",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controller/vendor.lua",
+      "sha256": "e890fefa3aa344d6dedd0d47ed71bce475d2b6671ca0c7bd05f4a81818b15f12"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/_js.htm",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/_js.htm",
+      "sha256": "8cc9ec2770f08303d4c3164c2a8b2c1f33b756da247ff6ab8f6aa8c660ed7de0"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/cellular.htm",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/cellular.htm",
+      "sha256": "0c179372a972a57cfebe0942c84afb8011d869fc2052fe39da1946ed2e3b7526"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/interfaces.htm",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/view/vendor/interfaces.htm",
+      "sha256": "6b24bc8393dbd333ae1fe976e49bdb0027e49e2b5d8da222869d3c1ae06c00d8"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/rollback.sh",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/rollback.sh",
+      "sha256": "62cf319bb3d030497027241982b651264ad09fabab23c70268a6766745bee3ec"
+    },
+    {
+      "source": "outputs/x28-luci-network-integration/test-ui.cjs",
+      "destination": "experiments/oem-ui/x28-luci-network-integration/test-ui.cjs",
+      "sha256": "c0a847bf2f6ae6d0903088dcbbee8702ebbfa346099c851f8de7538449123a7e"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/README.md",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/README.md",
+      "sha256": "8c7453b80aa2a0185e895eacb359049868f588385a743e7a5c966ba3c9eec213"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/files/usr/lib/lua/luci/controller/firewall.lua",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/files/usr/lib/lua/luci/controller/firewall.lua",
+      "sha256": "1ed271f377b06d90d30a5238d7e1a59d54a7d418970d4ff32bf75cf4dc995eaf"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/files/usr/lib/lua/luci/controller/vendor.lua",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/files/usr/lib/lua/luci/controller/vendor.lua",
+      "sha256": "ee8b30e8cff5280efcc7c0cdc54fddb42596aae8908681c389342f85a6fc24a2"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/files/usr/lib/lua/luci/view/vendor/firewall.htm",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/files/usr/lib/lua/luci/view/vendor/firewall.htm",
+      "sha256": "2fdfd4873430babd17099613b7486690c6da490470acc3984827c87848cf28a4"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/rollback.sh",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/rollback.sh",
+      "sha256": "95e361eb201183c52cab2dcc93209529cb0e187badb02c3433db982664ef9a41"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/test-firewall-ui.cjs",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/test-firewall-ui.cjs",
+      "sha256": "428a07a2e4afbaa850b6260bcf851c0e1966b5a24d315ab7c068c1595f62847a"
+    },
+    {
+      "source": "outputs/x28-luci-firewall-integration/test-firewall.lua",
+      "destination": "experiments/oem-ui/x28-luci-firewall-integration/test-firewall.lua",
+      "sha256": "f31e14c86c498759dc3be237efdb6c0fca708efa356a2b604d4bec671d1d8b11"
+    },
+    {
+      "source": "outputs/x28-native-preview/README.md",
+      "destination": "experiments/oem-ui/x28-native-preview/README.md",
+      "sha256": "6ec63b4f02765e5388da7a84db9f13f0c764ed39b871bc33afa5c16edf095811"
+    },
+    {
+      "source": "outputs/x28-native-preview/files/usr/lib/lua/luci/controller/x28_preview.lua",
+      "destination": "experiments/oem-ui/x28-native-preview/files/usr/lib/lua/luci/controller/x28_preview.lua",
+      "sha256": "3d928a06dc0d111629f01bab1e64325b0388d598e368dd591429d827172b8e7c"
+    },
+    {
+      "source": "outputs/x28-native-preview/files/usr/lib/lua/luci/view/x28/native_preview.htm",
+      "destination": "experiments/oem-ui/x28-native-preview/files/usr/lib/lua/luci/view/x28/native_preview.htm",
+      "sha256": "652ea5053f87dff2e2cddbfab1964703558393f6b86460b8e0d7df11b9ff7cc7"
+    },
+    {
+      "source": "outputs/x28-native-preview/test_readonly.py",
+      "destination": "experiments/oem-ui/x28-native-preview/test_readonly.py",
+      "sha256": "34db907ff1b8b543b01c2f8869df8d802245abd6ac9c2a4bd102209465dc02ae"
+    },
+    {
+      "source": "work/x28-stock-preview/luci-stock",
+      "destination": "experiments/stock-luci-preview/luci-stock",
+      "sha256": "504808be79cd1403d490e0c75c35c698c97bdb4e92d8a0562194ae0d2bfce69e"
+    },
+    {
+      "source": "work/x28-stock-preview/stock.lua",
+      "destination": "experiments/stock-luci-preview/stock.lua",
+      "sha256": "99c0efbf7e4b9dc3f9711b2a7041deb662f20be845791f03f7b728a70a668a2a"
+    },
+    {
+      "source": "work/x28-stock-preview/preview-guard.js",
+      "destination": "experiments/stock-luci-preview/preview-guard.js",
+      "sha256": "7a6a793fb5aed8d52dcf81e758322cb8d1083a370f0b5809f8f462d471ef1a69"
+    },
+    {
+      "source": "work/x28-stock-preview/test.lua",
+      "destination": "experiments/stock-luci-preview/test.lua",
+      "sha256": "b3446f28ef7007ab7e7cdc103090afdd3039f734792545102fc0c48f2ce86f4c"
+    },
+    {
+      "source": "work/x28-stock-preview/test_http.py",
+      "destination": "experiments/stock-luci-preview/test_http.py",
+      "sha256": "dfe9b415ce458a35b526766a22a36bd4ba851e5969c31caa58dccfea7321ecd3"
+    }
+  ],
+  "note": "Initial copy hashes precede documented path/credential/license edits. Private backups, vendor binaries, screenshots and keys were excluded. Original workspace retained for recovery."
+}

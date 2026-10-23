@@ -1,0 +1,62 @@
+<%+header%>
+<h2>Interfaces</h2>
+<div class="cbi-map">
+<p>Live LAN, cellular WAN and wireless devices. Use each connection's settings to apply changes through the router's network service.</p>
+<p id="network-msg" role="status">Loading live interfaces…</p>
+<div class="cbi-section">
+<table class="table"><thead><tr class="tr table-titles"><th class="th">Connection</th><th class="th">Device</th><th class="th">Address / details</th><th class="th">Settings</th></tr></thead><tbody id="connections"></tbody></table>
+</div>
+<div class="cbi-section"><h3>Active devices</h3>
+<table class="table"><thead><tr class="tr table-titles"><th class="th">Device</th><th class="th">State</th><th class="th">Addresses / bridge members</th></tr></thead><tbody id="devices"></tbody></table>
+</div>
+<button type="button" class="cbi-button" id="refresh-network">Refresh</button>
+</div>
+<%+vendor/_js%>
+<script>
+const statusURL = '<%=luci.dispatcher.build_url("admin/network/x28_status")%>';
+const links = {
+ lan: '<%=luci.dispatcher.build_url("admin/network/dhcp")%>',
+ wan: '<%=luci.dispatcher.build_url("admin/network/cellular")%>',
+ wifi: '<%=luci.dispatcher.build_url("admin/network/wireless")%>'
+};
+const message = document.getElementById('network-msg');
+function cell(value) { const td = document.createElement('td'); td.className = 'td'; td.textContent = value; return td; }
+function connection(name, device, details, href) {
+ const tr = document.createElement('tr'); tr.className = 'tr';
+ tr.append(cell(name), cell(device), cell(details));
+ const td = cell(''), a = document.createElement('a'); a.href = href; a.textContent = 'Configure'; a.className = 'cbi-button';
+ a.setAttribute('aria-label', 'Configure ' + name); td.appendChild(a); tr.appendChild(td); return tr;
+}
+async function refreshNetwork() {
+ const button = document.getElementById('refresh-network'); button.disabled = true;
+ try {
+  const [state, lan, wan] = await Promise.all([
+   fetch(statusURL, {cache:'no-store'}).then(r => { if (!r.ok) throw new Error('Live interface request failed'); return r.json(); }),
+   vcall({cmd:3, method:'GET'}), vcall({cmd:133, method:'GET'})
+  ]);
+  if (!Array.isArray(state.interfaces) || lan.success !== true || wan.success !== true) throw new Error('Could not read the live network configuration');
+  const interfaces = state.interfaces;
+  const local = interfaces.find(i => i.members && i.addresses.some(a => a.split('/')[0] === lan.lanIp));
+  const uplinks = interfaces.filter(i => i.default_route);
+  const wifi = interfaces.filter(i => /^(ra\d|rai\d)/.test(i.name));
+  const rows = document.getElementById('connections'); rows.textContent = '';
+  rows.append(
+   connection('LAN', local ? local.name : 'Not detected', lan.lanIp + ' / ' + lan.netMask + (local ? ' · ' + local.members.join(', ') : ''), links.lan),
+   connection('WAN / Cellular', uplinks.map(i => i.name).join(', ') || 'No IPv4 default route', (wan.wan_ip || 'No IPv4 address') + ' · APN: ' + (wan.apn_name || 'Unknown'), links.wan),
+   connection('Wireless', wifi.map(i => i.name).join(', ') || 'No active radio devices', local ? 'Bridged into LAN (' + local.name + ')' : 'LAN bridge not detected', links.wifi)
+  );
+  const devices = document.getElementById('devices'); devices.textContent = '';
+  interfaces.forEach(i => {
+   const tr = document.createElement('tr'); tr.className = 'tr';
+   const detail = i.addresses.join(', ') + (i.members ? ' · Members: ' + i.members.join(', ') : '');
+   tr.append(cell(i.name + (i.default_route ? ' (internet route)' : '')), cell(i.up ? 'Up' : 'Down'), cell(detail || 'No IP address'));
+   devices.appendChild(tr);
+  });
+  message.textContent = 'Updated ' + new Date().toLocaleTimeString() + '. Additional cellular devices may carry operator services; they are not extra configurable WAN connections.';
+ } catch (e) { message.textContent = e.message; }
+ finally { button.disabled = false; }
+}
+document.getElementById('refresh-network').onclick = refreshNetwork;
+refreshNetwork();
+</script>
+<%+footer%>
