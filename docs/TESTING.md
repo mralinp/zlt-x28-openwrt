@@ -186,6 +186,12 @@ All in [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md), each with its reproduce comm
 - **Not proven**: running the programs (they need the modem's `/dev/ccci*` devices), `dlopen` and Lua
   `require` dependencies, symbol versions (`GLIBCXX_*`).
 
+## 15. UART
+
+See [RECOVERY: UART](RECOVERY.md#uart-debug-console-2-in-progress). Candidate 3-hole footprint on the
+back side (none of the holes is ground); logic level unknown (1.8 V reported for a similar board). Waiting on a
+level shifter. **Do not wire a 3.3 V adapter's TX directly.**
+
 ## 16. The 23.05 userspace boots and works (QEMU)
 
 - **Question**: does the userspace we build (fw3 + iptables-legacy instead of firewall4, LuCI from parts)
@@ -217,9 +223,3 @@ All in [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md), each with its reproduce comm
   `-br`; `uclient-fetch` discards the body on HTTP 403.
 - **Not proven**: anything about the X28's own **4.19 kernel** or hardware (QEMU runs 23.05's 5.15 kernel).
   That needs the on-device test (a RAM-only chroot on the running X28) or a flashed slot.
-
-## 15. UART
-
-See [RECOVERY: UART](RECOVERY.md#uart-debug-console-2-in-progress). Candidate 3-hole footprint on the
-back side (none of the holes is ground); logic level unknown (1.8 V reported for a similar board). Waiting on a
-level shifter. **Do not wire a 3.3 V adapter's TX directly.**
