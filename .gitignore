@@ -30,3 +30,5 @@ main.py
 private/
 __pycache__/
 graphify-out/
+# MediaTek's proprietary LuCI Wi-Fi controller: unclear redistribution rights, kept local only
+experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controller/mtkwifi.lua

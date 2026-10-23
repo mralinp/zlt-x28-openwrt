@@ -1,0 +1,73 @@
+<%+header%>
+<h2>WAN / Cellular</h2>
+<div class="cbi-map">
+<p>Changes use the modem's existing cellular service and may reconnect your internet connection.</p>
+<p id="cellular-msg" role="status">Loading cellular settings…</p>
+<div class="cbi-section"><h3>Current connection</h3><dl id="cellular-status"></dl></div>
+<fieldset class="cbi-section" id="profile-fields" disabled><legend>APN profile</legend>
+<div class="cbi-value"><label for="apn-profile" class="cbi-value-title">Default profile</label><select id="apn-profile"></select></div>
+<button type="button" class="cbi-button cbi-button-save" id="save-profile">Apply profile</button>
+</fieldset>
+<fieldset class="cbi-section" id="cellular-fields" disabled><legend>Connection settings</legend>
+<div class="cbi-value"><label for="pdp-type" class="cbi-value-title">IP protocol</label><select id="pdp-type"><option value="IP">IPv4</option><option value="IPV6">IPv6</option><option value="IPV4V6">IPv4 / IPv6</option></select></div>
+<div class="cbi-value"><label for="cellular-mtu" class="cbi-value-title">MTU</label><input id="cellular-mtu" type="number" min="576" max="1500" step="1"></div>
+<div class="cbi-value"><label for="cellular-nat" class="cbi-value-title">NAT</label><input id="cellular-nat" type="checkbox"></div>
+<button type="button" class="cbi-button cbi-button-save" id="save-cellular">Apply connection settings</button>
+</fieldset>
+</div>
+<%+vendor/_js%>
+<script>
+let profiles = [], loaded = false;
+const get = id => document.getElementById(id);
+const msg = text => get('cellular-msg').textContent = text;
+function detail(label, value) {
+ const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = label; dd.textContent = value || 'Unavailable';
+ get('cellular-status').append(dt, dd);
+}
+async function loadCellular() {
+ loaded = false; get('profile-fields').disabled = get('cellular-fields').disabled = true;
+ try {
+  const wan = await vcall({cmd:133, method:'GET'});
+  const config = await vcall({cmd:213, method:'GET', subcmd:3});
+  const list = await vcall({cmd:248, method:'GET'});
+  for (const [name, reply] of [['Connection',wan],['IP settings',config],['APN profiles',list]]) {
+   if (reply.success !== true && reply.success !== 1) throw new Error(name + ': ' + (reply.message || 'The modem did not return a successful response'));
+  }
+  if (!Array.isArray(list.apn_list)) throw new Error('The modem returned an invalid APN profile list');
+  if (!['IP','IPV6','IPV4V6'].includes(config.selectType)) throw new Error('Unsupported cellular IP protocol');
+  profiles = list.apn_list;
+  get('cellular-status').textContent = '';
+  [['Device',wan.wan_real_iface],['APN',wan.apn_name],['IPv4',wan.wan_ip],['IPv6',wan.wan_ipv6_ip],['DNS',[wan.wan_dns,wan.wan_dns2].filter(Boolean).join(', ')]].forEach(x => detail(x[0],x[1]));
+  get('apn-profile').textContent = '';
+  profiles.forEach((p, i) => get('apn-profile').add(new Option((p.name || 'Profile') + ' — ' + (p.apnName || 'Automatic'), String(i), false, p.default_flag === '1')));
+  get('pdp-type').value = config.selectType; get('cellular-mtu').value = config.apnMTU; get('cellular-nat').checked = config.apnNatName === '1';
+  loaded = true; get('profile-fields').disabled = profiles.length === 0; get('cellular-fields').disabled = false;
+  msg('Settings loaded from the modem.');
+ } catch (e) { msg(e.message); }
+}
+async function applyCellular(body, success) {
+ if (!confirm('This may reconnect cellular WAN and interrupt internet access. Apply these settings?')) return;
+ get('profile-fields').disabled = get('cellular-fields').disabled = true; msg('Applying…');
+ try {
+  const reply = await vcall(body);
+  if (!success(reply)) throw new Error('The modem did not confirm the change. Refresh this page to check its current settings.');
+  // shortcut: vendor CGI acknowledges writes without a rollback timer; verify after reconnecting.
+  msg('The modem accepted the settings. Refresh this page after the cellular connection has reconnected.');
+ } catch (e) { msg(e.message); }
+ finally { loaded = false; }
+}
+get('save-profile').onclick = () => {
+ const selected = Number(get('apn-profile').value);
+ if (!loaded || !Number.isInteger(selected) || !profiles[selected]) return msg('Reload this page before applying a profile.');
+ const updated = profiles.map((p, i) => Object.assign({}, p, {default_flag: i === selected ? '1' : '0'}));
+ applyCellular({cmd:248, method:'POST', apn_list:updated}, r => r.success === true || r.success === 1);
+};
+get('save-cellular').onclick = () => {
+ const type = get('pdp-type').value, mtu = Number(get('cellular-mtu').value);
+ if (!loaded) return msg('Reload this page before applying connection settings.');
+ if (!['IP','IPV6','IPV4V6'].includes(type) || !Number.isInteger(mtu) || mtu < (type === 'IP' ? 576 : 1280) || mtu > 1500) return msg('MTU must be 576–1500 for IPv4, or 1280–1500 when IPv6 is enabled.');
+ applyCellular({cmd:213, method:'POST', subcmd:3, selectType:type, apnMTU:String(mtu), apnNatName:get('cellular-nat').checked ? '1' : '0'}, r => r.message === '0');
+};
+loadCellular();
+</script>
+<%+footer%>
