@@ -12,9 +12,9 @@ lines (numbers are line numbers in the raw capture) and was checked for MAC addr
 |---|---|
 | Which slot boots? | **Slot B.** `[QL_AB] metadata.slots[0].priority:14, slots[1].priority:15` then `[AB] ab_suffix: _b, ab_retry: 0, ab_boot_success: 1`; the kernel command line has `bootslot=b` and `ubi.mtd=42` (`rootfs_b`). |
 | Is the A/B record in `misc` the real selector? | **Yes, consistent with it.** The 14/15 pair matches the bytes read from `misc` in [BOOT-FLOW.md](../BOOT-FLOW.md) (candidate 1). It does not prove the other two candidates are unused. |
-| Does the boot chain verify signatures? | **Yes, in two places.** The preloader verifies `loader_ext_b`, `sspm_b`, `lk_b`, `tee_b` (ATF), `mcupm_b` and `pi_img_b` ("cert verify ... ok"). LK then verifies `boot_b` (the kernel image), the modem images (`md1rom`, `md1dsp`, `md1drdi`), the tinysys firmware and the GPU/DPM blobs, and ends with **`[SBC] ROOTFS_SIG_VFY Success`** just before the kernel starts. |
+| Does the boot chain verify signatures? | **Yes, in two places.** The preloader verifies `loader_ext_b`, `sspm_b`, `lk_b`, `tee_b` (ATF), `mcupm_b` and `pi_img_b` ("cert verify ... ok"). LK then verifies `boot_b` (the kernel image), the modem images (`md1rom`, `md1dsp`, `md1drdi`), the tinysys firmware and the `medhw-*` and `dpm*` blobs, and ends with **`[SBC] ROOTFS_SIG_VFY Success`** just before the kernel starts. |
 | Is secure boot enforced? | **Not settled.** Every SBC line is followed by `sbc_en = 0`, and the log shows `SEC CFG is valid. Lock state is 1`, `sboot_state = 0x1`, `lock_state(default) = 0x4`, `[BLDR] Tool connection is unlocked`, `sec_boot_check=7`. These can mean "checks run and pass but are not enforced" or the opposite. Only booting a modified image from slot A (with a way back) settles it. |
-| Boot timing | `bootprof.lk_t=5860` (LK takes about 5.9 s), `bootprof.pl_t=1200`. |
+| Boot timing | `bootprof.pl_t=1200` and `bootprof.lk_t=5860` are passed to the kernel (the unit is not stated in the log; they look like milliseconds, i.e. LK about 5.9 s). |
 
 ## Other things worth knowing
 
@@ -109,7 +109,8 @@ lines (numbers are line numbers in the raw capture) and was checked for MAC addr
  1030: [SBC] dpmdm cert chain vfy pass
  1032: [SBC] image dpmdm auth pass
  1034: [SBC] ROOTFS_SIG_VFY Success
- 1069: [    0.000000] <0>-(0)[0:swapper][name:main&]Kernel command line: console=tty0 console=ttyS0,921600n1 		root=/dev/ubiblock0_0 rootfstype=squashfs ubi.mtd=42 		init=/etc/preinit 		loglevel=8 		androidboot.selinux=permissive androidboot.hardware=mt6890 		initcall_debug=1 ramoops.mem_address=0x42880000
+ 1069: Kernel command line (whitespace collapsed):
+        console=tty0 console=ttyS0,921600n1 root=/dev/ubiblock0_0 rootfstype=squashfs ubi.mtd=42 init=/etc/preinit loglevel=8 androidboot.selinux=permissive androidboot.hardware=mt6890 initcall_debug=1 ramoops.mem_address=0x42880000 ramoops.mem_size=0xe0000 ramoops.pmsg_size=0x10000 ramoops.console_size=0x40000 mtk_printk_ctrl.disable_uart=0 bootslot=b androidboot.hardware=mt6890 bootprof.pl_t=1200 bootprof.logo_t=0 bootprof.lk_t=5860
 ```
 
 ## Reproduce
