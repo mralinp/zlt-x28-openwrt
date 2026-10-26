@@ -128,7 +128,11 @@ python3 tools/recovery/read_verify.py lk_b
 hash in the backup. The offset comes from the backup's `/proc/mtd`, the expected hash from
 its `SHA256SUMS`. Add `--debug` to log the download agent's XML replies.
 
-## UART (debug console, #2): in progress
+## UART (debug console, #2): read side confirmed
+
+**2026-10-26: the console was read at 921600 8N1 during a power-cycle** (preloader, LK and kernel are all visible); see
+[research/uart-boot-log.md](research/uart-boot-log.md). The write side (typing to the console) is not wired yet.
+The notes below are the earlier search for the pads and the level rules, kept for the next unit.
 
 The kernel console is on `ttyS0` at **921600 8N1** (`console=ttyS0,921600n1` in the boot
 command line). No labelled header was found. Board silkscreen: **`TZ7.823.432 X28`**.
