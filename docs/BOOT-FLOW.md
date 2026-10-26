@@ -29,6 +29,8 @@ Three candidate controls were found. Which one actually decides is **not yet est
    (`"\0AB0"`), stored four times (`0x800`, `0x40800`, `0x80800`, `0xc0800`, one per erase block). After the
    magic and four `0xff` bytes, two 4-byte slot entries follow: A = `0e 00 01 00`, B = `0f 00 01 00`. Read as
    *priority, retries, successful*: A = 14/0/1, B = 15/0/1, so B wins, which matches the live slot.
+   **Confirmed by UART** ([uart-boot-log.md](research/uart-boot-log.md)): the bootloader prints
+   `[QL_AB] ... slots[0].priority:14, slots[1].priority:15` and `ab_suffix: _b`.
 2. **Quectel's own module** (confirmed present). LK contains `platform/mediatek/common/bootctrl/ql_raw_data_module.c`,
    the literal command-line fragments `bootslot=a` and `bootslot=b` (each next to its own root-device fragment),
    and answers the standard Android "set active slot" call with `set active slot: not supported!`. This points to
@@ -48,6 +50,10 @@ DRAM calibration; it is not shown to be slot-related.
 `rootfs,pubk`, `rootfs,sigval` and `rootfs,hashvallist`. Each slot has a `rootfs_sig_*` partition. So the boot
 chain checks a signature over the rootfs, and a rootfs we build is not signed with the vendor key.
 
+**Confirmed by UART**: on a normal boot LK prints `[SBC] ROOTFS_SIG_VFY Success` just before the kernel, after
+verifying `boot_b` and the modem images; the preloader verifies `lk_b`, `tee_b` and the tinysys images. The log also
+shows `sbc_en = 0`, so it is unclear whether these checks are enforced.
+
 **Unknown**: what a failed check does (refuse to boot, fall back, or only report), and whether the kernel or
 userspace enforces `hashvallist`. Until that is known, flashing a custom rootfs to slot A cannot be planned.
 Tracked in its own issue.
@@ -63,8 +69,8 @@ strings -n 5 $B/mtd38-lk_b.bin | grep -E 'bootslot=|bootctrl|ql_raw_data|ROOTFS_
 
 ## Safe ways to settle the unknowns
 
-- **UART** ([#2](https://github.com/mralinp/zlt-x28-openwrt/issues/2)): LK logs its slot and signature decisions
-  at power-on; reading the log changes nothing.
+- **UART** ([#2](https://github.com/mralinp/zlt-x28-openwrt/issues/2)): done for the read side, see
+  [uart-boot-log.md](research/uart-boot-log.md). Still needed: a test of a modified image on slot A with a way back.
 - **Vendor source or docs** ([#18](https://github.com/mralinp/zlt-x28-openwrt/issues/18)): the GPL request covers
   the kernel; the LK and Quectel boot-control behaviour may be documented by Quectel for the RG500L platform.
 - **Vendor update path**: read-only inspection of the stock FOTA/upgrade scripts shows how the vendor itself
