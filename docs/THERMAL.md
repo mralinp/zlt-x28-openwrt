@@ -43,7 +43,7 @@ during them, so they are not a valid baseline. Use the 65 C figure above (modem 
 |---|---|
 | Fitted | 2026-10-27, around 19:40 local (inferred from a gap in the log and a restart at that time; owner to confirm) |
 | Fan | 12 V; model, size, airflow direction and mounting: _not recorded yet_ |
-| Power | _not recorded yet_: from a spare 12 V supply or the router's 12 V input, **never** from a board header or signal pin |
+| Power | _not recorded yet_: currently from a separate 12 V source (owner to confirm). Before moving it to the board's smart-fan pin, measure that pin's voltage and check its current rating against the fan's rated current |
 | Control | none: it runs at full speed whenever it has power |
 
 **Smart-fan pin (owner, 2026-10-27):** the board has a smart-fan pin that the fan will be soldered to later. Its
