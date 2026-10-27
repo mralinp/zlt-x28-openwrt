@@ -8,6 +8,7 @@ Read in this order if you are new (or returning after a long break):
 4. [**FIRMWARE-INVENTORY.md**](FIRMWARE-INVENTORY.md): what the stock firmware is made of, and what a port needs.
 5. [**BUILD.md**](BUILD.md): how the native image is built (open half in CI, vendor half locally).
 6. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
+7. [**THERMAL.md**](THERMAL.md): heat baseline and the effect of the 12 V fan.
 
 ## Tree
 
@@ -17,6 +18,7 @@ docs/
 ├── TESTING.md                test log: every test, result, reproduce command, what is not proven
 ├── PROJECT-PLAN.md           goal, strategy, phases 0–6, risks, operating rules
 ├── RECOVERY.md               NAND backup, USB preloader/DA access, full USB reads, restore plan, UART
+├── THERMAL.md                baseline and fan result (65 C to 46 C idle), how it was measured, what is not measured
 ├── BOOT-FLOW.md              A/B slots (current slot, selection candidates) and the rootfs signature check
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── BUILD.md                  open userspace (ImageBuilder, CI) vs vendor half (local only)
