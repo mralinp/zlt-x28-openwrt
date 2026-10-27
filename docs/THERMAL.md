@@ -5,9 +5,10 @@ Tracked in [#46](https://github.com/mralinp/zlt-x28-openwrt/issues/46). Smart fa
 
 ## Result in one table
 
-Idle, modem on and passing traffic, readings in degrees C.
+Idle load, modem on and passing traffic, readings in degrees C. The fan runs at **full speed** all the time (it has no speed control yet),
+so the second column is the best case for cooling.
 
-| Sensor (thermal zone) | No fan, 2026-10-20 | With 12 V fan, 2026-10-27 |
+| Sensor (thermal zone) | No fan, 2026-10-20 | 12 V fan at full speed, 2026-10-27 |
 |---|---|---|
 | SoC (`soc_max`) | 65 | 46 |
 | CPU core 0 (`cpu_little0`) | 65 | 44–46 |
@@ -17,7 +18,7 @@ Idle, modem on and passing traffic, readings in degrees C.
 | RF (`rf_ntc`) | 59 | 41 |
 | PMIC (`pmic`) | 66 | 45 |
 
-That is about **16–20 degrees cooler** at idle. The kernel's thermal trip points are 85 / 95 / 115 C
+That is about **16–20 degrees cooler** at idle load, with the fan flat out. Slowing it down will give back some of that. The kernel's thermal trip points are 85 / 95 / 115 C
 (`/sys/class/thermal/thermal_zone0/trip_point_*_temp`), so the unit was never near them; the point of the fan is
 margin and longevity, not avoiding a shutdown. The Quectel `ql_ntc` policy has its own, unpublished limits.
 
@@ -43,13 +44,16 @@ during them, so they are not a valid baseline. Use the 65 C figure above (modem 
 | Fitted | 2026-10-27, around 19:40 local (inferred from a gap in the log and a restart at that time; owner to confirm) |
 | Fan | 12 V; model, size, airflow direction and mounting: _not recorded yet_ |
 | Power | _not recorded yet_: from a spare 12 V supply or the router's 12 V input, **never** from a board header or signal pin |
-| Control | none: it runs whenever it has power |
+| Control | none: it runs at full speed whenever it has power |
 
-The stock "Smart temperature control" page (vendor UI, `cmd 372`: off / always on / smart, threshold 50–90 C)
-exists in the firmware, but this unit has **no fan header**, so that setting drives nothing here.
+**Smart-fan pin (owner, 2026-10-27):** the board has a smart-fan pin that the fan will be soldered to later. Its
+location, voltage and whether it is on/off or PWM are _not recorded yet_ (#47). The stock "Smart temperature control" page
+(vendor UI, `cmd 372`: off / always on / smart, threshold 50–90 C) is the firmware side of that feature; its fan-status fields
+read empty on this unit today because nothing is connected to the pin.
 
 ## Not measured yet
 
+- **With the fan on smart control or at lower speed.** The table is full speed only.
 - **Under load.** All numbers are idle. Run a speed test or a sustained download and read `/root/templog` afterwards to get the
   temperature at full modem power. That is the number that decides whether the fan can be slowed or switched off.
 - **Noise and dust**, and what happens if the fan stops. Nothing monitors the fan.
@@ -60,5 +64,5 @@ exists in the firmware, but this unit has **no fan header**, so that setting dri
 ## Planned
 
 [#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47): control the fan from the OpenWrt panel (on, off, or by
-temperature). It needs the answers to two open questions first: how the fan is powered, and whether the board exposes
-a GPIO or PWM output that can switch it safely.
+temperature). It needs the answers to open questions first: where the smart-fan pin is, what it outputs (voltage, on/off or PWM, tach input?),
+and how the fan is powered. The stock vendor smart-temperature setting may already drive it once the fan is wired to that pin.
