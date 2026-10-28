@@ -38,9 +38,15 @@ bad-block remapping is needed. The engine has no bad-block check; a bad block wo
 sessions below: fixed target, original/candidate hash binding, per-spec candidate validator
 (`rootfs_a`: different 64 MiB image that passes `package_ubi.inspect`; `misc`: exactly the four-copy
 A selection), neighbor guards re-read before and after, one write, no retry/reboot, restore tolerant of a
-half-written target. Checked against the real private candidate and `misc` dump. **Not built:** the
-attested entry command (receipts, UART/backup-copy/free-space checks, typed confirmation, restore claim)
-modelled on `restore_entry.py`, and the hardware identical-write passes. No device I/O exists in the engine.
+half-written target. Checked against the real private candidate and `misc` dump. **Entry command (`tools/recovery/slot_entry.py`, built):** `slot_entry.py {rootfs_a|misc} {identical|write|restore}`.
+Dry-run is offline. `--write` additionally needs `--backup-copy` (a second, verified archive), `--uart-log` (updated within
+60 s), live SSH confirming B, 1 GiB free, the pinned DA/host/tool/unit identities, and a typed phrase that names the
+target, mode, the first 12 hex digits of the image, `SAME-DISK` when the copy shares a disk, and for `misc` also
+`BROM-ROUTE-PROVEN`. The candidate hash comes from the build manifest. Sequencing is enforced by receipts: `rootfs_a write`
+needs a verified `identical` run (24 h); `misc identical` needs a verified `rootfs_a write`; `misc write` needs both a verified
+`misc identical` and that `rootfs_a write`; `restore` needs `--resume` of the stopped or finished write run and is claimed once.
+**Not done:** hardware identical-write passes, a proven BROM route, and the router-safety-auditor's review of the entry
+command. No device I/O has been run through it.
 
 ## Step 1: `rootfs_a` write session (tool to build: #99)
 
@@ -96,9 +102,11 @@ Identical-write hardware pass on the original `misc` before any changed write. `
   **`misc` first, then `rootfs_a`**.
 - After a fallback, `misc` restore tolerates `rootfs_a` being the candidate, the original, or a copy of B (stock
   repair), and nothing else; every other guard must still match exactly.
-- The first A boot is **kernel-log only**: no getty, key-only SSH, failsafe removed, and a switch-init failure only
-  leaves `/tmp/x28-switch.failed`. Treat management access as unproven until it works. Whether to add a safer
-  access path first (for example a UART shell) is an open decision for the owner.
+- The first A boot has a **UART shell** (#104): `ttyS0::askfirst:/bin/ash --login` at 921600 8N1, press Enter on
+  the proven shifted-TX/RX setup. It needs the board's UART pads (physical access), root's password stays locked and
+  SSH stays key-only. It is the way in if switch/network init fails, since failsafe is removed and there is no getty.
+  Unverified on hardware: that procd creates `/dev/ttyS0` (stock does the same with `getty -L ttyS0`) and that
+  the prompt appears. If it does not, the boot is kernel-log only and the three-try fallback is the exit.
 
 ## Gates before the first write (all must be true)
 
