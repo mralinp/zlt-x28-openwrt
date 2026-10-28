@@ -113,14 +113,12 @@ Identical-write hardware pass on the original `misc` before any changed write. `
 1. #86, #87, #89 merged; #88, #91, #92 merged; the new tools (#99, #100) merged with host tests and a
    hardware identical-write pass each.
 2. Router-safety-auditor sign-off on this plan and both tools.
-3. `rootfs_a` and `misc` originals re-hashed against the backup. A copy on separate physical storage was
-   **waived by the owner (2026-10-29)**: the unit costs far less than the laptop that holds the backup, so a lost
-   laptop is the larger loss either way. The entry command still needs a second *file* with the identical hash
-   (`--backup-copy`), and the typed phrase carries `SAME-DISK`. Consequence, accepted: if the laptop disk is lost,
-   no recovery from the archive exists.
+3. `rootfs_a` and `misc` originals re-hashed against the backup, and **a verified second copy on separate
+   physical storage** (done 2026-10-29: a USB drive, SHA-256 `84ad2ad8...` identical to
+   `ARCHIVE.sha256`; pass it as `--backup-copy`, so no `SAME-DISK` token is needed while it sits on that drive).
 4. UART capture running; read-only preflight shows B selected, no pending FOTA/slot operation.
 5. The attested entry command exists (pins the build-manifest hash, receipts, UART log, typed confirmation).
-6. A BROM/DA route is **proven** on a controlled non-boot state (the auditor's finding: all DA work so far ran on
+6. The recovery route is **proven** as set out in [recovery-route-proof](recovery-route-proof.md) (the auditor's finding: all DA work so far ran on
    a booted stock-B unit), and a 64 MiB identical `rootfs_a` rehearsal has passed.
 7. `zmtk_boot_done` on B has been re-read read-only for the fallback behavior, and the owner has decided whether
    B's `ab_image_sync` must be blocked.
