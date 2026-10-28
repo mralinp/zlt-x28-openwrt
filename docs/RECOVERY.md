@@ -10,6 +10,8 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 The proposed first experiment targets `rootfs_sig_a` to avoid deliberately writing LK; see the
 [exact first-write review plan](research/first-write-plan.md) (#57), which requires the hardened tool
 from PR #56. Existing LK commands are examples, not execution approval. The plan has unresolved gates.
+The [read-only rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) now
+passes for the target and all five guards (101 MiB); no write or changed-data restore was tested.
 
 | Step | Script | Result |
 |---|---|---|

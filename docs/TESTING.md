@@ -34,6 +34,7 @@ Conventions:
 | 17 | 23.05 userspace runs on the X28 (RAM chroot, stock 4.19) | 2026-10-23 | ✅ 10/10: musl, uci, iptables-legacy, fw3 print, ubus/rpcd, LuCI; router state unchanged | this page |
 | 18 | Rootfs signed metadata and active content match (#40) | 2026-10-28 | ✅ offline RSA-PSS checks and read-only live SquashFS hash agree; failure enforcement remains unresolved | [Evidence and test gate](research/rootfs-signed-content.md) |
 | 19 | Offline restore guardrails and backup recheck (#4) | 2026-10-28 | ✅ 24 synthetic tests; all 51 raw/gzip/archive members reverified; physical restore remains untested | [Recovery preflight](RECOVERY.md#offline-recovery-preflight-2026-10-28-4) |
+| 20 | Read-only USB target and first-write guards (#57) | 2026-10-28 | ✅ 6/6 exact-size, acknowledged reads match backup; 101 MiB; no flash write | [Read rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) |
 
 Nothing has been **written** to the device's flash by this project, and no native image has booted yet.
 
