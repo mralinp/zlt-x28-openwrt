@@ -521,3 +521,7 @@ session verified the target and all five guards; stock slot B then booted succes
 [execution evidence and remaining gate](research/first-write-plan.md#observed-execution-2026-10-28-57--60).
 The installer removes the extra ACK; its offline regression passes, but the patched path is not
 hardware-tested. Changed-data restoration remains unproven.
+
+The next [changed-data restore proposal](research/changed-data-restore-plan.md) is offline only.
+It requires patched same-session validation, bounded restore tooling and independent review before
+any changed bytes are written.
