@@ -37,6 +37,27 @@ def save(run, receipt):
     path.replace(run / 'receipt.json')
 
 
+def host_identity():
+    """Pinned mtkclient source plus reviewed patches == the installed XML library; returns that text."""
+    src = MTK_HOME / 'src'
+    head = subprocess.check_output(['git', '-C', str(src), 'rev-parse', 'HEAD'], text=True).strip()
+    if head != MTKCLIENT_COMMIT:
+        raise ValueError('mtkclient checkout is not pinned')
+    expected = subprocess.check_output(['git', '-C', str(src), 'show', f'{head}:{XML}'], text=True)
+    for rel, old, new, required in PATCHES:
+        if rel != XML.removeprefix('mtkclient/'):
+            raise ValueError('unreviewed installer patch file')
+        if expected.count(old) != 1:
+            if required:
+                raise ValueError('pinned source patch target changed')
+            continue
+        expected = expected.replace(old, new)
+    installed = list((MTK_HOME / 'venv').glob('lib/python*/site-packages/' + XML))
+    if len(installed) != 1 or installed[0].read_text() != expected:
+        raise ValueError('installed XML library is not exactly pinned source plus reviewed patches; run setup_mtkclient.py')
+    return expected
+
+
 def local_inputs(backup, loader):
     table = backup_table(backup)
     layout = [{k: p[k] for k in ('index', 'name', 'size', 'erase_size', 'offset')} for p in table]
@@ -54,22 +75,7 @@ def local_inputs(backup, loader):
         p = by_name[name]
         if (p['offset'], p['size'], p['sha256']) != (addr, size, sha):
             raise ValueError('guard identity mismatch: ' + name)
-    src = MTK_HOME / 'src'
-    head = subprocess.check_output(['git', '-C', str(src), 'rev-parse', 'HEAD'], text=True).strip()
-    if head != MTKCLIENT_COMMIT:
-        raise ValueError('mtkclient checkout is not pinned')
-    expected = subprocess.check_output(['git', '-C', str(src), 'show', f'{head}:{XML}'], text=True)
-    for rel, old, new, required in PATCHES:
-        if rel != XML.removeprefix('mtkclient/'):
-            raise ValueError('unreviewed installer patch file')
-        if expected.count(old) != 1:
-            if required:
-                raise ValueError('pinned source patch target changed')
-            continue
-        expected = expected.replace(old, new)
-    installed = list((MTK_HOME / 'venv').glob('lib/python*/site-packages/' + XML))
-    if len(installed) != 1 or installed[0].read_text() != expected:
-        raise ValueError('installed XML library is not exactly pinned source plus reviewed patches; run setup_mtkclient.py')
+    expected = host_identity()
     tools = b''.join(Path(__file__).with_name(name).read_bytes() for name in
                      ('restore_entry.py', 'changed_restore.py', 'common.py', 'read_by_name.py', 'write_verify.py', 'setup_mtkclient.py'))
     identity = {'source': engine.ORIGINAL, 'da': DA_HASH, 'host': digest(expected.encode()),
