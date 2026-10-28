@@ -3,14 +3,15 @@
 How to back up the X28's NAND and reach it over USB when Linux no longer boots.
 Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 
-> **Status, 2026-10-28:** full backup verified; USB reads work. The approved patched
-> identical-byte rewrite of inactive `rootfs_sig_a` passed all twelve same-session target/guard
-> reads and returned to stock B. **Changed-data restoration remains unproven.** Do not flash
-> experimental firmware until that separate recovery test has passed.
+> **Status, 2026-10-29:** USB reads and the bounded changed-page restore test pass. In inactive
+> `rootfs_sig_a`, one 4 KiB pattern page was verified, then the original restored byte-for-byte;
+> all eighteen target/guard reads and stock-B return passed. This is a tested narrow recovery path,
+> not universal rollback or approval to flash experimental firmware.
 
-See the [#70 hardware result](research/patched-identical-write-result.md), the
-[first-write history](research/first-write-plan.md) and the separately gated
-[changed-data restore proposal](research/changed-data-restore-plan.md). Existing LK commands
+See the [#72 changed-page result](research/changed-page-restore-result.md),
+[#70 identical-write result](research/patched-identical-write-result.md),
+[first-write history](research/first-write-plan.md) and
+[historical changed-data plan](research/changed-data-restore-plan.md). Existing LK commands
 are examples, not execution approval; use this unit's own backups only.
 
 | Step | Script | Result |
@@ -22,7 +23,7 @@ are examples, not execution approval; use this unit's own backups only.
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
 | 6. Read a partition over USB, compare hash | `read_verify.py lk_b` | ✅ **MATCH** (`0ad94f06…7007156`) with the Quectel DA |
 | 6b. Read every partition over USB, compare | `read_all.py` | ✅ all 51 read: **44 MATCH**, 7 DIFF, all in partitions written at runtime |
-| 7. Restore a partition over USB | `restore_entry.py` | ⏸️ identical-mode hardware PASS; changed-data restoration pending |
+| 7. Restore a partition over USB | `restore_entry.py` | ✅ bounded changed-page test + original restore + stock-B return; broader recovery limits remain |
 
 ## Safety rules
 
@@ -201,8 +202,9 @@ before proposing another operation. A matching readback alone is not general rec
 
 The original `write_verify.py` remains an identical-only checker: it accepts allowed inactive-A
 partitions only after B/full-layout confirmation and backup/guard matches. It refuses a changed target.
-The new bounded engine can accept only the one exact staged candidate for restore-only mode; that
-operation is host-tested but still not hardware-proven. No generic damaged-target override exists.
+The bounded engine now passed the [full changed-page test and restore sequence](research/changed-page-restore-result.md).
+Its separate failed-run restore-only entry accepts just the one exact candidate and remains
+host-tested only. No generic damaged-target override exists.
 
 The initial 2026-10-22 safety audit refused execution on the only unit without UART or a spare.
 UART was subsequently established and the user approved exact identical writes with the disclosed
@@ -499,11 +501,11 @@ plan and your OK). Every partition already reads back correctly over USB (`read_
 
 ## Open questions
 
-- Changed-data restoration on recoverable hardware; USB reads and the scoped identical rewrite now pass.
+- Recovery after arbitrary corruption or interruption; the scoped one-page change/restore and USB reads now pass.
 - Entering BROM if the preloader itself is damaged (key combination or test point).
 - How OOB/YAFFS2 metadata and bad blocks must be handled on restore (the backup has no OOB).
-- UART access (#2): confirm the candidate footprint and its logic level (see [UART](#uart-debug-console-2-in-progress)),
-  and the A/B rollback rules (#3).
+- Exact UART pad mapping/shifter part for reproducibility; shifted RX is already confirmed
+  ([UART](#uart-debug-console-2-read-side-confirmed)). A/B reset-time rollback policy remains unresolved (#3).
 
 ### First identical rewrite and host protocol fix (2026-10-28)
 
@@ -513,8 +515,9 @@ session verified the target and all five guards; stock slot B then booted succes
 [execution evidence and remaining gate](research/first-write-plan.md#observed-execution-2026-10-28-57--60).
 The installer removes the extra ACK. The later [patched hardware test (#70)](research/patched-identical-write-result.md)
 completed one identical rewrite, all twelve target/guard reads in the same session, and a verified
-stock-B return. Changed-data restoration remains unproven.
+stock-B return. At that stage changed-data restoration was still unproven;
+the later [#72 result](research/changed-page-restore-result.md) now establishes the narrow page restore.
 
-The next [changed-data restore proposal](research/changed-data-restore-plan.md) is offline only.
-Patched same-session validation has passed; the bounded tooling is host-tested. Fresh execution
-gates, safety review and separate approval still apply before any changed bytes are written.
+The [changed-data plan](research/changed-data-restore-plan.md) was subsequently executed under
+separate approval in #72. Future device operations still require fresh gates, safety review and
+exact-scope approval. The test did not boot changed certificates or a custom rootfs.

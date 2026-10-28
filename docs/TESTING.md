@@ -21,7 +21,7 @@ Conventions:
 | 4 | Download agents for flash access | 2026-10-21/22 | ✅ only mtkclient `7cb40e7` + Quectel `DA_BR.bin` reads | [RECOVERY](RECOVERY.md) |
 | 5 | USB read of `lk_b` vs backup | 2026-10-22 | ✅ byte-identical | [RECOVERY](RECOVERY.md) |
 | 6 | USB read of all 51 partitions, twice | 2026-10-22 | ✅ 44 match, 7 differ (all runtime-written) | [RECOVERY](RECOVERY.md) |
-| 7 | Restore one inactive-slot partition | 2026-10-28 | ⏸️ identical rewrite verified; changed-data restoration still pending | [Patched write result](research/patched-identical-write-result.md) |
+| 7 | Restore one inactive-slot partition | 2026-10-29 | ✅ exact changed-padding page restored; arbitrary recovery remains unproven | [Changed-page restore result](research/changed-page-restore-result.md) |
 | 8 | Kernel config and module inventory | 2026-10-23 | ✅ config recovered; no `nf_tables`, no DSA | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
 | 9 | Runtime dependency map | 2026-10-23 | ✅ modem 4 vendor pkgs, cellular ~11, Wi-Fi tied to Tozed apps | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
 | 10 | fw3 fit on the stock kernel | 2026-10-23 | ✅ fits; gaps: `ip6table_raw`, `xt_hashlimit`, flow offload | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
@@ -33,11 +33,12 @@ Conventions:
 | 16 | 23.05 userspace boots and works (QEMU) | 2026-10-23 | ✅ 12/12: procd, netifd, fw3 ruleset, ubus, LuCI | this page |
 | 17 | 23.05 userspace runs on the X28 (RAM chroot, stock 4.19) | 2026-10-23 | ✅ 10/10: musl, uci, iptables-legacy, fw3 print, ubus/rpcd, LuCI; router state unchanged | this page |
 | 18 | Rootfs signed metadata and active content match (#40) | 2026-10-28 | ✅ offline RSA-PSS checks and read-only live SquashFS hash agree; failure enforcement remains unresolved | [Evidence and test gate](research/rootfs-signed-content.md) |
-| 19 | Offline restore guardrails and backup recheck (#4) | 2026-10-28 | ✅ 24 synthetic tests; all 51 raw/gzip/archive members reverified; physical restore remains untested | [Recovery preflight](RECOVERY.md#offline-recovery-preflight-2026-10-28-4) |
+| 19 | Offline restore guardrails and backup recheck (#4) | 2026-10-28 | ✅ 24 synthetic tests; all 51 raw/gzip/archive members reverified; hardware follow-up is test 22 below | [Recovery preflight](RECOVERY.md#offline-recovery-preflight-2026-10-28-4) |
 | 20 | Read-only USB target and first-write guards (#57) | 2026-10-28 | ✅ 6/6 exact-size, acknowledged reads match backup; 101 MiB; no flash write | [Read rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) |
 | 21 | Patched identical-byte USB rewrite (#70) | 2026-10-28 | ✅ one acknowledged write; 12/12 same-session target/guard reads match; verified stock-B return | [Result and limits](research/patched-identical-write-result.md) |
+| 22 | Changed-page USB restore (#72) | 2026-10-29 | ✅ candidate then original; 18/18 exact reads match; verified stock-B return | [Result and limits](research/changed-page-restore-result.md) |
 
-Inactive `rootfs_sig_a` has been rewritten with its original bytes. Changed-data restoration and a native custom-image boot remain untested.
+Inactive `rootfs_sig_a` has passed an exact changed-page-and-restore test. A native custom-image boot remains untested.
 
 ## Lab setup
 
@@ -119,17 +120,17 @@ Inactive `rootfs_sig_a` has been rewritten with its original bytes. Changed-data
   across reboots.
 - **Lesson**: restore only static partitions; NV partitions only as a last resort (they change between boots).
 
-## 7. Restore an inactive-slot partition (partially established)
+## 7. Restore an inactive-slot partition (bounded hardware PASS)
 
-- The initial 2026-10-22 audit refused hardware writes without UART or a spare. UART RX capture was
-  subsequently established, and the user separately approved exact identical-byte tests with the
-  disclosed same-Mac backup limitation.
-- The earlier original-byte write needed a fresh read-only session after a host ACK bug. Following
-  its fix, the #70 test completed one identical rewrite with all six pre/post checks in the same
-  session and a verified normal stock-B return. See the [result](research/patched-identical-write-result.md).
-- This is not changed-data restoration or general recovery. The bounded engine and guarded entry
-  command are host-tested; their [changed-data operation](research/changed-data-restore-plan.md)
-  remains separately gated. No slot-A/custom-image boot or damaged-preloader recovery is proven.
+- The [#70 identical rewrite](research/patched-identical-write-result.md) passed one write,
+  twelve same-session target/guard reads and a verified stock-B return.
+- The separately approved [#72 changed-page test](research/changed-page-restore-result.md) programmed
+  exactly one 4 KiB padding page in inactive `rootfs_sig_a`, verified it and every guard, restored the
+  original, and verified all six again. Two acknowledged writes, eighteen exact matching reads,
+  independent byte comparisons and UART/SSH-confirmed B return passed.
+- This proves the narrow tested restore. Arbitrary damaged-target recovery, failed-run restore-only
+  re-entry, OOB/bad blocks, damaged-preloader recovery and slot-A/custom-image boot remain unproven.
+  Same-Mac backup protection was explicitly disclosed and accepted for these scoped tests.
 
 ## 8. Kernel config and module inventory
 
