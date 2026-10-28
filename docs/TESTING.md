@@ -21,7 +21,7 @@ Conventions:
 | 4 | Download agents for flash access | 2026-10-21/22 | ✅ only mtkclient `7cb40e7` + Quectel `DA_BR.bin` reads | [RECOVERY](RECOVERY.md) |
 | 5 | USB read of `lk_b` vs backup | 2026-10-22 | ✅ byte-identical | [RECOVERY](RECOVERY.md) |
 | 6 | USB read of all 51 partitions, twice | 2026-10-22 | ✅ 44 match, 7 differ (all runtime-written) | [RECOVERY](RECOVERY.md) |
-| 7 | Restore one inactive-slot partition | — | ⏸️ not run (safety audit: NO-GO until UART or a spare unit) | [RECOVERY](RECOVERY.md) |
+| 7 | Restore one inactive-slot partition | 2026-10-28 | ⏸️ identical rewrite verified; changed-data restoration still pending | [Patched write result](research/patched-identical-write-result.md) |
 | 8 | Kernel config and module inventory | 2026-10-23 | ✅ config recovered; no `nf_tables`, no DSA | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
 | 9 | Runtime dependency map | 2026-10-23 | ✅ modem 4 vendor pkgs, cellular ~11, Wi-Fi tied to Tozed apps | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
 | 10 | fw3 fit on the stock kernel | 2026-10-23 | ✅ fits; gaps: `ip6table_raw`, `xt_hashlimit`, flow offload | [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md) |
@@ -29,14 +29,15 @@ Conventions:
 | 12 | Userspace build (CI and local) | 2026-10-23 | ✅ 177 packages, 4.7 MB, no firewall4/nftables | [BUILD](BUILD.md) |
 | 13 | Automatic release | 2026-10-23 | ✅ `v0.1.0` pre-release with verified assets | [WORKFLOW](WORKFLOW.md) |
 | 14 | musl link test of the vendor stack on `v0.1.0` | 2026-10-23 | ✅ 10/10 binaries resolve | this page |
-| 15 | UART console | — | 🚧 candidate pads found, unconfirmed | [RECOVERY](RECOVERY.md#uart-debug-console-2-in-progress) |
+| 15 | UART console | 2026-10-28 | ✅ shifted RX capture at 921600; boot and recovery logs recorded | [RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed) |
 | 16 | 23.05 userspace boots and works (QEMU) | 2026-10-23 | ✅ 12/12: procd, netifd, fw3 ruleset, ubus, LuCI | this page |
 | 17 | 23.05 userspace runs on the X28 (RAM chroot, stock 4.19) | 2026-10-23 | ✅ 10/10: musl, uci, iptables-legacy, fw3 print, ubus/rpcd, LuCI; router state unchanged | this page |
 | 18 | Rootfs signed metadata and active content match (#40) | 2026-10-28 | ✅ offline RSA-PSS checks and read-only live SquashFS hash agree; failure enforcement remains unresolved | [Evidence and test gate](research/rootfs-signed-content.md) |
 | 19 | Offline restore guardrails and backup recheck (#4) | 2026-10-28 | ✅ 24 synthetic tests; all 51 raw/gzip/archive members reverified; physical restore remains untested | [Recovery preflight](RECOVERY.md#offline-recovery-preflight-2026-10-28-4) |
 | 20 | Read-only USB target and first-write guards (#57) | 2026-10-28 | ✅ 6/6 exact-size, acknowledged reads match backup; 101 MiB; no flash write | [Read rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) |
+| 21 | Patched identical-byte USB rewrite (#70) | 2026-10-28 | ✅ one acknowledged write; 12/12 same-session target/guard reads match; verified stock-B return | [Result and limits](research/patched-identical-write-result.md) |
 
-Nothing has been **written** to the device's flash by this project, and no native image has booted yet.
+Inactive `rootfs_sig_a` has been rewritten with its original bytes. Changed-data restoration and a native custom-image boot remain untested.
 
 ## Lab setup
 
@@ -118,16 +119,17 @@ Nothing has been **written** to the device's flash by this project, and no nativ
   across reboots.
 - **Lesson**: restore only static partitions; NV partitions only as a last resort (they change between boots).
 
-## 7. Restore an inactive-slot partition (not run)
+## 7. Restore an inactive-slot partition (partially established)
 
-- **Script ready**: `python3 tools/recovery/write_verify.py lk_a` (dry run by default). It accepts only `*_a`
-  partitions while the router reports `bootslot=b`, reads guard partitions (neighbours, slot-B twin, `misc`,
-  `boot_para`) before and after, and stops on any change.
-- **Safety audit** (`router-safety-auditor`, 2026-10-22): **NO-GO on the only unit**. Writing back
-  identical bytes cannot prove the DA erases before programming, and there is no recovery yet if slot A
-  breaks and the unit ever falls back to it.
-- **Plan**: on a spare unit, write different content and restore it; then, with UART attached, the
-  identical-bytes test on this unit.
+- The initial 2026-10-22 audit refused hardware writes without UART or a spare. UART RX capture was
+  subsequently established, and the user separately approved exact identical-byte tests with the
+  disclosed same-Mac backup limitation.
+- The earlier original-byte write needed a fresh read-only session after a host ACK bug. Following
+  its fix, the #70 test completed one identical rewrite with all six pre/post checks in the same
+  session and a verified normal stock-B return. See the [result](research/patched-identical-write-result.md).
+- This is not changed-data restoration or general recovery. The bounded engine and guarded entry
+  command are host-tested; their [changed-data operation](research/changed-data-restore-plan.md)
+  remains separately gated. No slot-A/custom-image boot or damaged-preloader recovery is proven.
 
 ## 8. Kernel config and module inventory
 
@@ -192,9 +194,10 @@ All in [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md), each with its reproduce comm
 
 ## 15. UART
 
-See [RECOVERY: UART](RECOVERY.md#uart-debug-console-2-in-progress). Candidate 3-hole footprint on the
-back side (none of the holes is ground); logic level unknown (1.8 V reported for a similar board). Waiting on a
-level shifter. **Do not wire a 3.3 V adapter's TX directly.**
+See [RECOVERY: UART](RECOVERY.md#uart-debug-console-2-read-side-confirmed). Shifted RX capture is
+confirmed at **921600 8N1**: board TX at 1.8 V through the 1.8-to-3.3 V shifter to adapter RX,
+with common GND. The #70 run recorded preloader, DA and the verified stock-B return without
+transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's TX directly.**
 
 ## 16. The 23.05 userspace boots and works (QEMU)
 
