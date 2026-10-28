@@ -185,7 +185,7 @@ To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`
 python3 tools/recovery/read_by_name.py lk_b
 ```
 
-### 7. Restore one inactive-slot partition (not run yet)
+### 7. Identical rewrite of one inactive-slot partition (not run yet)
 
 ```bash
 python3 tools/recovery/write_verify.py lk_a            # dry run: plan, live slot check, guards
@@ -196,7 +196,9 @@ The only script that writes flash. It accepts only `*_a` partitions (with a deny
 while the router reports `bootslot=b`. The source is always the verified backup image. In one
 session it reads the target plus **guard partitions** (its neighbours, its slot-B twin, `misc`,
 `boot_para`), which must all match the backup. It then writes and reads everything back. A
-changed guard stops it immediately. Afterwards, confirm without the DA:
+changed guard stops it immediately. This tool deliberately refuses a target that already differs from
+the backup, so it is an **identical rewrite check**, not yet a general damaged-partition restore tool.
+After a fully verified result and an approved normal boot, confirm without the DA:
 `ssh router 'cat /proc/cmdline; sha256sum /dev/mtd25'`.
 
 **Safety audit (`router-safety-auditor`, 2026-10-22): NO-GO on the only unit for now.**
@@ -209,6 +211,39 @@ changed guard stops it immediately. Afterwards, confirm without the DA:
 Plan: on a **spare X28**, first write *different* content to a slot-A partition and restore it
 (this proves erase and restore). Only then run the identical-bytes test on this unit, with UART
 attached. Units ship different firmware builds, so each unit restores only from its own backup.
+
+### Offline recovery preflight (2026-10-28, #4)
+
+No router or USB access was used for this test pass. The user has a separate phone internet connection
+and accepts replacing the unit if damaged; this reduces the consequence of an outage, not the probability
+of NAND corruption. No flash or reboot approval is implied.
+
+- Rechecked all **51 raw images** (1,072,168,960 bytes) against their recorded sizes/SHA-256.
+- Rechecked all **51 preserved gzip captures**, including compressed hashes and decompressed contents.
+- Rechecked the complete archive hash and all **51 archived compressed members**. All passed; original
+  backup files were read without overwriting them. This is integrity evidence, not restore proof.
+- `python3 tools/recovery/test_write_verify.py`: **24 host-only tests passed**. Synthetic files and a fake
+  download agent exercise the CLI without SSH, USB, firmware imports, private dumps, or vendor binaries.
+  A mutation removing the write-acknowledgement requirement made its regression test fail as expected.
+- Backup-preparation, firmware-inventory, and recovery-common self-checks also passed.
+
+The restore planner now requires a successful, key-only SSH result with exactly one slot value and a
+full `/proc/mtd` layout matching the backup before USB entry. Both neighbours, the slot twin, `misc`,
+and `boot_para` are mandatory. Sources use absolute paths and are hashed again immediately before the
+write. A write requires an existing loader file; tests do not establish the loader's hardware behavior.
+Hardware imports occur only after preflight; dry-run needs no mtkclient environment.
+
+Each file-backed read must report success, have exactly the expected length, and match SHA-256.
+A failed write acknowledgement can never become success merely because the old bytes still match.
+There is **one write attempt**; no automatic retry. Every invocation retains its own host-side probe
+directory. Unverified results do not recommend a normal reboot. CI runs the synthetic tests.
+
+**Still not tested:** actual erase/program behavior, changed-data restoration, power interruption,
+bad-block/OOB handling on writes, rollback after a failed boot, and automatic slot synchronization.
+The local source is revalidated just before use, but the vendor writer still opens it separately:
+keep the backup immutable while a session runs. Do not treat software tests as a hardware safety guarantee.
+The next device action requires an exact target/operation, UART capture, approved recovery procedure,
+and explicit permission; this offline pass authorizes none of those actions.
 
 ## UART (debug console, #2): read side confirmed
 
