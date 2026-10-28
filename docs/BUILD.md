@@ -70,5 +70,61 @@ drill is proposed. Next is case-sensitive local assembly with selected vendor fi
 network/key-only access and overlay policy, and removal of the effective stock cross-slot clone path.
 The stock certificate describes the original SquashFS; changed-content enforcement remains unresolved.
 Exact slot selection/reversal and an image-specific deployment operation need review before first-A use.
-No existing build output is approved to flash. The local Docker daemon was unavailable during this
-audit; no assembly or device operation was performed.
+No existing build output is approved to flash. The local Docker daemon was unavailable during the audit; no assembly or device operation was
+performed then. The later private staging result below is still not a bootable image.
+
+## Private staging archive (#76)
+
+`tools/build/stage_native.py` now creates the first **non-flashable** assembled archive. It works
+archive-to-archive, preserving case without extracting onto macOS. Run locally with this unit's
+verified inputs; do not upload proprietary inputs/outputs into CI:
+
+```sh
+python3 tools/build/stage_native.py \
+  --stock private/firmware/20261021/rootfs-b-system.tar.gz \
+  --modern private/build/out/openwrt-23.05.5-armsr-armv8-generic-rootfs.tar.gz \
+  --ipk private/third-party/openwrt-23.05.5/dl/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk \
+        private/third-party/openwrt-23.05.5/dl/libstdcpp6_12.3.0-4_aarch64_generic.ipk \
+  --output private/build/native-stage-NEW
+```
+
+Output must not exist. `NOT-FLASHABLE`, `manifest.json` and `rootfs-staging.tar.gz` record the result;
+`INCOMPLETE` remains if output creation fails. Input hashes describe the exact bytes parsed. The tool
+does not authenticate arbitrary input archives: verify originals/build/package checksums beforehand.
+It is a local staging tool, with no SSH, USB or flash entry. Outputs contain proprietary code and must
+stay under `private/`. The gzip archive is not a UBI image; its byte hash can vary between builds due
+to gzip timestamps. The manifest records content provenance, not a claim of bit-reproducible packaging.
+
+The tool preserves modern core files, replaces module/autoload files and kernel/kmod package records
+with stock 4.19.205 equivalents, and adds the ten previously link-tested vendor binaries with their
+missing ELF library dependencies. Modern libraries are reused by exact requested filename, retaining
+the established four older compatibility libraries where names differ. Stock library symlink chains
+are preserved. Existing conflicting extra-package files, selected vendor roots, unsafe member paths,
+duplicate normalized names, link escapes and merged descendants below non-directories are refused.
+Absolute rootfs symlinks remain root-relative links; the tool never follows them into the host.
+
+No stock init scripts or enable links are imported. All `lib/upgrade/*` paths and any
+`zmtk_boot_done` path are removed from staging, including generic upgrade helpers; normal sysupgrade
+is deliberately unavailable. Kernel package scripts are stored as metadata, never executed. This
+removal is not a whole-program proof that no remaining binary can write flash. A future effective
+boot tree, overlays and activation paths still require review.
+
+### Observed staging result (2026-10-29)
+
+Private output `private/build/native-stage-76-final/` contains 146 matching stock modules and 24
+vendor-closure entries. Its archive SHA-256 is
+`58ef3b127f3aa766b63f9d840fcf1d713f2383ab5c294a4ccf88aa719c4ad890`.
+Nine synthetic tests pass on Python 3.9 and 3.14, including merged-link/path conflicts and selected-root
+symlink terminal collisions. CI runs these using synthetic archives only. The actual output was
+extracted in an isolated, network-disabled temporary Linux filesystem: all manifest file hashes and
+links matched; `xt_DSCP.ko` and `xt_dscp.ko` survived distinctly; no 5.15 modules or upgrade helpers
+remained. Musl `--list` resolved all ten vendor roots and their relocations without executing their
+entry points. No router access, firmware service, package hook or device operation was used.
+
+**Remaining integration:** data-only extra-IPK extraction has not installed their control/status
+records or executed maintainer scripts; vendor binaries likewise need reviewed package ownership.
+Stock module records are transplanted, not evidence that all dependent firmware/config files are
+present. Initial modem/mount/network/Wi-Fi activation, device-node/xattr policy, key-only management
+access, fresh overlay policy, UBI packaging, signed-content handling and slot selection are unfinished.
+The stage has no operational boot guarantee and must not be flashed or booted. Next work integrates
+and validates those actual boot-tree requirements before producing a candidate image.
