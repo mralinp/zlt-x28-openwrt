@@ -90,3 +90,23 @@ boot, signature/content enforcement, fallback after failed verification, or prel
 This plan has only received manual offline review. Independent safety review was unavailable when
 #61 was prepared and must be obtained before hardware execution. No runnable write command is supplied
 until the scoped tool and its failure checks exist.
+
+## Offline engine implementation (#64)
+
+`tools/recovery/changed_restore.py` implements the bounded session sequence, with no CLI or hardware
+imports. `test` accepts only the original target, stages the exact candidate once, verifies all six
+partitions, restores the original once and verifies all six again. `restore` accepts only the exact
+staged target and original guards before its single original-image write. Every source identity,
+acknowledgement, length and hash is checked. Any exception or mismatch stops; there is no retry,
+connection close, automatic reboot, or slot switch. The caller retains recovery state for review.
+
+Each invocation creates a private run directory with separate readbacks, source snapshots and a
+flushed journal recording attempted writes before USB calls. A journal is evidence, not a resumable
+approval token. Sources and captures must remain under ignored private storage when used later.
+Host tests use synthetic data and a fake DA; no vendor SDK or USB dependency is needed in CI.
+
+**Still blocked for hardware execution:** this engine takes an already established DA session.
+There is no reviewed entry point binding this unit's pre-entry slot/layout evidence to that session,
+rechecking selection metadata, validating the DA and installed ACK patch, or enforcing the other
+execution gates above. Do not call it manually on a live DA to bypass those gates. The existing
+identical-only checker is unchanged. The offline engine does not prove recovery on the device.
