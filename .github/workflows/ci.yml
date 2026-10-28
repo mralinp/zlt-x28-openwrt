@@ -39,6 +39,8 @@ jobs:
       - run: python3 tools/recovery/test_restore_entry.py
       - run: python3 tools/recovery/test_slot_session.py
       - run: python3 tools/recovery/test_slot_entry.py
+      - run: python3 tools/recovery/test_slot_blocks.py
+      - run: python3 tools/recovery/test_slot_blocks_entry.py
       - run: python3 tools/build/test_stage_native.py
       - run: python3 tools/build/test_ab_guard.py
       - run: python3 tools/build/test_first_boot.py
