@@ -127,7 +127,10 @@ def integrate(stage,key,stock_path,output):
         put('lib/preinit/00_preinit.conf',config+'\npi_preinit_no_failsafe="y"\n')
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755)
     link=tarfile.TarInfo('etc/rc.d/S18x28-switch');link.type=tarfile.SYMTYPE;link.linkname='../init.d/x28-switch';tree[link.name]=(link,b'')
-    put('etc/inittab','::sysinit:/etc/init.d/rcS S boot\n::shutdown:/etc/init.d/rcS K shutdown\n')
+    # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. Root's password
+    # stays locked; this is the single way in if switch/network init fails, since failsafe is removed.
+    if 'bin/ash' not in tree:raise ValueError('missing /bin/ash for the console shell')
+    put('etc/inittab','::sysinit:/etc/init.d/rcS S boot\n::shutdown:/etc/init.d/rcS K shutdown\nttyS0::askfirst:/bin/ash --login\n')
     put('etc/config/network',f"""config interface 'loopback'
  option device 'lo'
  option proto 'static'
@@ -170,7 +173,7 @@ config interface 'lan'
     report={'flashable':False,'input_stage_sha256':digest(raw),'archive_sha256':digest(archive.read_bytes()),
             'lan_device':LAN,'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
             'removed_paths':removed,'enabled_start_links':sorted(n for n in tree if n.startswith('etc/rc.d/S')),
-            'limits':['No modem/Wi-Fi/shared mounts','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No DHCP/web UI','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
+            'limits':['No modem/Wi-Fi/shared mounts','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No DHCP/web UI','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
     (output/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');(output/'INCOMPLETE').unlink()
     return report
 
