@@ -36,3 +36,4 @@ jobs:
       - run: python3 tools/recovery/test_write_verify.py
       - run: python3 tools/recovery/test_upload_ack.py
       - run: python3 tools/recovery/test_changed_restore.py
+      - run: python3 tools/recovery/test_restore_entry.py
