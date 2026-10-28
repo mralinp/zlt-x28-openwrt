@@ -87,9 +87,20 @@ were not used to infer the first payload's control flow.
 booting**, by assertion/panic and an interrupt-disabled spin. It is neither log-only nor an immediate
 A/B fallback. No SBC flag test, retry counter, slot write, or reboot occurs in the decoded wrapper-to-halt
 path. This establishes behavior on a returned verification error, including cert1 failure; it does not
-prove that every modified rootfs produces such an error. The exact signed content and cryptographic
-callees remain unaudited. An independently running watchdog could subsequently reset the device;
+prove that every modified rootfs produces such an error. The signed content is now identified in the
+[signed-content report](research/rootfs-signed-content.md); the crypto implementation has not received
+a full security audit. An independently running watchdog could subsequently reset the device;
 reset-time slot policy remains unknown. No failure was induced on hardware.
+
+### What the successful check authenticates
+
+**Confirmed by offline signature verification and a read-only live hash:** cert2 authenticates a
+604-byte message containing SHA-256 of exactly 31,274,410 bytes of the stock SquashFS. The live
+`predata + hashvallist + postdata` reconstructs that message, and the active read-only rootfs has
+the matching digest. The four traced LK reads fetch certificates from `rootfs_sig_b`; a rootfs
+payload hash by LK or a later enforcement consumer is still not established.
+See [signed-content evidence and the device-test gate](research/rootfs-signed-content.md) for byte
+ranges, the independent RSA-PSS checks, reproduction, and the recovery prerequisites before failure tests.
 
 ### Kernel/userspace enforcement after handoff
 

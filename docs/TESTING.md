@@ -32,6 +32,7 @@ Conventions:
 | 15 | UART console | — | 🚧 candidate pads found, unconfirmed | [RECOVERY](RECOVERY.md#uart-debug-console-2-in-progress) |
 | 16 | 23.05 userspace boots and works (QEMU) | 2026-10-23 | ✅ 12/12: procd, netifd, fw3 ruleset, ubus, LuCI | this page |
 | 17 | 23.05 userspace runs on the X28 (RAM chroot, stock 4.19) | 2026-10-23 | ✅ 10/10: musl, uci, iptables-legacy, fw3 print, ubus/rpcd, LuCI; router state unchanged | this page |
+| 18 | Rootfs signed metadata and active content match (#40) | 2026-10-28 | ✅ offline RSA-PSS checks and read-only live SquashFS hash agree; failure enforcement remains unresolved | [Evidence and test gate](research/rootfs-signed-content.md) |
 
 Nothing has been **written** to the device's flash by this project, and no native image has booted yet.
 
