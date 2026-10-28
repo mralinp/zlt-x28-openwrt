@@ -134,6 +134,26 @@ outside this inspection. The recorded boot command line selects `/dev/ubiblock0_
 not a device-mapper root ([UART log](research/uart-boot-log.md)); that observation also cannot rule
 out vendor enforcement elsewhere.
 
+**Lower-level callback inspection:** `mtd_read` (`0x740ccc`) loads its read callback from
+object offset `0x90` at `0x740d20`, calls it at `0x740d3c`, and returns through ECC/error handling.
+`allocate_partition` installs `part_read` (`0x74355c`) at `0x743dec–0x743df4` when the parent has
+that callback. `part_read` adds the partition offset, loads the parent's callback at `0x7435a8`,
+and calls it at `0x7435b4`. Separately, vendor `nand_probe` installs `nand_read` (`0x77a0d8`)
+at object offset `0x90` at `0x77b498–0x77b4a0`. These are observed setup assignments, not runtime
+proof that no callback is subsequently replaced.
+
+This vendor `nand_read` calls `nand_operation` at `0x77a12c` with `w6 = 1` (read).
+`nand_operation` selects `nandx_read` (`0x76f6cc`) at `0x779a40–0x779a64` for that argument;
+its three indirect operation calls use that selection. `nandx_read` reaches additional lower-level
+operations, including an indirect call at `0x76f974`; that layer is not resolved here.
+No hash-list verification was identified in these inspected wrapper bodies.
+
+The common `_mcount` entry at `0x1e4a0` loads `ftrace_trace_function` (symbol offset `0x1b8daa0`)
+at `0x1e4a8–0x1e4ac`, skips the callback if it equals `ftrace_stub` (`0x1e4d8`, a `ret`), and otherwise
+calls it at `0x1e4cc`. Thus the instrumentation call is an actual indirect boundary; its runtime
+target cannot be inferred from this static Image. Lower-level callbacks, instrumentation state,
+and other paths remain explicit limits of the negative result.
+
 **Unknown:** whether any kernel or userspace component enforces this metadata through indirect,
 constructed, or otherwise unnamed access. Absence of literal names is not proof of absence of
 verification. No consumer or enforcement path has been established. Consequently custom-rootfs
