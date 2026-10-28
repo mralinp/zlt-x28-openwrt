@@ -201,3 +201,49 @@ of the complete identity/calibration backup outside this machine before acceptin
 A pass records only: one acknowledged identical-byte write, exact target/guard readback, and a normal
 stock-B boot if observed. The separate changed-data erase/restore experiment must then be designed
 and approved; an altered-rootfs boot or a bad-signature boot remains beyond this first test.
+
+## Observed execution (2026-10-28, #57 / #60)
+
+**Partial protocol failure, then verified recovery reads and normal B boot.** The single approved
+identical rewrite of `rootfs_sig_a` received `WRITE-FLASH` success. All six pre-write reads matched.
+The tool then failed its first same-session post-read (`xread: Wrong length`); it exited 1 and
+produced no post-read files. This was not the planned clean `IDENTICAL REWRITE VERIFIED` result.
+No write retry was issued.
+
+The private UART capture shows the requested `NAND-WHOLE` range `0x13500000`, length `0x100000`.
+The DA reports erasing four blocks at `0x13500000`, `0x13540000`, `0x13580000`, `0x135c0000`
+(NAND commands `0x60`/`0xd0`), then programming the first page and skipping the 255 empty pages.
+After `Download_data end.`, it sends END/OK and START, but receives a bare host `OK` as the
+next XML command: `CMD XML(OK) invalid.`, `ERR!UNSUPPORTED`, then
+`REVEIVING END CMD Result ERROR. halt.` (near UART byte 8,262,190).
+This establishes erase/program activity on this run, rather than only a host API acknowledgement.
+
+After reviewing that failure and obtaining separate approval for a fresh read-only DA session,
+the target and all five guards were read again: **six exact-length matches, 105,906,176 bytes**.
+The approved return boot then completed on **slot B**, with UART `ROOTFS_SIG_VFY Success`.
+Read-only SSH confirmed `bootslot=b`, `ubi.mtd=42`, and both `/dev/mtd28` and `/dev/mtd41`
+SHA-256 `1ebb121adfbac5603dca0e65c3b276a315fda1450bdbd573f3c600b5f399d4b6`.
+
+Evidence remains private under `private/usb-probe/20261028/`:
+`first-write-rootfs_sig_a-h6i2qujs/` (host/UART/outcome),
+`restore-rootfs_sig_a-zr_t1yxa/` (pre-reads), and
+`read-verify-after-first-write-xrthz8fh/` (fresh post-reads and result).
+All 51 original raw backups were verified before the write; a second verified archive was made
+on the **same Mac**, not on separate physical storage.
+
+### Host fix and remaining gate
+
+The pinned mtkclient `upload(raw=True)` sends an extra ACK before reading END.
+Its normal END and START handlers already acknowledge both commands. The installer now removes
+only that raw-only ACK; the normal completion acknowledgements remain. An offline scripted peer
+reproduces the original failure and checks that patched raw and normal uploads leave the peer ready
+for the next command. The same check also passed against the actual pinned installed `upload`
+method without importing USB code. The fix has **not** been exercised on hardware.
+
+This proves an identical-byte erase/program followed by matching fresh-session reads and a normal
+stock-B boot. It does **not** prove restoring changed data, booting slot A, bad-block handling,
+recovery after damage to the preloader, or rootfs enforcement. Before any changed-data test,
+review a separately scoped restore operation (including a way to restore a deliberately mismatching
+target, which the current checker rejects), preserve the original, define exact guard reads and stop
+conditions, and obtain approval for that specific device operation. No further flash write is authorized
+by the host fix.
