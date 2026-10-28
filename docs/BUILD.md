@@ -249,3 +249,45 @@ or create a vendor signature. Key login, physical Ethernet/switch initialization
 package ownership, device nodes/xattrs, actual fresh-overlay mount behavior, and slot selection/
 reversal remain unproven. The next step is isolated runtime management validation and first-A boot
 planning. There is no proposal to repeat the completed recovery drill or flash this artifact yet.
+
+## Isolated packaged SSH authentication (#82)
+
+The packaged Dropbear/dbclient pair now passes a runtime authentication test with root's password
+field locked as `!`: a generated authorized Ed25519 key succeeds, a different key fails, and the
+same key fails after the authorization file is emptied. No password is supplied. This settles the
+narrow locked-account/key-authentication concern from #78 for these binaries on the container's
+kernel. It is **not** a native X28 boot, actual management-key test or procd/network-service test.
+
+```sh
+docker run --rm --network none --read-only --cap-drop ALL \
+  --cap-add SYS_CHROOT --cap-add SETUID --cap-add SETGID \
+  --security-opt no-new-privileges --tmpfs /tmp:rw,exec,size=512m \
+  -v "$PWD/tools/build:/tools:ro" \
+  -v "$PWD/private/build/native-ubi-80-reviewed:/candidate:ro" \
+  x28-firmware-tools:ubi python3 /tools/management_auth_test.py /candidate
+```
+
+The check requires Docker root and refuses an active non-loopback interface. Docker may expose
+inactive default tunnel devices; those are allowed, but no interface except `lo` may be up. No
+network-administration capability or host network is provided. The script verifies the candidate
+SquashFS digest/non-flashable marker, extracts only into temporary scratch, parses the actual UCI
+password/root-login/port/LAN settings and checks locked root. The test server uses the equivalent
+`-s -g` authentication flags but overrides binding to `127.0.0.1:2222`; it does **not** start the init
+script, netifd or any vendor daemon. `dbclient -y` trusts only the temporary test server's ephemeral
+host key in this isolated namespace; that is not the policy for accessing the real router.
+
+Client, wrong-client and host keys are generated in the scratch tree and deleted with it. The real
+profile's public key is replaced **only in that temporary tree**; the private candidate is read-only,
+and no user private key/password is accessed or stored. Client stdin is empty and each command has
+a timeout. Every result is asserted, and the server is terminated in a finally block. The only remote
+command is an `echo` marker inside the same scratch root. No firmware/vendor entry point executes.
+
+Observed result against SquashFS digest
+`1934e74fbbea68df203b189da35d21fdcd6f6d3686a638de33beb0c4b5ae5f2d`: **PASS** for authorized key,
+wrong-key rejection, empty-authorization rejection and locked root. The tool emits a sanitized JSON
+summary without keys; generated private keys never leave the temporary container filesystem.
+
+Still unverified: this unit's actual public-key/client combination, full Dropbear UCI service startup,
+procd/overlay boot, physical Ethernet/switch setup, vendor activation, signed-content acceptance and
+slot selection/reversal. The candidate remains **NOT-FLASHABLE**. Next work targets effective first-A
+boot/management behavior and exact slot policy, without another recovery-write rehearsal.
