@@ -105,8 +105,73 @@ flushed journal recording attempted writes before USB calls. A journal is eviden
 approval token. Sources and captures must remain under ignored private storage when used later.
 Host tests use synthetic data and a fake DA; no vendor SDK or USB dependency is needed in CI.
 
-**Still blocked for hardware execution:** this engine takes an already established DA session.
-There is no reviewed entry point binding this unit's pre-entry slot/layout evidence to that session,
-rechecking selection metadata, validating the DA and installed ACK patch, or enforcing the other
-execution gates above. Do not call it manually on a live DA to bypass those gates. The existing
-identical-only checker is unchanged. The offline engine does not prove recovery on the device.
+**Engine-only scope (#64):** this engine takes an already established DA session. The guarded
+entry command below (#66) adds pre-entry slot/layout binding, selection-metadata checks and host/DA
+validation. Do not call the engine manually on a live DA to bypass those gates. The existing
+identical-only checker is unchanged. Offline tests do not prove recovery on the device.
+
+## Guarded entry command (#66)
+
+`tools/recovery/restore_entry.py` supplies `identical`, `test` and `restore` entry modes.
+Default is an **offline dry-run**: it verifies local originals, all 51 backup images, exact full
+layout, DA hash and installed XML implementation, but performs no SSH, hardware import or USB I/O.
+The installed XML file must equal `git show` of the pinned upstream blob plus the reviewed installer
+patches; a dirty checkout or matching version label alone is insufficient. The current private
+installation was detected as unpatched by this preflight; it was not modified during implementation.
+
+After merging and independently reviewing this command, apply the installer host patch and rerun
+all host checks before requesting approval for the next identical write. No fresh device operation
+has been approved or performed by this PR. The following templates are **for review**, not execution:
+
+```sh
+python3 tools/recovery/restore_entry.py identical
+# Later, only with separate approval and the correct private capture/copy paths:
+# private/mtkclient-7cb40e7/venv/bin/python tools/recovery/restore_entry.py identical \
+#   --write --backup-copy /verified/copy/complete-captured-partitions.tar --uart-log /private/live-uart.log
+```
+
+`--write` requires the private venv interpreter (re-exec occurs before hardware import), a verified
+second complete archive, at least 768 MiB free, a nonempty UART log updated within 60 seconds,
+and exact typed confirmation for this mode and target. A hard link to the original archive is refused.
+Same-filesystem copies require the additional `SAME-DISK` confirmation and record the unmet physical
+backup protection; different filesystem IDs also do not by themselves prove separate physical storage.
+The operator must review that storage risk and attest continuous RX capture, stable power and no
+pending stock upgrade/FOTA. A recent log timestamp cannot establish capture wiring or guarantee future
+logging. All these conditions require explicit review before execution, not a blanket unattended run.
+
+Initial `identical` and `test` entry requires fresh key-only SSH confirming B and the entire fixed
+layout before USB entry. A private receipt fingerprints source, DA, installed host library, actual
+local implementation files and this unit's backup `proinfo` hash. It records the canonical run path,
+mode, pre-entry B selection, timestamp, archive-copy condition and journal digest. No password is used.
+After connection, a fresh exact-length/hash DA read of `proinfo` binds the device to that unit; the
+actually imported XML module must match the verified implementation. The engine then reads the target
+and every fixed guard, including `misc` and `boot_para`, before any write. Matching those full metadata
+partitions binds the runtime selection state to the previously reviewed B baseline; it does not predict
+later stock boot or upgrade behavior. Receipts cannot replace those fresh reads.
+
+`identical` writes the original once and requires all six exact same-session post-read matches.
+`test --prior-identical ENTRY_RUN` requires that matching tool/unit/source/DA receipt, successful
+write acknowledgement and the full twelve-read journal, unchanged and no older than 24 hours.
+The test receipt retains the canonical rehearsal run reference for traceability.
+The prior receipt is evidence, not approval of changed-data testing. A separate exact-mode confirmation
+is still required. Test mode retains the two-write maximum from the plan.
+
+`restore --resume FAILED_TEST_ENTRY_RUN` bypasses SSH only for a bound stopped test run whose durable
+journal records exactly one staged-write attempt and no original-write attempt. It still checks all
+local identities, copy/log/space conditions, fresh unit identity, exact current staged bytes and every
+original guard. It atomically creates an exclusive one-use claim in the failed run before connecting, preventing an
+automatic retry with the same receipt. A restore attempt that itself fails, an unknown target, or a
+changed guard requires a separately reviewed recovery action. No generic damaged-target override exists.
+
+**Interruption limit:** SIGKILL, host power loss or a full/broken log filesystem may leave no complete
+terminal receipt/journal. This command intentionally refuses that evidence. It cannot promise recovery
+from every interruption; a separately reviewed action using fresh reads is required. There is no stale
+receipt timeout on stopped-test recovery, but exact current state and new explicit approval remain
+mandatory. This is a local operator workflow, not an authenticated security boundary against someone
+who can edit the code and private receipts.
+
+All readbacks, source snapshots, chip/identity data and receipts stay in ignored `private/usb-probe`.
+The command closes only its host USB handle, never requests DA shutdown or reboot, and says STOP on
+unverified outcomes. Normal B return remains a separately reviewed power cycle after all original and
+guard reads pass, followed by UART and read-only SSH confirmation. Hardware validation of the host
+ACK fix, identical entry and changed-data restore remains outstanding.

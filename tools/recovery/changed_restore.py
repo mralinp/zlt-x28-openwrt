@@ -1,7 +1,7 @@
-"""Bounded #62 session engine, with NO hardware entry point.
+"""Bounded #62 session engine, used by the guarded restore_entry.py command.
 
-Not approved for device use. A future reviewed caller must establish slot/layout,
-DA identity, patched host and execution approval before supplying a DA session.
+Device use requires separate approval and all documented entry gates. The caller
+must establish slot/layout, DA identity and patched host before supplying a session.
 No connect, retry, erase, slot-switch, reboot or generic image/range option exists.
 """
 import hashlib
@@ -25,13 +25,13 @@ GUARDS = (
 
 
 def run_session(da, original, output, *, mode):
-    """Run test (two writes) or restore (one), stopping on the first discrepancy.
+    """Run identical/restore (one write) or test (two), stopping on any discrepancy.
 
     The caller owns/retains the session on failure. Output is a new private run
     directory; its journal is evidence, never authorization to resume automatically.
     """
-    if mode not in ('test', 'restore'):
-        raise ValueError('mode must be test or restore')
+    if mode not in ('test', 'restore', 'identical'):
+        raise ValueError('mode must be identical, test or restore')
     if not isinstance(original, bytes) or len(original) != SIZE or hashlib.sha256(original).hexdigest() != ORIGINAL:
         raise ValueError('original source identity mismatch')
     if original[0x40000:0x41000] != b'\xff' * 4096:
@@ -58,7 +58,7 @@ def run_session(da, original, output, *, mode):
 
         try:
             record(mode=mode, target_offset=ADDRESS, target_length=SIZE)
-            check('before', ORIGINAL if mode == 'test' else STAGED)
+            check('before', STAGED if mode == 'restore' else ORIGINAL)
             steps = [('staged', staged, STAGED), ('original', original, ORIGINAL)] if mode == 'test' else [('original', original, ORIGINAL)]
             for label, data, digest in steps:
                 source = out / f'source-{label}.bin'

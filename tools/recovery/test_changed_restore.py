@@ -51,6 +51,11 @@ class SessionTests(unittest.TestCase):
     def run_session(self, mode='test'):
         return r.run_session(self, self.original, self.out, mode=mode)
 
+    def test_identical_mode_writes_original_once(self):
+        self.run_session('identical')
+        self.assertEqual(self.writes, [(r.ADDRESS, r.SIZE)])
+        self.assertEqual(self.data[r.ADDRESS], self.original)
+
     def test_stage_then_restore_exact_original(self):
         self.run_session()
         self.assertEqual(self.writes, [(r.ADDRESS, r.SIZE)]*2)
