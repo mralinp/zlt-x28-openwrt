@@ -19,9 +19,12 @@ class SessionTests(unittest.TestCase):
         self.original = b'\x11' * 64
         self.candidate = b'\x22' * 64
         self.guard = b'G' * 16
-        self.spec = s.Spec('t', 0x1000, 64, H(self.original),
-                           tuple((f'g{i}', 0x2000 + i * 0x100, 16, H(self.guard)) for i in range(3)),
-                           lambda o, c: None if c != o else (_ for _ in ()).throw(ValueError('same')))
+        guards = tuple((f'g{i}', 0x2000 + i * 0x100, 16, H(self.guard)) for i in range(3))
+        # g2 may legitimately differ after a fallback repair, but only when restoring
+        wide = guards[:2] + (('g2', 0x2200, 16, (H(self.guard), H(b'R' * 16))),)
+        self.spec = s.Spec('t', 0x1000, 64, H(self.original), guards,
+                           lambda o, c: None if c != o else (_ for _ in ()).throw(ValueError('same')),
+                           H(self.candidate), wide)
         self.data = {0x1000: self.original, **{0x2000 + i * 0x100: self.guard for i in range(3)}}
         self.writes = []
         self.fail_write = self.fail_read = self.drift_guard = self.corrupt = self.exception = 0
@@ -45,7 +48,7 @@ class SessionTests(unittest.TestCase):
 
     def run_(self, mode='write', **kw):
         return s.run_session(self, self.spec, kw.get('original', self.original), kw.get('candidate', self.candidate),
-                             kw.get('sha', H(self.candidate)), self.out, mode=mode)
+                             self.out, mode=mode)
 
     def journal(self):
         return [json.loads(l) for p in self.out.glob('*/journal.jsonl') for l in p.read_text().splitlines()]
@@ -64,18 +67,18 @@ class SessionTests(unittest.TestCase):
     def test_restore_works_from_candidate_or_a_half_written_target(self):
         for state in (self.candidate, b'\x33' * 64):
             self.data[0x1000] = state
-            self.run_('restore', candidate=None, sha=None)
+            self.run_('restore', candidate=None)
             self.assertEqual(self.data[0x1000], self.original)
 
     def test_restore_still_stops_on_guard_drift(self):
         self.data[0x1000] = self.candidate
         self.data[0x2100] = b'X' * 16
         with self.assertRaises(ValueError):
-            self.run_('restore', candidate=None, sha=None)
+            self.run_('restore', candidate=None)
         self.assertEqual(self.writes, [])
 
     def test_wrong_inputs_refuse_before_any_io(self):
-        for kw in ({'original': b'\x00' * 64}, {'sha': 'a' * 64}, {'candidate': self.original, 'sha': H(self.original)}):
+        for kw in ({'original': b'\x00' * 64}, {'candidate': b'\x55' * 64}, {'candidate': self.original}):
             with self.assertRaises(ValueError):
                 self.run_('write', **kw)
         with self.assertRaises(ValueError):
@@ -106,6 +109,27 @@ class SessionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_('write')
         self.assertEqual(self.writes, [])
+
+    def test_restore_accepts_a_repaired_guard_but_write_does_not(self):
+        self.data[0x2200] = b'R' * 16
+        with self.assertRaises(ValueError):
+            self.run_('write')
+        self.assertEqual(self.writes, [])
+        self.data[0x1000] = self.candidate
+        self.run_('restore', candidate=None)
+        self.assertEqual(self.data[0x1000], self.original)
+
+    def test_write_intent_is_journaled_and_fsynced_before_the_write(self):
+        order = []
+        real_fsync = s.os.fsync
+        s.os.fsync = lambda fd: (order.append('fsync'), real_fsync(fd))[1]
+        self.addCleanup(setattr, s.os, 'fsync', real_fsync)
+        real_write = self.writeflash
+        self.writeflash = lambda **kw: (order.append('write'), real_write(**kw))[1]
+        self.run_('write')
+        attempt = [e for e in self.journal() if 'write_attempt' in e]
+        self.assertEqual(len(attempt), 1)
+        self.assertEqual(order[order.index('write') - 1], 'fsync')
 
     def test_source_file_is_read_only_and_new_run_dir_each_time(self):
         a = self.run_('identical')
@@ -142,12 +166,44 @@ class SpecTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             s.validate_rootfs_a(b'\xff' * 0x4000000, b'short')
 
-    def test_guards_cover_the_neighbors_and_never_the_target(self):
-        names = {g[0] for g in s.ROOTFS_A.guards}
-        self.assertEqual(names, {'boot_a', 'rootfs_sig_a', 'rootfs_sig_b', 'misc', 'boot_para', 'lk_a', 'tee_a'})
-        misc = s.misc_spec('a' * 64)
-        self.assertIn(('rootfs_a', 0x13600000, 0x4000000, 'a' * 64), misc.guards)
-        self.assertNotIn('misc', {g[0] for g in misc.guards})
+    def specs(self):
+        return s.rootfs_a_spec('a' * 64), s.misc_spec('a' * 64)
+
+    def test_real_specs_guard_both_slots_and_never_the_target(self):
+        every = {'boot_a', 'rootfs_sig_a', 'rootfs_sig_b', 'boot_para', 'lk_a', 'tee_a', 'boot_b', 'rootfs_b', 'lk_b', 'tee_b'}
+        rootfs_a, misc = self.specs()
+        self.assertEqual({g[0] for g in rootfs_a.guards}, every | {'misc'})
+        self.assertEqual({g[0] for g in misc.guards}, every | {'rootfs_a'})
+        for spec in (rootfs_a, misc):
+            self.assertNotIn(spec.name, {g[0] for g in spec.guards})
+            ranges = sorted((g[1], g[1] + g[2]) for g in (*spec.guards, (spec.name, spec.addr, spec.size)))
+            for (a0, a1), (b0, b1) in zip(ranges, ranges[1:]):
+                self.assertLessEqual(a1, b0, 'overlapping ranges')
+
+    def test_hashes_are_pinned_and_a_new_rootfs_a_hash_is_required(self):
+        rootfs_a, misc = self.specs()
+        self.assertEqual((rootfs_a.candidate_sha, misc.candidate_sha), ('a' * 64, s.MISC_A_SHA))
+        for bad in ('short', s.ROOTFS_A_SHA, s.ROOTFS_B_SHA):
+            with self.assertRaises(ValueError):
+                s.rootfs_a_spec(bad)
+            with self.assertRaises(ValueError):
+                s.misc_spec(bad)
+
+    def test_rootfs_a_restore_needs_misc_on_b_but_misc_restore_tolerates_a_repaired_rootfs_a(self):
+        rootfs_a, misc = self.specs()
+        self.assertEqual(dict((g[0], g[3]) for g in rootfs_a.restore_guards)['misc'], s.MISC_SHA)
+        accepted = dict((g[0], g[3]) for g in misc.restore_guards)['rootfs_a']
+        self.assertEqual(set(accepted), {'a' * 64, s.ROOTFS_A_SHA, s.ROOTFS_B_SHA})
+        self.assertEqual(dict((g[0], g[3]) for g in misc.guards)['rootfs_a'], 'a' * 64)
+
+    def test_misc_candidate_hash_matches_the_selection_bytes(self):
+        original = bytearray(b'\xff' * 0x100000)
+        for off in s.MISC_COPIES:
+            original[off:off + 16] = s.MISC_BEFORE
+        for off in s.MISC_COPIES:
+            original[off:off + 16] = s.MISC_AFTER
+        # the real dump's other bytes are 0xff, so this reproduces the pinned hash
+        self.assertEqual(H(bytes(original)), s.MISC_A_SHA)
 
 
 if __name__ == '__main__':

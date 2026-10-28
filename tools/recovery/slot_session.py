@@ -22,8 +22,10 @@ ROOTFS_SIG = '1ebb121adfbac5603dca0e65c3b276a315fda1450bdbd573f3c600b5f399d4b6'
 MISC_SHA = 'd8a5b852d2336a8a39a3a09894797de4cd9e14b84425cc12db8d02e4f8cbc780'
 ROOTFS_A_SHA = '5f0c997ddbc0a8380b4785d58048659f26efff5e7d173825972f3ca45646cc36'
 BOOT_SHA = 'c8cc8244078cb6539c72842540250bc7ca40b8fb9b66123a6bd85a529e47b120'
+ROOTFS_B_SHA = 'c4e3f3d25b3aefca70995c070faa177931a61738b4997acd52a6446daee4cf01'
+MISC_A_SHA = 'cd512c873dd4bf290135989e6da4b4b542e277ea2c01239f331ddccae253a543'  # original with the four-copy A selection
 LK_A = '0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156'
-TEE_A = '11ff271cde406bd47cd4ded010906b900ccf63bcbdd02e450bec678398400b10'
+TEE_A = '11ff271cde406bd47cd4ded010906b900ccf63bcbdd02e450bec678398400b10'  # A and B copies of boot/lk/tee/rootfs_sig are byte-identical
 BOOT_PARA = '11fe64ca9cf44765dc451767b862b5ce4c7759fe38b79fd7949297992e054636'
 
 # Per-copy A-selection edit from docs/research/slot-selection.md; copies sit one 256 KiB erase block apart.
@@ -37,8 +39,10 @@ class Spec(NamedTuple):
     addr: int
     size: int
     original_sha: str
-    guards: tuple          # (name, addr, size, sha256) re-read around every write
+    guards: tuple          # (name, addr, size, sha256 or tuple of accepted sha256) re-read around every write
     validate: Callable     # (original, candidate) -> None, raises ValueError
+    candidate_sha: str     # the only image `write` may put on the target (pinned by whoever builds the spec)
+    restore_guards: tuple  # guards for `restore`: wider, because stock B may have repaired slot A after a fallback
 
 
 def validate_rootfs_a(original, candidate):
@@ -57,27 +61,36 @@ def validate_misc(original, candidate):
         raise ValueError('misc candidate is not exactly the four-copy A selection')
 
 
-ROOTFS_A = Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, (
-    ('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG),
-    ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG), ('misc', 0x700000, 0x100000, MISC_SHA),
-    ('boot_para', 0x8e00000, 0x200000, BOOT_PARA), ('lk_a', 0x11200000, 0x200000, LK_A),
-    ('tee_a', 0x11400000, 0x100000, TEE_A)), validate_rootfs_a)
+B_SIDE = (('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, 0x4000000, ROOTFS_B_SHA),
+          ('lk_b', 0x1d800000, 0x200000, LK_A), ('tee_b', 0x1da00000, 0x100000, TEE_A))
+COMMON = (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG),
+          ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG), ('boot_para', 0x8e00000, 0x200000, BOOT_PARA),
+          ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE)
+
+
+def rootfs_a_spec(candidate_sha):
+    """Write rootfs_a. `restore` is refused unless misc still selects B: restore misc first once A is selected."""
+    if len(candidate_sha) != 64 or candidate_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA):
+        raise ValueError('rootfs_a candidate hash must be a new SHA-256')
+    guards = (*COMMON, ('misc', 0x700000, 0x100000, MISC_SHA))
+    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards)
 
 
 def misc_spec(rootfs_a_sha):
-    """misc runs after rootfs_a holds the approved candidate, whose hash the caller supplies."""
-    return Spec('misc', 0x700000, 0x100000, MISC_SHA, (
-        ('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_a', 0x13600000, 0x4000000, rootfs_a_sha),
-        ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG), ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG),
-        ('boot_para', 0x8e00000, 0x200000, BOOT_PARA), ('lk_a', 0x11200000, 0x200000, LK_A),
-        ('tee_a', 0x11400000, 0x100000, TEE_A)), validate_misc)
+    """Select A (write) or return to B (restore). misc is a live, whole-partition (1 MiB) erase and rewrite."""
+    if len(rootfs_a_sha) != 64 or rootfs_a_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA):
+        raise ValueError('misc session needs the approved new rootfs_a hash')
+    rootfs_a = ('rootfs_a', 0x13600000, 0x4000000)
+    # After a fallback, stock B's ab_image_sync may have copied B over A: rootfs_a then equals rootfs_b.
+    return Spec('misc', 0x700000, 0x100000, MISC_SHA, (*COMMON, (*rootfs_a, rootfs_a_sha)), validate_misc, MISC_A_SHA,
+                (*COMMON, (*rootfs_a, (rootfs_a_sha, ROOTFS_A_SHA, ROOTFS_B_SHA))))
 
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def run_session(da, spec, original, candidate, candidate_sha256, output, *, mode):
+def run_session(da, spec, original, candidate, output, *, mode):
     """identical: original over original. write: candidate over original. restore: original over anything.
 
     The caller owns the session on failure. The journal is evidence, never authority to resume.
@@ -87,8 +100,8 @@ def run_session(da, spec, original, candidate, candidate_sha256, output, *, mode
     if not isinstance(original, bytes) or len(original) != spec.size or digest(original) != spec.original_sha:
         raise ValueError('original source identity mismatch')
     if mode == 'write':
-        if not isinstance(candidate, bytes) or len(candidate) != spec.size or digest(candidate) != candidate_sha256:
-            raise ValueError('candidate differs from the approved hash')
+        if not isinstance(candidate, bytes) or len(candidate) != spec.size or digest(candidate) != spec.candidate_sha:
+            raise ValueError('candidate differs from the hash pinned in the spec')
         spec.validate(original, candidate)
     out = Path(tempfile.mkdtemp(prefix=f'{spec.name}-{mode}-', dir=Path(output).resolve()))
     with (out / 'journal.jsonl').open('x') as journal:
@@ -112,15 +125,15 @@ def run_session(da, spec, original, candidate, candidate_sha256, output, *, mode
             actual = read(label, spec.name, spec.addr, spec.size)
             if expected_target is not None and actual != expected_target:
                 raise ValueError(f'STOP: {label} {spec.name} did not match; no retry or reboot')
-            for name, addr, size, sha in spec.guards:
-                if read(label, name, addr, size) != sha:
+            for name, addr, size, sha in (spec.restore_guards if mode == 'restore' else spec.guards):
+                if read(label, name, addr, size) not in ((sha,) if isinstance(sha, str) else sha):
                     raise ValueError(f'STOP: {label} guard {name} did not match; no retry or reboot')
 
         try:
             record(mode=mode, target=spec.name, target_offset=spec.addr, target_length=spec.size,
-                   candidate_sha256=candidate_sha256 if mode == 'write' else None)
+                   candidate_sha256=spec.candidate_sha if mode == 'write' else None)
             check('before', None if mode == 'restore' else spec.original_sha)
-            data, want = (candidate, candidate_sha256) if mode == 'write' else (original, spec.original_sha)
+            data, want = (candidate, spec.candidate_sha) if mode == 'write' else (original, spec.original_sha)
             source = out / 'source.bin'
             with source.open('xb') as stream:
                 stream.write(data)

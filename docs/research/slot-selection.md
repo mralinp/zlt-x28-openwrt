@@ -58,12 +58,12 @@ Priority alone orders the slots; tries and success are what the preloader's retr
 4. **Writing `misc` is the missing tool.** The recovery tools deliberately deny shared `misc` writes.
    Writing it live with the vendor `dd-nand` helper is a read-erase-write of a 256 KiB block per copy; a
    power loss mid-write damages one copy. The route already proven on hardware is the bounded
-   changed-page engine ([#72](changed-page-restore-result.md)); it must be extended to four `misc` pages
+   changed-page engine ([#72](changed-page-restore-result.md)); it is extended to `misc` as a whole-1-MiB session (`slot_session.py`), a higher risk class because `misc` is the live selector; the bytes that change are four per copy
    plus their restore, with its own offline tests and a hardware pass on identical data first.
 
 ## Gates this leaves for #90
 
-- Extend the bounded engine to `misc` (4 pages, restore from the verified dump), host tests, identical-write
+- Extend the bounded engine to `misc` (whole partition, restore from the verified dump), host tests, identical-write
   hardware pass.
 - UART capture running; expected lines: `ab_suffix: _a, ab_retry: 3, ab_boot_success: 0` on the first
   A boot, then `_b` after exhaustion.
