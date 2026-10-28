@@ -102,12 +102,37 @@ class BlockwiseTests(unittest.TestCase):
             self.run_(da, 'restore', order=(1, 2, 3, 4))
             self.assertEqual(bytes(da.mem[b.MISC_ADDR]), self.before, done)
 
-    def test_restore_tolerates_a_blank_or_half_written_target_but_not_foreign_other_blocks(self):
+    def test_restore_writes_only_blocks_that_differ_and_damaged_ones_first(self):
         da = FakeDA(self.before)
-        da.mem[b.MISC_ADDR][0:b.BLOCK] = b'\xff' * b.BLOCK  # copy 1 blank
-        da.mem[b.MISC_ADDR][b.BLOCK:2 * b.BLOCK] = b'\xff' * b.BLOCK  # copy 2 blank too
+        mem = da.mem[b.MISC_ADDR]
+        mem[b.BLOCK:2 * b.BLOCK] = b'\xff' * b.BLOCK                      # copy 2 blank (damaged)
+        mem[3 * b.BLOCK:4 * b.BLOCK] = b.blocks(self.probe)[3]            # copy 4 holds the new record
+        self.run_(da, 'restore', order=(4, 3, 2, 1))
+        # copy 2 is damaged so it goes first; copy 4 is new so it follows; copies 1 and 3 are already original
+        self.assertEqual(da.writes, [(b.MISC_ADDR + b.BLOCK, b.BLOCK), (b.MISC_ADDR + 3 * b.BLOCK, b.BLOCK)])
+        self.assertEqual(bytes(mem), self.before)
+
+    def test_restore_recovers_two_damaged_blocks_and_ignores_the_plan_order_for_them(self):
+        da = FakeDA(self.before)
+        mem = da.mem[b.MISC_ADDR]
+        mem[0:b.BLOCK] = b'\xff' * b.BLOCK
+        mem[b.BLOCK:2 * b.BLOCK] = b'\x00' * b.BLOCK
+        self.run_(da, 'restore', order=(4, 3, 2, 1))
+        self.assertEqual(sorted(w[0] for w in da.writes), [b.MISC_ADDR, b.MISC_ADDR + b.BLOCK])
+        self.assertEqual(bytes(mem), self.before)
+
+    def test_restore_of_an_untouched_misc_writes_nothing(self):
+        da = FakeDA(self.before)
+        self.run_(da, 'restore')
+        self.assertEqual(da.writes, [])
+        self.assertEqual(self.journal()[-1]['status'], 'TARGET_AND_GUARDS_VERIFIED')
+
+    def test_restore_stops_on_guard_drift_before_any_write(self):
+        da = FakeDA(self.before)
+        da.mem[b.MISC_ADDR][0:b.BLOCK] = b'\xff' * b.BLOCK
+        da.mem[0x100][:] = b'X' * 16
         with self.assertRaises(ValueError):
-            self.run_(da, 'restore', order=(1, 2, 3, 4))  # block 2 is foreign while block 1 is being restored
+            self.run_(da, 'restore')
         self.assertEqual(da.writes, [])
 
     def test_stops_without_retry_on_each_failure(self):
