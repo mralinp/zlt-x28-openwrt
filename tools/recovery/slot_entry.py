@@ -36,8 +36,8 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def load_inputs(backup, loader, target, mode, candidate_dir):
-    """Verified originals, the pinned candidate and the spec; raises on any identity mismatch."""
+def verified_backup(backup, loader):
+    """The complete verified backup table and its by-name index; raises on any layout, integrity or DA mismatch."""
     table = backup_table(backup)
     layout = [{k: p[k] for k in ('index', 'name', 'size', 'erase_size', 'offset')} for p in table]
     if digest(json.dumps(layout, sort_keys=True).encode()) != LAYOUT_HASH:
@@ -49,6 +49,12 @@ def load_inputs(backup, loader, target, mode, candidate_dir):
     by_name = {p['name']: p for p in table}
     if sha256_file(loader) != DA_HASH:
         raise ValueError('DA identity mismatch')
+    return table, by_name
+
+
+def load_inputs(backup, loader, target, mode, candidate_dir):
+    """Verified originals, the pinned candidate and the spec; raises on any identity mismatch."""
+    table, by_name = verified_backup(backup, loader)
     original = Path(by_name[target]['image']).read_bytes()
     manifest = json.loads((candidate_dir / 'manifest.json').read_text())
     rootfs_a_image = (candidate_dir / 'rootfs-a-experimental.bin').read_bytes()

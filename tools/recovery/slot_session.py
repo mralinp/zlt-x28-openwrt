@@ -63,9 +63,13 @@ def validate_misc(original, candidate):
 
 B_SIDE = (('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, 0x4000000, ROOTFS_B_SHA),
           ('lk_b', 0x1d800000, 0x200000, LK_A), ('tee_b', 0x1da00000, 0x100000, TEE_A))
+# Static modem-side partitions (identical A/B copies); the 80 MiB md1img pair and the live nvdata/nvram are not re-read.
+MODEM_SIDE = (('proinfo', 0x600000, 0x100000, 'f5fb04aa5b882706b9309e885f19477261336ef76a150c3b4d3489dfac3953ec'), ('md1dsp_a', 0x10000000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'), ('md1dsp_b', 0x1c600000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'),
+              ('mcf1_a', 0x6d00000, 0x800000, 'c01bb4545be6644cb666943b501d20ecc447208b25ad06879e7a29bb70c32351'), ('mcf1_b', 0x7d00000, 0x800000, 'c01bb4545be6644cb666943b501d20ecc447208b25ad06879e7a29bb70c32351'),
+              ('mcf2_a', 0x7500000, 0x800000, '6762592011405cc420e001697b0d245b8a01871f7934f2b132b4ca9d231bd154'), ('mcf2_b', 0x8500000, 0x800000, '6762592011405cc420e001697b0d245b8a01871f7934f2b132b4ca9d231bd154'))
 COMMON = (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG),
           ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG), ('boot_para', 0x8e00000, 0x200000, BOOT_PARA),
-          ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE)
+          ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE, *MODEM_SIDE)
 
 
 def rootfs_a_spec(candidate_sha):

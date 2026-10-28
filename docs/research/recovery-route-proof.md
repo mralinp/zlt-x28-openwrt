@@ -48,6 +48,44 @@ still works. This is the single behavior the first `misc` write could change.
 4. **True BROM** (test point or key combination, undocumented for the X28): only worthwhile if the preloader is
    ever written. Out of scope for these sessions; record as a stretch.
 
+## Check 1, attempt 1 (2026-10-29): inconclusive
+
+Tooling: `capstone` 5.0.7 (user site), plus ad-hoc scripts. `rea` could not help (no Ghidra configured; it refuses
+raw images). What was established:
+
+- `mtd00-preloader.bin` holds a GFH image at file offset `0x40000`: `file_len 0x3e96c`, load `0x200ea0`, jump
+  offset `0x160`. Entry (`0x201000`) is a 4-word header, then **ARM** code (`b`, then `ldr r6,[pc,..]`, zeroed
+  registers, `mrc p15`); the image relocates itself, and most literals are not near the load address.
+- A link base of `0x208488` (4 of 10 error/status strings are pointed to by words there) puts the strings
+  (`rollback_slot fail`, `[QL_AB] slot:`, `[QL_AB]current solt`, `check fail, slot`) in a pointer table at file
+  offsets `0x3d4c4-0x3d6ec`, laid out as records (`{.., ptr, 0, ptr, .., 0x30001}`) rather than loaded by
+  `ldr` literals. No ARM or Thumb `ldr`-literal reaches those words, so the log text is reached through a table
+  or base register, and the control flow around `no valid slot` and `bldr_handshake` was **not** recovered.
+
+The question stays open. A proper decompiler with this image loaded at `0x200ea0` (ARM entry, relocation visible)
+is the way to continue; ad-hoc scripts are not enough for a table-driven, relocated binary.
+
+## Check 1, attempt 2 (2026-10-29): Ghidra headless, still inconclusive
+
+Tooling: Ghidra 12.1.4 under `~/ghidra` with a macOS arm64 decompiler built from its bundled source
+(`make ghidra_opt` with `-arch arm64`), run headless on `pl.bin` (the GFH payload) imported as `ARM:LE:32:v8` at base
+`0x208488`, with `TMode` set to Thumb per function. Findings:
+
+- Log strings are reached by Thumb `ldr rX,[pc,#n]; add rX,pc` (PC-relative offsets), which is why absolute-address
+  scans failed. Mapped this way: `before bldr_handshake` / `bldr_handshake` / `USB handshake` / `sec_boot_check`
+  are referenced from the code at file offsets `0x17aae-0x17c1c`.
+- That code is inside the boot-stage main function at file offset `0x1792c` (address `0x21fdb4`). Its decompilation
+  is a straight chain of init calls, each followed by a timed log, and a boot-mode `switch` before the handshake; it
+  contains no visible early exit on an AB error in the part that was read.
+- `part_init` is referenced from `0x2236a`; a platform-init chain (`0x22a5f0`) runs the same pattern.
+- The AB module (`[QL_AB]`, `[AB] ... no valid slot!`, `rollback_slot`, `ab init fail`) was **not** located: no
+  PC-relative or absolute reference to those strings was found, so it is reached through another table or a stage
+  loaded at a different base.
+
+Unanswered: whether an invalid slot record is fatal before the USB handshake. To continue, locate the AB module by
+walking callers of the `nand_read`/partition read of `misc` (string `get part misc fail try para`) or by running a
+full Ghidra auto-analysis with the relocation applied. If that stays unclear, check 3 is the only way to know.
+
 ## Check 1, attempt 3 (2026-10-29): AB module still not found
 
 Extra scans over `pl.bin` for any code that reaches the AB strings (`[QL_AB]`, `[AB] ...`, `no valid slot`,
