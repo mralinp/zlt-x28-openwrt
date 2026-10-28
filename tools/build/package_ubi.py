@@ -13,6 +13,7 @@ import subprocess
 import tarfile
 import tempfile
 import zlib
+from ab_guard import check as ab_check
 from stage_native import digest,load_archive
 
 PEB,LEB,PARTITION,LAYOUT=0x40000,0x3e000,0x4000000,0x7fffefff
@@ -81,7 +82,7 @@ def package(profile,output):
     require(not output.exists(),'output exists')
     manifest=json.loads((profile/'manifest.json').read_text());raw=(profile/'rootfs-management.tar.gz').read_bytes()
     require(manifest.get('flashable') is False and (profile/'NOT-FLASHABLE').is_file() and digest(raw)==manifest.get('archive_sha256'),'profile identity mismatch')
-    load_archive(io.BytesIO(raw))  # Validate every member and link ancestor before host extraction.
+    ab_check(load_archive(io.BytesIO(raw)))  # Validate every member and link ancestor before host extraction; #87 guard.
     output.mkdir(parents=True,mode=0o700);(output/'INCOMPLETE').touch()
     (output/'NOT-FLASHABLE').write_text('Experimental UBI packaging only. Runtime management, hardware, signature and slot gates remain.\n')
     with tempfile.TemporaryDirectory(prefix='x28-package-') as work:

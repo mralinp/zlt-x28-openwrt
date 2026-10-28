@@ -14,6 +14,7 @@ import struct
 import sys
 import tarfile
 
+from ab_guard import check as ab_check
 from stage_native import digest, load_archive, resolve, validate_parents
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
@@ -160,6 +161,7 @@ config interface 'lan'
     put('etc/fstab','# First-boot profile: no shared partition mounts.\n')
     put('etc/config/fstab','# No shared volumes or swap enabled.\n')
     validate_parents(tree)
+    ab_check(tree)  # #87: refuse a profile whose boot path can reach flash or the other slot
     output.mkdir(parents=True,mode=0o700);(output/'NOT-FLASHABLE').write_text('Management profile only; overlay, UBI, signature/slot and hardware readiness unverified.\n');(output/'INCOMPLETE').touch()
     archive=output/'rootfs-management.tar.gz'
     with tarfile.open(archive,'x:gz') as tar:
