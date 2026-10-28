@@ -48,6 +48,23 @@ still works. This is the single behavior the first `misc` write could change.
 4. **True BROM** (test point or key combination, undocumented for the X28): only worthwhile if the preloader is
    ever written. Out of scope for these sessions; record as a stretch.
 
+## Check 1, attempt 1 (2026-10-29): inconclusive
+
+Tooling: `capstone` 5.0.7 (user site), plus ad-hoc scripts. `rea` could not help (no Ghidra configured; it refuses
+raw images). What was established:
+
+- `mtd00-preloader.bin` holds a GFH image at file offset `0x40000`: `file_len 0x3e96c`, load `0x200ea0`, jump
+  offset `0x160`. Entry (`0x201000`) is a 4-word header, then **ARM** code (`b`, then `ldr r6,[pc,..]`, zeroed
+  registers, `mrc p15`); the image relocates itself, and most literals are not near the load address.
+- A link base of `0x208488` (4 of 10 error/status strings are pointed to by words there) puts the strings
+  (`rollback_slot fail`, `[QL_AB] slot:`, `[QL_AB]current solt`, `check fail, slot`) in a pointer table at file
+  offsets `0x3d4c4-0x3d6ec`, laid out as records (`{.., ptr, 0, ptr, .., 0x30001}`) rather than loaded by
+  `ldr` literals. No ARM or Thumb `ldr`-literal reaches those words, so the log text is reached through a table
+  or base register, and the control flow around `no valid slot` and `bldr_handshake` was **not** recovered.
+
+The question stays open. A proper decompiler with this image loaded at `0x200ea0` (ARM entry, relocation visible)
+is the way to continue; ad-hoc scripts are not enough for a table-driven, relocated binary.
+
 ## Decision rule for gate 6
 
 - `rootfs_a` sessions: the preloader window precedes nothing they change (`misc` still selects B), so gate 6 is
