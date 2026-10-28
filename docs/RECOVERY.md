@@ -7,6 +7,10 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 > `lk_b` read through the preloader matches the backup byte for byte. No write or restore
 > has been attempted. Do not flash experimental firmware until a restore has been tested.
 
+The proposed first experiment targets `rootfs_sig_a` to avoid deliberately writing LK; see the
+[exact first-write review plan](research/first-write-plan.md) (#57), which requires the hardened tool
+from PR #56. Existing LK commands are examples, not execution approval. The plan has unresolved gates.
+
 | Step | Script | Result |
 |---|---|---|
 | 1. Back up every partition over SSH | `dump_partitions.py` | ✅ 51 partitions, 1,072,168,960 bytes (2026-10-20) |
