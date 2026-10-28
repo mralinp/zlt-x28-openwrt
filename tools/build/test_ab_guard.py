@@ -25,7 +25,8 @@ class GuardTests(unittest.TestCase):
 
     def test_every_writer_form_is_caught_in_an_enabled_script(self):
         for bad in (b'ab_image_sync "_b"',b'mtd write - rootfs',b'mtd -p 262144 write - x',b'nandwrite /dev/mtd1 f',b'sysupgrade -n f',
-                    b'/sbin/sysupgrade f',b'dd if=x of=/dev/mtd3',b'set_bootctrl 1 2',b'platform_do_upgrade f',b'ubiupdatevol /dev/ubi0_0 f'):
+                    b'/sbin/sysupgrade f',b'dd if=x of=/dev/mtd3',b'set_bootctrl 1 2',b'platform_do_upgrade f',b'ubiupdatevol /dev/ubi0_0 f',
+                    b'dd-nand of=x',b'fw_setenv a b',b'ubirmvol /dev/ubi0 -n 1',b'ubiattach -m 3',b'flash_eraseall /dev/mtd3',b'mtd erase misc',b'mtd unlock misc'):
             t=tree({**BASE,'etc/init.d/network':b'#!/bin/sh /etc/rc.common\n'+bad+b'\n'},LINK)
             with self.assertRaises(ValueError,msg=bad):g.check(t)
 

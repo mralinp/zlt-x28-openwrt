@@ -14,7 +14,7 @@ import sys
 from stage_native import load_archive, resolve
 
 FORBIDDEN = re.compile(rb'ab_image_sync|zmtk_boot_done|bootctrl|platform_do_upgrade|nandwrite|flash_erase|ubiupdatevol|'
-                       rb'ubiformat|\bmtd\s[^\n]*\bwrite\b|(?:^|[\s;&|`(])(?:/sbin/)?sysupgrade\s|of=/dev/(?:mtd|ubi|block)')
+                       rb'ubiformat|\bmtd\s[^\n]*\bwrite\b|(?:^|[\s;&|`(])(?:/sbin/)?sysupgrade\s|of=/dev/(?:mtd|ubi|block)|dd-nand|fw_setenv|ubi(?:rmvol|mkvol|rsvol|attach|detach)|flash_eraseall|flash_unlock|\bmtd\s[^\n]*\b(?:erase|unlock)\b')
 PATHS = re.compile(rb'(?<![\w.-])/((?:etc|lib|usr|sbin|bin)/[A-Za-z0-9_./-]*[A-Za-z0-9_])')
 ROOT_PREFIXES = ('etc/rc.d/','etc/hotplug.d/','etc/crontabs/','etc/uci-defaults/','lib/preinit/')
 ROOT_FILES = ('etc/inittab','etc/rc.local','etc/preinit','etc/rc.common','etc/init.d/rcS')

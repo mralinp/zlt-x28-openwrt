@@ -17,7 +17,7 @@ Slot selection lives in `misc`, which still says B. So:
 4. Boot A under UART. Return path = automatic fallback (inferred) or restoring `misc`.
 
 `rootfs_sig_a` and every other A partition stay untouched: it already carries the valid stock certificates
-(#91), and the stock B-side `ab_image_sync "_a"` repair (#92) is not triggered while A's retry counter is 0.
+(#91), and the stock B-side `ab_image_sync "_a"` repair (#92) is not triggered while A's retry counter is 0. The repair condition is `retry_a > 3` seen from B (`zmtk_boot_done:137-142`); what the counter reads after a preloader rollback is unobserved, so after any fallback assume stock B **may** have copied B over A.
 
 ## Target facts (read-only, 2026-10-29, stock B)
 
@@ -30,7 +30,7 @@ Slot selection lives in `misc`, which still says B. So:
 | Candidate | `rootfs-a-experimental.bin`, 64 MiB, 44 populated PEBs, rest `ff`; per-build digest in its manifest |
 
 With no bad blocks, the physical block `n` of the image is the block `n` the UBI attach expects, so no
-bad-block remapping is needed. A new bad block appearing during the write must stop the session.
+bad-block remapping is needed. The engine has no bad-block check; a bad block would surface only as a readback mismatch. Re-read `/sys/class/mtd/mtd29/bad_blocks` (read-only SSH) immediately before the write.
 
 ## Status of the tools
 
@@ -59,9 +59,13 @@ a hash allowlist of exactly **two** sources (original `5f0c997d...` and the one 
 
 ## Step 3: `misc` selection session (tool to build: #100)
 
-Same pattern for `misc` only: four 4 KiB pages at `0x800 + k * 0x40000`, source allowlist = the verified dump
+**`misc` is its own risk class.** The engine writes the whole 1 MiB partition (four 256 KiB erase blocks), as the
+proven `rootfs_sig_a` session did, but `misc` is the live selector: a power or USB loss mid-write can leave blank or
+mixed slot records that the preloader may refuse (`no valid slot!`) or read unpredictably. Even the identical-data
+rehearsal carries this risk, so it is not a free dry run, and it must not be done before a BROM route is proven
+(gate 6). The four changed ranges are `0x800 + k * 0x40000`; source allowlist = the verified dump
 (`d8a5b852...`) and the one A-selected image (derivation and bytes in #92: per copy `0e000100 0f000100` →
-`0f030000 0e000100`). Guards: `rootfs_a` (candidate hash), `rootfs_sig_a/b`, `boot_a/b`, `boot_para`.
+`0f030000 0e000100`). Guards: `rootfs_a` (exactly the candidate hash) and every A and B counterpart (`boot`, `lk`, `tee`, `rootfs_sig`, `rootfs_b`) plus `boot_para`. The candidate hash is pinned in the spec (`cd512c87...`).
 Identical-write hardware pass on the original `misc` before any changed write. `restore` writes the original.
 
 ## UART and expectations
@@ -84,7 +88,17 @@ Identical-write hardware pass on the original `misc` before any changed write. `
 | Kernel panic or mount failure | image problem | same; fix the image, rebuild, rewrite |
 | A runs, no SSH on 192.168.70.1 | switch/management problem; no UART shell (no getty, failsafe removed) | let tries run out, or restore `misc` |
 | Boots B again after 3 tries | fallback works | record it; keep the log |
-| Neither slot boots | the matrix failed | BROM/DA restore from the verified backup, the only route independent of boot |
+| Neither slot boots | the matrix failed | BROM/DA restore from the verified backup: **the only route independent of boot, and not yet tested on a unit that cannot boot** |
+
+## Restore order and post-fallback state
+
+- Once `misc` selects A, restoring `rootfs_a` is refused by the engine (its `misc` guard fails). The order is always
+  **`misc` first, then `rootfs_a`**.
+- After a fallback, `misc` restore tolerates `rootfs_a` being the candidate, the original, or a copy of B (stock
+  repair), and nothing else; every other guard must still match exactly.
+- The first A boot is **kernel-log only**: no getty, key-only SSH, failsafe removed, and a switch-init failure only
+  leaves `/tmp/x28-switch.failed`. Treat management access as unproven until it works. Whether to add a safer
+  access path first (for example a UART shell) is an open decision for the owner.
 
 ## Gates before the first write (all must be true)
 
@@ -94,7 +108,14 @@ Identical-write hardware pass on the original `misc` before any changed write. `
 3. `rootfs_a` and `misc` originals re-hashed against the backup, **and a verified copy on separate physical
    storage** (the existing archive is on the same Mac).
 4. UART capture running; read-only preflight shows B selected, no pending FOTA/slot operation.
-5. The user approves the exact target, source hash, one write request per session and each power cycle.
+5. The attested entry command exists (pins the build-manifest hash, receipts, UART log, typed confirmation).
+6. A BROM/DA route is **proven** on a controlled non-boot state (the auditor's finding: all DA work so far ran on
+   a booted stock-B unit), and a 64 MiB identical `rootfs_a` rehearsal has passed.
+7. `zmtk_boot_done` on B has been re-read read-only for the fallback behavior, and the owner has decided whether
+   B's `ab_image_sync` must be blocked.
+8. The user approves the exact target, source hash, one write request per session and each power cycle.
+
+The fallback to B is **expected, unverified**.
 
 Not covered: secure-world enforcement (#91), the unobserved preloader retry logic (#92), mixed `misc`
 copies after a power cut.
