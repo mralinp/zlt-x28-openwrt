@@ -3,8 +3,8 @@
 
   sig-block identical --block K      rehearsal: identical rewrite of one 256 KiB block of rootfs_sig_a (K = 1..3)
   misc-blocks probe                  all four misc copies get distinct A priorities but still select B
-  misc-blocks probe-restore --resume restore the original misc, blockwise
-  misc-blocks select --last-copy K   the real A selection, blockwise, copy K written last
+  misc-blocks probe-restore --resume R --observed-copy K   restore the original misc, blockwise; K = the copy the UART showed
+  misc-blocks select --last-copy K   the real A selection, blockwise, copy K written last (K must equal the observed copy)
   misc-blocks select-restore --resume
 
 Plan: docs/research/misc-probe-plan.md. Use the private mtkclient venv Python for --write. No automatic reboot or
@@ -32,7 +32,7 @@ PRIOR = {
     ('sig-block', 'identical'): [],
     ('misc-blocks', 'probe'): [('prior_sig_block', 'sig', True)],
     ('misc-blocks', 'probe-restore'): [('resume', 'probe', False)],
-    ('misc-blocks', 'select'): [('prior_probe', 'probe', True), ('prior_rootfs_a', 'rootfs_a', True)],
+    ('misc-blocks', 'select'): [('prior_probe_restore', 'probe-restore', True), ('prior_rootfs_a', 'rootfs_a', True)],
     ('misc-blocks', 'select-restore'): [('resume', 'select', False)],
 }
 KIND_MODE = {'probe': 'write', 'select': 'write', 'probe-restore': 'restore', 'select-restore': 'restore'}
@@ -40,6 +40,8 @@ KIND_MODE = {'probe': 'write', 'select': 'write', 'probe-restore': 'restore', 's
 
 def order_for(mode, last_copy, resumed_order=None):
     if mode.endswith('restore'):
+        if not isinstance(resumed_order, (list, tuple)) or sorted(resumed_order) != [1, 2, 3, 4]:
+            raise ValueError('resumed receipt has an invalid copy order')
         return tuple(resumed_order)
     if mode == 'probe':
         return (4, 3, 2, 1)
@@ -62,6 +64,57 @@ def check_blocks_journal(raw, header, step_mode, order, sha_of, verified):
         if attempts != want or results != [{'write_result': step_mode, 'copy': c, 'acknowledged': True} for c in order] \
                 or events[-1].get('status') != 'TARGET_AND_GUARDS_VERIFIED':
             raise ValueError('prior run did not finish verified')
+
+
+def check_restore_journal(raw, header, old_sha_of):
+    """A finished restore: every write is an original block, acknowledged, and the final misc hash is the original."""
+    events = [json.loads(line) for line in raw.splitlines()]
+    if not events or events[0] != header:
+        raise ValueError('journal header mismatch')
+    attempts = [e for e in events if 'write_attempt' in e]
+    results = [e for e in events if 'write_result' in e]
+    if len(attempts) != len(results) or len({e['copy'] for e in attempts}) != len(attempts):
+        raise ValueError('restore journal writes are inconsistent')
+    for a, r in zip(attempts, results):
+        if a != {'write_attempt': 'restore', 'copy': a['copy'], 'sha256': old_sha_of(a['copy'])} or r != {'write_result': 'restore', 'copy': a['copy'], 'acknowledged': True}:
+            raise ValueError('restore journal wrote something other than an acknowledged original block')
+    finals = [e for e in events if e.get('read') == 'final' and e.get('name') == 'misc']
+    if events[-1].get('status') != 'TARGET_AND_GUARDS_VERIFIED' or len(finals) != 1 or finals[0].get('sha256') != session.MISC_SHA:
+        raise ValueError('restore did not finish with the original misc')
+
+
+def load_restore_prior(run, expect, header, old_sha_of):
+    """A verified probe-restore run: the original misc is back, and the observed copy it recorded."""
+    run = Path(run).resolve(strict=True)
+    if (run / 'restore-claim.json').exists():
+        raise ValueError('restore attempt already claimed; separate review required')
+    receipt = json.loads((run / 'receipt.json').read_text())
+    if (receipt.get('schema') != 3 or receipt.get('run') != str(run) or receipt.get('target') != 'misc-blocks' or receipt.get('mode') != 'probe-restore'
+            or {k: receipt.get('identity', {}).get(k) for k in expect} != expect or receipt.get('observed_copy') not in (1, 2, 3, 4)):
+        raise ValueError('probe-restore receipt does not match this unit, tools or image')
+    if receipt.get('status') != 'VERIFIED' or not 0 <= time.time() - receipt.get('created', 0) <= entry.MAX_AGE:
+        raise ValueError('probe-restore evidence is not verified or is older than 24 h')
+    journal = run / receipt.get('journal', 'missing')
+    if journal.name != 'journal.jsonl' or journal.resolve().parent.parent != run:
+        raise ValueError('journal outside bound run')
+    raw = journal.read_bytes()
+    if digest(raw) != receipt.get('journal_hash'):
+        raise ValueError('journal changed or incomplete')
+    check_restore_journal(raw, header, old_sha_of)
+    return receipt
+
+
+def check_guards(parts, guards):
+    """Every guard's address, size and (static) hash must match the verified backup table; a typo stops the build."""
+    live = {'rootfs_a'}  # rootfs_a is checked against the approved candidate, not the backup
+    for name, addr, size, sha in guards:
+        if name.startswith('rootfs_sig_a_b'):
+            if addr != blocks.SIG_ADDR + int(name[-1]) * blocks.BLOCK or size != blocks.BLOCK:
+                raise ValueError('sig block guard identity mismatch: ' + name)
+            continue
+        p = parts.get(name)
+        if p is None or (p['offset'], p['size']) != (addr, size) or (name not in live and isinstance(sha, str) and p['sha256'] != sha):
+            raise ValueError('guard identity mismatch: ' + name)
 
 
 def load_blocks_prior(run, expect, header, kind, order, sha_of, verified):
@@ -106,7 +159,8 @@ def main():
     ap.add_argument('--backup-copy', type=Path)
     ap.add_argument('--uart-log', type=Path)
     ap.add_argument('--prior-sig-block', type=Path)
-    ap.add_argument('--prior-probe', type=Path)
+    ap.add_argument('--prior-probe-restore', type=Path, help='verified probe-restore run (select)')
+    ap.add_argument('--observed-copy', type=int, help='probe-restore: the copy 1..4 whose A priority the UART showed')
     ap.add_argument('--prior-rootfs-a', type=Path)
     ap.add_argument('--resume', type=Path)
     args = ap.parse_args()
@@ -116,9 +170,11 @@ def main():
     for flag, *_ in wanted:
         if getattr(args, flag) is None:
             raise ValueError(f'{args.target} {args.mode} requires --{flag.replace("_", "-")}')
-    for flag in ('prior_sig_block', 'prior_probe', 'prior_rootfs_a', 'resume'):
+    for flag in ('prior_sig_block', 'prior_probe_restore', 'prior_rootfs_a', 'resume'):
         if getattr(args, flag) is not None and flag not in [w[0] for w in wanted]:
             raise ValueError(f'--{flag.replace("_", "-")} is not valid for {args.target} {args.mode}')
+    if (args.mode == 'probe-restore') != (args.observed_copy is not None) or (args.observed_copy not in (None, 1, 2, 3, 4)):
+        raise ValueError('--observed-copy 1..4 is required for probe-restore only')
     if (args.target == 'sig-block') != (args.block is not None):
         raise ValueError('--block is for sig-block only, and required there')
     if args.mode in ('select', 'select-restore') and args.candidate_dir is None:
@@ -129,6 +185,7 @@ def main():
     here = Path(__file__).parent
     tools = b''.join((here / n).read_bytes() for n in ('slot_blocks_entry.py', 'slot_blocks.py', 'slot_entry.py', 'slot_session.py',
                                                       'restore_entry.py', 'common.py', 'read_by_name.py', 'write_verify.py', 'setup_mtkclient.py'))
+    tools += b''.join((here.parent / 'build' / n).read_bytes() for n in ('package_ubi.py', 'stage_native.py', 'ab_guard.py'))
     base_id = {'da': entry.DA_HASH, 'host': host, 'tools': digest(tools), 'unit': parts['proinfo']['sha256']}
     rootfs_a_sha = None
     if args.candidate_dir is not None:
@@ -140,12 +197,15 @@ def main():
     if args.target == 'sig-block':
         sig_a = Path(parts['rootfs_sig_a']['image']).read_bytes()
         spec, block = blocks.sig_block_spec(sig_a, args.block)
+        check_guards(parts, spec.guards)
         identity = {'target': spec.name, 'original': spec.original_sha, 'candidate': spec.candidate_sha, 'rootfs_a': session.ROOTFS_A_SHA, **base_id}
         image_sha, extra = spec.original_sha, ''
     else:
         before = Path(parts['misc']['image']).read_bytes()
         after = blocks.probe_image(before) if args.mode.startswith('probe') else blocks.select_image(before)
         after_sha = digest(after)
+        if after_sha != (blocks.PROBE_SHA if args.mode.startswith('probe') else session.MISC_A_SHA):
+            raise ValueError('misc image differs from its pinned hash')
         resumed = None
         if args.resume is not None:
             resumed = json.loads((args.resume / 'receipt.json').read_text()).get('order')
@@ -156,9 +216,11 @@ def main():
         rootfs_a_ok = {'select': (rootfs_a_sha,), 'select-restore': (rootfs_a_sha, session.ROOTFS_A_SHA, session.ROOTFS_B_SHA)}.get(
             args.mode, tuple(x for x in (session.ROOTFS_A_SHA, rootfs_a_sha) if x))
         guards = blocks.misc_guards(rootfs_a_ok)
+        check_guards(parts, guards)
         identity = {'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': after_sha, 'rootfs_a': rootfs_a_sha or session.ROOTFS_A_SHA, **base_id}
         image_sha = after_sha if not args.mode.endswith('restore') else session.MISC_SHA
-        extra = f' ORDER {"".join(map(str, order))}' + (f' ROOTFS-A {rootfs_a_sha[:12]}' if args.mode == 'select' else '') + ' BROM-ROUTE-PROVEN'
+        extra = (f' ORDER {"".join(map(str, order))}' + (f' ROOTFS-A {rootfs_a_sha[:12]}' if args.mode == 'select' else '') +
+                 (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ' BROM-ROUTE-PROVEN')
     priors = {}
     for flag, kind, verified in wanted:
         run = getattr(args, flag)
@@ -166,6 +228,14 @@ def main():
             sig_spec, _ = blocks.sig_block_spec(Path(parts['rootfs_sig_a']['image']).read_bytes(), json.loads((Path(run) / 'receipt.json').read_text()).get('block'))
             priors[flag] = entry.load_prior(run, {**base_id, 'target': sig_spec.name, 'original': sig_spec.original_sha,
                                                   'candidate': sig_spec.candidate_sha, 'rootfs_a': session.ROOTFS_A_SHA}, sig_spec, 'identical', True)
+        elif kind == 'probe-restore':
+            before_pr = Path(parts['misc']['image']).read_bytes()
+            old_blocks = blocks.blocks(before_pr)
+            header = {'mode': 'restore', 'target': 'misc', 'order': [4, 3, 2, 1], 'before_sha': session.MISC_SHA, 'after_sha': blocks.PROBE_SHA}
+            expect = {**base_id, 'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': blocks.PROBE_SHA}
+            priors[flag] = load_restore_prior(run, expect, header, lambda c: digest(old_blocks[c - 1]))
+            if args.last_copy != priors[flag]['observed_copy']:
+                raise ValueError(f'--last-copy {args.last_copy} differs from the copy the probe showed ({priors[flag]["observed_copy"]})')
         elif kind == 'rootfs_a':  # produced by slot_entry.py: bound to the unit, host and approved image, not to this script's hash
             priors[flag] = entry.load_prior(run, {'target': 'rootfs_a', 'candidate': rootfs_a_sha, 'rootfs_a': rootfs_a_sha, 'da': base_id['da'],
                                                   'host': base_id['host'], 'unit': base_id['unit']}, session.rootfs_a_spec(rootfs_a_sha), 'write', True)
@@ -215,7 +285,7 @@ def main():
     receipt = {'schema': 3 if args.target == 'misc-blocks' else 2, 'run': str(run), 'target': 'misc-blocks' if args.target == 'misc-blocks' else spec.name,
                'mode': 'identical' if args.target == 'sig-block' else args.mode, 'status': 'STARTED', 'identity': identity, 'created': time.time(),
                'uart': str(uart), 'same_disk_backup': same_disk, 'order': list(order) if order else None,
-               'block': args.block, 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
+               'block': args.block, 'observed_copy': args.observed_copy, 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
     save(run, receipt)
     if args.resume:
         claim_restore(args.resume.resolve(), run)

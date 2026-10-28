@@ -32,12 +32,15 @@ class OrderTests(unittest.TestCase):
         for bad in (None, 0, 5):
             with self.assertRaises(ValueError):
                 e.order_for('select', bad)
+        for bad in (None, [1, 2], 'abc', [1, 1, 2, 3]):
+            with self.assertRaises(ValueError):
+                e.order_for('probe-restore', None, bad)
 
     def test_sequencing_table(self):
         flags = lambda t, m: [p[0] for p in e.PRIOR[(t, m)]]
         self.assertEqual(flags('sig-block', 'identical'), [])
         self.assertEqual(flags('misc-blocks', 'probe'), ['prior_sig_block'])
-        self.assertEqual(sorted(flags('misc-blocks', 'select')), ['prior_probe', 'prior_rootfs_a'])
+        self.assertEqual(sorted(flags('misc-blocks', 'select')), ['prior_probe_restore', 'prior_rootfs_a'])
         self.assertEqual((flags('misc-blocks', 'probe-restore'), flags('misc-blocks', 'select-restore')), (['resume'], ['resume']))
         self.assertTrue(all(p[2] for k, v in e.PRIOR.items() if not k[1].endswith('restore') for p in v))
         self.assertTrue(all(not p[2] for k, v in e.PRIOR.items() if k[1].endswith('restore') for p in v))
@@ -116,6 +119,90 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(text, 'WRITE select misc-blocks cd512c873dd4 ORDER 4312 ROOTFS-A abcdef123456 BROM-ROUTE-PROVEN SAME-DISK')
 
 
+class RestoreEvidenceTests(JournalTests):
+    def restore_events(self, writes=((2, True),), final_sha=ss.MISC_SHA, status='TARGET_AND_GUARDS_VERIFIED'):
+        old = b.blocks(self.before)
+        ev = [{'mode': 'restore', 'target': 'misc', 'order': [4, 3, 2, 1], 'before_sha': ss.MISC_SHA, 'after_sha': b.PROBE_SHA}]
+        for c, ack in writes:
+            ev += [{'write_attempt': 'restore', 'copy': c, 'sha256': e.digest(old[c - 1])}, {'write_result': 'restore', 'copy': c, 'acknowledged': ack}]
+        return ev + [{'read': 'final', 'name': 'misc', 'acknowledged': True, 'length': b.MISC_SIZE, 'sha256': final_sha}, {'status': status}]
+
+    def make(self, events, observed=2, status='VERIFIED', age=0, ident=IDENT):
+        self.n += 1
+        run = (self.root / f'p{self.n}').resolve()
+        (run / 'j').mkdir(parents=True)
+        journal = run / 'j' / 'journal.jsonl'
+        journal.write_text(''.join(json.dumps(x) + '\n' for x in events))
+        (run / 'receipt.json').write_text(json.dumps({'schema': 3, 'run': str(run), 'target': 'misc-blocks', 'mode': 'probe-restore', 'status': status,
+                                                      'identity': ident, 'created': time.time() - age, 'order': [4, 3, 2, 1], 'observed_copy': observed,
+                                                      'journal': 'j/journal.jsonl', 'journal_hash': e.digest(journal.read_bytes())}))
+        return run
+
+    def load_pr(self, run):
+        old = b.blocks(self.before)
+        header = {'mode': 'restore', 'target': 'misc', 'order': [4, 3, 2, 1], 'before_sha': ss.MISC_SHA, 'after_sha': b.PROBE_SHA}
+        return e.load_restore_prior(run, IDENT, header, lambda c: e.digest(old[c - 1]))
+
+    def test_a_clean_restore_with_or_without_writes_is_accepted_and_reports_the_observed_copy(self):
+        self.assertEqual(self.load_pr(self.make(self.restore_events()))['observed_copy'], 2)
+        self.assertEqual(self.load_pr(self.make(self.restore_events(writes=())))['observed_copy'], 2)
+        self.assertEqual(self.load_pr(self.make(self.restore_events(writes=((3, True), (1, True)))))['observed_copy'], 2)
+
+    def test_bad_restore_evidence_is_refused(self):
+        cases = {
+            'unacknowledged': dict(events=self.restore_events(writes=((2, False),))),
+            'not original': dict(events=self.restore_events(final_sha='x' * 64)),
+            'no clean end': dict(events=self.restore_events(status='STOP_UNVERIFIED_NO_RETRY_OR_REBOOT')),
+            'no observed copy': dict(events=self.restore_events(), observed=0),
+            'stale': dict(events=self.restore_events(), age=90000),
+            'unverified': dict(events=self.restore_events(), status='STOP_UNVERIFIED'),
+            'other unit': dict(events=self.restore_events(), ident={**IDENT, 'unit': 'x' * 64}),
+            'duplicate copy': dict(events=self.restore_events(writes=((2, True), (2, True)))),
+        }
+        for name, kw in cases.items():
+            with self.assertRaises(ValueError, msg=name):
+                self.load_pr(self.make(**kw))
+
+    def test_a_restore_that_wrote_the_wrong_bytes_is_refused(self):
+        ev = self.restore_events()
+        ev[1]['sha256'] = 'x' * 64
+        with self.assertRaises(ValueError):
+            self.load_pr(self.make(ev))
+
+    def test_a_claimed_restore_run_is_spent(self):
+        run = self.make(self.restore_events())
+        (run / 'restore-claim.json').write_text('{}')
+        with self.assertRaises(ValueError):
+            self.load_pr(run)
+
+
+class GuardCrossCheckTests(unittest.TestCase):
+    def table(self):
+        return {'boot_a': {'offset': 0x11500000, 'size': 0x2000000, 'sha256': ss.BOOT_SHA}}
+
+    def test_matching_guards_pass_and_typos_are_caught(self):
+        e.check_guards(self.table(), (('boot_a', 0x11500000, 0x2000000, ss.BOOT_SHA),))
+        for g in (('boot_a', 0x11500004, 0x2000000, ss.BOOT_SHA), ('boot_a', 0x11500000, 0x1000000, ss.BOOT_SHA),
+                  ('boot_a', 0x11500000, 0x2000000, 'x' * 64), ('boot_x', 0x11500000, 0x2000000, ss.BOOT_SHA)):
+            with self.assertRaises(ValueError):
+                e.check_guards(self.table(), (g,))
+
+    def test_sig_block_guards_are_checked_by_address(self):
+        e.check_guards({}, (('rootfs_sig_a_b2', b.SIG_ADDR + 2 * b.BLOCK, b.BLOCK, 'a' * 64),))
+        with self.assertRaises(ValueError):
+            e.check_guards({}, (('rootfs_sig_a_b2', b.SIG_ADDR + 3 * b.BLOCK, b.BLOCK, 'a' * 64),))
+
+    @unittest.skipUnless((Path(__file__).resolve().parents[2] / 'private/recovery/20261020-capture-prepared-20261021').exists(), 'private backup absent')
+    def test_every_real_guard_matches_the_verified_backup(self):
+        import common
+        parts = {p['name']: p for p in common.backup_table(common.DEFAULT_BACKUP)}
+        sig_a = Path(parts['rootfs_sig_a']['image']).read_bytes()
+        for rootfs_a_ok in ((ss.ROOTFS_A_SHA,), ('a' * 64,)):
+            e.check_guards(parts, b.misc_guards(rootfs_a_ok))
+        for k in (1, 2, 3):
+            e.check_guards(parts, b.sig_block_spec(sig_a, k)[0].guards)
+
+
 class GateTests(unittest.TestCase):
     def run_main(self, *argv):
         with patch.object(sys, 'argv', ['slot_blocks_entry.py', *argv]):
@@ -125,7 +212,10 @@ class GateTests(unittest.TestCase):
         for argv in (('sig-block', 'probe'), ('misc-blocks', 'identical'), ('misc-blocks', 'probe'), ('misc-blocks', 'select'),
                      ('misc-blocks', 'probe-restore'), ('sig-block', 'identical', '--block', '1', '--resume', '/x'),
                      ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--block', '1'), ('sig-block', 'identical'),
-                     ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--resume', '/y')):
+                     ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--resume', '/y'),
+                     ('misc-blocks', 'probe-restore', '--resume', '/x'), ('misc-blocks', 'probe-restore', '--resume', '/x', '--observed-copy', '5'),
+                     ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--observed-copy', '2'),
+                     ('misc-blocks', 'select', '--prior-probe-restore', '/x', '--prior-rootfs-a', '/y', '--last-copy', '1')):
             with self.assertRaises(ValueError, msg=argv):
                 self.run_main(*argv)
 
