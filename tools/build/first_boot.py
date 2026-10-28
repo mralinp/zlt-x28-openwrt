@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Apply a private, NOT-FLASHABLE first-boot management profile to #76 staging.
 
-Explicit wired device, static LAN, key-only SSH. No vendor activation or device I/O.
+Stock swconfig, observed MT7531AE VLAN table, static LAN on eth0.3, key-only SSH. No vendor activation or device I/O.
 """
 import argparse
 import base64
@@ -10,14 +10,64 @@ import io
 import json
 import posixpath
 from pathlib import Path
-import re
 import struct
+import sys
 import tarfile
 
-from stage_native import digest, load_archive, validate_parents
+from stage_native import digest, load_archive, resolve, validate_parents
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S19dropbear','S20network'}
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
+from inventory import elf_dynamic
+
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S20network'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
+
+LAN = 'eth0.3'  # socket 4 = MT7531AE port 4, untagged VLAN 3 (#84)
+# vlan: (ports, untagged port whose PVID is that vlan). Copied from the observed stock table.
+SWITCH = {1:('1 5t',1),2:('2 5t',2),3:('4 5t',4),4:('0 6t',0)}
+SWITCH_UCI = "\nconfig switch\n option name 'switch0'\n option reset '1'\n option enable_vlan '1'\n" + ''.join(
+    f"\nconfig switch_vlan\n option device 'switch0'\n option vlan '{v}'\n option vid '{v}'\n option ports '{ports}'\n"
+    f"\nconfig switch_port\n option device 'switch0'\n option port '{port}'\n option pvid '{v}'\n"
+    for v,(ports,port) in SWITCH.items())
+# Not the vendor initializer: no PHY/GPIO writes, no lan_mgr. The chk lines read back what `load` must have set.
+SWITCH_INIT = """#!/bin/sh /etc/rc.common
+START=18
+
+fail() { echo "x28-switch: $*" >&2; : > /tmp/x28-switch.failed; return 1; }
+chk() { want="$1"; shift; got=$(swconfig dev switch0 "$@" 2>/dev/null) && [ "$(echo $got)" = "$want" ]; }
+
+start() {
+	rm -f /tmp/x28-switch.failed
+	[ "$(swconfig list 2>/dev/null)" = "Found: switch0 - MT7531AE" ] || { fail "unexpected switch"; return 1; }
+	swconfig dev switch0 load network || { fail "load failed"; return 1; }
+	chk 1 get enable_vlan || fail "vlan not enabled"
+""" + ''.join(f"\tchk '{ports}' vlan {v} get ports || fail 'vlan {v} ports'\n\tchk {v} port {port} get pvid || fail 'port {port} pvid'\n"
+              for v,(ports,port) in SWITCH.items()) + """	[ ! -e /tmp/x28-switch.failed ]
+}
+"""
+
+
+def add_swconfig(tree,stock):
+    """Copy stock /sbin/swconfig plus any ELF dependency the tree lacks; every NEEDED must resolve."""
+    todo=['sbin/swconfig'];seen=set();added=[]
+    while todo:
+        name=todo.pop()
+        if name in seen:continue
+        seen.add(name);chain=[]
+        real,data=resolve(stock,name,chain)
+        for item in chain:
+            if item not in tree:tree[item]=stock[item];added.append(item)
+            elif name=='sbin/swconfig':raise ValueError('swconfig path already occupied: '+item)
+        if data[:4]!=b'\x7fELF':raise ValueError('not ELF: '+name)
+        for need in elf_dynamic(data)[1]:
+            options=[d+'/'+need for d in ('lib','usr/lib')]
+            have=next((p for p in options if p in tree),None)
+            if have:resolve(tree,have)
+            else:
+                old=next((p for p in options if p in stock),None)
+                if old is None:raise ValueError('unresolved swconfig library: '+need)
+                todo.append(old)
+    return added
 
 
 def public_key(text):
@@ -45,15 +95,15 @@ def public_key(text):
     return fields[0]+' '+fields[1]+'\n'
 
 
-def integrate(stage,key,device,output):
+def integrate(stage,key,stock_path,output):
     key=public_key(key)
-    if not re.fullmatch(r'eth[01](?:\.[1-9][0-9]{0,3})?',device) or ('.' in device and int(device.split('.')[1])>4094):
-        raise ValueError('explicit eth0/eth1 or valid VLAN device required')
     if output.exists():raise FileExistsError(output)
     manifest=json.loads((stage/'manifest.json').read_text());raw=(stage/'rootfs-staging.tar.gz').read_bytes()
     if manifest.get('flashable') is not False or not (stage/'NOT-FLASHABLE').is_file() or digest(raw)!=manifest.get('archive_sha256'):
         raise ValueError('staging identity/marker mismatch')
+    stock_bytes=Path(stock_path).read_bytes()
     tree=load_archive(io.BytesIO(raw));removed=[]
+    swconfig_added=add_swconfig(tree,load_archive(io.BytesIO(stock_bytes),'rootfs'))
     for name in list(tree):
         if (name.startswith(('etc/rc.d/','etc/uci-defaults/','etc/board.d/','lib/upgrade/','etc/dropbear/'))
             or 'zmtk_boot_done' in name or (name.startswith('lib/preinit/') and 'failsafe' in name)):
@@ -74,6 +124,8 @@ def integrate(stage,key,device,output):
     if 'lib/preinit/00_preinit.conf' in tree:
         config=tree['lib/preinit/00_preinit.conf'][1].decode()
         put('lib/preinit/00_preinit.conf',config+'\npi_preinit_no_failsafe="y"\n')
+    put('etc/init.d/x28-switch',SWITCH_INIT,0o755)
+    link=tarfile.TarInfo('etc/rc.d/S18x28-switch');link.type=tarfile.SYMTYPE;link.linkname='../init.d/x28-switch';tree[link.name]=(link,b'')
     put('etc/inittab','::sysinit:/etc/init.d/rcS S boot\n::shutdown:/etc/init.d/rcS K shutdown\n')
     put('etc/config/network',f"""config interface 'loopback'
  option device 'lo'
@@ -82,11 +134,11 @@ def integrate(stage,key,device,output):
  option netmask '255.0.0.0'
 
 config interface 'lan'
- option device '{device}'
+ option device '{LAN}'
  option proto 'static'
  option ipaddr '192.168.70.1'
  option netmask '255.255.255.0'
-""")
+"""+SWITCH_UCI)
     put('etc/config/dropbear',"""config dropbear
  option PasswordAuth 'off'
  option RootPasswordAuth 'off'
@@ -114,17 +166,17 @@ config interface 'lan'
         for name,(info,data) in sorted(tree.items()):
             meta=copy.copy(info);tar.addfile(meta,io.BytesIO(data) if meta.isfile() else None)
     report={'flashable':False,'input_stage_sha256':digest(raw),'archive_sha256':digest(archive.read_bytes()),
-            'lan_device':device,'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
+            'lan_device':LAN,'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
             'removed_paths':removed,'enabled_start_links':sorted(n for n in tree if n.startswith('etc/rc.d/S')),
-            'limits':['No modem/Wi-Fi/shared mounts','No DHCP/web UI','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
+            'limits':['No modem/Wi-Fi/shared mounts','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No DHCP/web UI','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
     (output/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');(output/'INCOMPLETE').unlink()
     return report
 
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--stage',type=Path,required=True)
-    ap.add_argument('--public-key',type=Path,required=True);ap.add_argument('--lan-device',required=True);ap.add_argument('--output',type=Path,required=True)
-    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.lan_device,args.output),indent=2))
+    ap.add_argument('--public-key',type=Path,required=True);ap.add_argument('--stock',type=Path,required=True);ap.add_argument('--output',type=Path,required=True)
+    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.stock,args.output),indent=2))
 
 
 if __name__=='__main__':main()
