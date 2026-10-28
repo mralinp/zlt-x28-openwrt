@@ -104,6 +104,9 @@ def load_restore_prior(run, expect, header, old_sha_of):
     return receipt
 
 
+PREFIX_GUARDS = {'rootfs_b'}
+
+
 def check_guards(parts, guards):
     """Every guard's address, size and (static) hash must match the verified backup table; a typo stops the build."""
     live = {'rootfs_a'}  # rootfs_a is checked against the approved candidate, not the backup
@@ -113,6 +116,10 @@ def check_guards(parts, guards):
                 raise ValueError('sig block guard identity mismatch: ' + name)
             continue
         p = parts.get(name)
+        if name in PREFIX_GUARDS:  # a static head of a partition whose tail is live (stock B's overlay)
+            if p is None or p['offset'] != addr or size > p['size'] or digest(Path(p['image']).read_bytes()[:size]) != sha:
+                raise ValueError('prefix guard identity mismatch: ' + name)
+            continue
         if p is None or (p['offset'], p['size']) != (addr, size) or (name not in live and isinstance(sha, str) and p['sha256'] != sha):
             raise ValueError('guard identity mismatch: ' + name)
 

@@ -75,6 +75,10 @@ def load_inputs(backup, loader, target, mode, candidate_dir):
         spec.validate(original, candidate)  # refuse a bad candidate before any connection or claim
     for name, addr, size, sha in spec.guards:
         p = by_name[name]
+        if name == 'rootfs_b':  # static head only: stock B's overlay lives in the tail
+            if p['offset'] != addr or size > p['size'] or digest(Path(p['image']).read_bytes()[:size]) != sha:
+                raise ValueError('prefix guard identity mismatch: ' + name)
+            continue
         if (p['offset'], p['size']) != (addr, size) or (isinstance(sha, str) and name != 'rootfs_a' and p['sha256'] != sha):
             raise ValueError('guard identity mismatch: ' + name)
     if (by_name[target]['offset'], by_name[target]['size']) != (spec.addr, spec.size):

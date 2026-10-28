@@ -22,6 +22,8 @@ ROOTFS_SIG = '1ebb121adfbac5603dca0e65c3b276a315fda1450bdbd573f3c600b5f399d4b6'
 MISC_SHA = 'd8a5b852d2336a8a39a3a09894797de4cd9e14b84425cc12db8d02e4f8cbc780'
 ROOTFS_A_SHA = '5f0c997ddbc0a8380b4785d58048659f26efff5e7d173825972f3ca45646cc36'
 BOOT_SHA = 'c8cc8244078cb6539c72842540250bc7ca40b8fb9b66123a6bd85a529e47b120'
+# Live stock B writes its overlay into the last 127 erase blocks of rootfs_b; only the first 128 blocks (32 MiB) are static.
+ROOTFS_B_HEAD_SHA = '33ef0fc046592bf2ef64c1604c829252013a6c656c66cf2b903d92ef5fb648b6'
 ROOTFS_B_SHA = 'c4e3f3d25b3aefca70995c070faa177931a61738b4997acd52a6446daee4cf01'
 MISC_A_SHA = 'cd512c873dd4bf290135989e6da4b4b542e277ea2c01239f331ddccae253a543'  # original with the four-copy A selection
 LK_A = '0ad94f065ebcfeefd157640d179b1b52779829a85179d07d38dd818b79007156'
@@ -61,7 +63,7 @@ def validate_misc(original, candidate):
         raise ValueError('misc candidate is not exactly the four-copy A selection')
 
 
-B_SIDE = (('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, 0x4000000, ROOTFS_B_SHA),
+B_SIDE = (('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, 0x2000000, ROOTFS_B_HEAD_SHA),
           ('lk_b', 0x1d800000, 0x200000, LK_A), ('tee_b', 0x1da00000, 0x100000, TEE_A))
 # Static modem-side partitions (identical A/B copies); the 80 MiB md1img pair and the live nvdata/nvram are not re-read.
 MODEM_SIDE = (('proinfo', 0x600000, 0x100000, 'f5fb04aa5b882706b9309e885f19477261336ef76a150c3b4d3489dfac3953ec'), ('md1dsp_a', 0x10000000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'), ('md1dsp_b', 0x1c600000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'),
