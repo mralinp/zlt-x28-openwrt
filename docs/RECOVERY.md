@@ -3,31 +3,31 @@
 How to back up the X28's NAND and reach it over USB when Linux no longer boots.
 Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 
-> **Status, 2026-10-22:** full backup taken and verified, and **flash reads over USB work**:
-> `lk_b` read through the preloader matches the backup byte for byte. No write or restore
-> has been attempted. Do not flash experimental firmware until a restore has been tested.
+> **Status, 2026-10-28:** full backup verified; USB reads work. The approved patched
+> identical-byte rewrite of inactive `rootfs_sig_a` passed all twelve same-session target/guard
+> reads and returned to stock B. **Changed-data restoration remains unproven.** Do not flash
+> experimental firmware until that separate recovery test has passed.
 
-The proposed first experiment targets `rootfs_sig_a` to avoid deliberately writing LK; see the
-[exact first-write review plan](research/first-write-plan.md) (#57), which requires the hardened tool
-from PR #56. Existing LK commands are examples, not execution approval. The plan has unresolved gates.
-The [read-only rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) now
-passes for the target and all five guards (101 MiB); no write or changed-data restore was tested.
+See the [#70 hardware result](research/patched-identical-write-result.md), the
+[first-write history](research/first-write-plan.md) and the separately gated
+[changed-data restore proposal](research/changed-data-restore-plan.md). Existing LK commands
+are examples, not execution approval; use this unit's own backups only.
 
 | Step | Script | Result |
 |---|---|---|
 | 1. Back up every partition over SSH | `dump_partitions.py` | ✅ 51 partitions, 1,072,168,960 bytes (2026-10-20) |
 | 2. Verify and unpack the backup | `verify_backup.py` | ✅ all sizes and SHA-256 match |
 | 3. Find the USB recovery port | `usb_watch.py` | ✅ preloader `0e8d:2000`, needs a USB-A-to-C cable |
-| 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient `7cb40e7` plus 3 local fixes |
+| 4. Install the USB tool | `setup_mtkclient.py` | ✅ mtkclient `7cb40e7` plus 4 local fixes |
 | 5. Read boot security | `target_config.py` | ✅ secure boot, SLA, DAA all **off** |
 | 6. Read a partition over USB, compare hash | `read_verify.py lk_b` | ✅ **MATCH** (`0ad94f06…7007156`) with the Quectel DA |
 | 6b. Read every partition over USB, compare | `read_all.py` | ✅ all 51 read: **44 MATCH**, 7 DIFF, all in partitions written at runtime |
-| 7. Restore a partition over USB | `write_verify.py` | ⏸️ script ready (dry run only); safety audit says NO-GO on this unit until UART or a spare unit |
+| 7. Restore a partition over USB | `restore_entry.py` | ⏸️ identical-mode hardware PASS; changed-data restoration pending |
 
 ## Safety rules
 
-- **Read-only by default.** Every script here only reads from the device. The download agent
-  runs in the modem's RAM, which is cleared at power-off.
+- **Read-only by default.** Explicit `--write` modes can write flash and require separate approval;
+  dry-runs do not authorize them. The download agent runs in RAM, cleared at power-off.
 - After any `mtkclient` command the modem stays in the preloader or download agent and
   **does not boot** (no internet) until its power is cycled. That is expected.
 - Never upload the raw partition images through LuCI, concatenate them, or write them blindly.
@@ -191,32 +191,24 @@ To read by partition name instead (`READ-PARTITION`, then `READ-PARTITION-TABLE`
 python3 tools/recovery/read_by_name.py lk_b
 ```
 
-### 7. Identical rewrite of one inactive-slot partition (not run yet)
+### 7. Identical rewrite of one inactive-slot partition
 
-```bash
-python3 tools/recovery/write_verify.py lk_a            # dry run: plan, live slot check, guards
-python3 tools/recovery/write_verify.py lk_a --write    # writes; modem must be up for the SSH check
-```
+The [#70 result](research/patched-identical-write-result.md) establishes one approved original-byte
+rewrite of `rootfs_sig_a` using `restore_entry.py identical --write`, with unit binding, six pre-reads,
+six same-session post-reads, and normal stock-B return. The guarded command defaults to an offline
+dry-run; consult its [exact execution gates](research/changed-data-restore-plan.md#guarded-entry-command-66)
+before proposing another operation. A matching readback alone is not general recovery proof.
 
-The only script that writes flash. It accepts only `*_a` partitions (with a denylist), and only
-while the router reports `bootslot=b`. The source is always the verified backup image. In one
-session it reads the target plus **guard partitions** (its neighbours, its slot-B twin, `misc`,
-`boot_para`), which must all match the backup. It then writes and reads everything back. A
-changed guard stops it immediately. This tool deliberately refuses a target that already differs from
-the backup, so it is an **identical rewrite check**, not yet a general damaged-partition restore tool.
-After a fully verified result and an approved normal boot, confirm without the DA:
-`ssh router 'cat /proc/cmdline; sha256sum /dev/mtd25'`.
+The original `write_verify.py` remains an identical-only checker: it accepts allowed inactive-A
+partitions only after B/full-layout confirmation and backup/guard matches. It refuses a changed target.
+The new bounded engine can accept only the one exact staged candidate for restore-only mode; that
+operation is host-tested but still not hardware-proven. No generic damaged-target override exists.
 
-**Safety audit (`router-safety-auditor`, 2026-10-22): NO-GO on the only unit for now.**
-- Writing back identical bytes proves the protocol and the address range, **not** that the DA
-  erases before programming: re-programming identical data passes the read-back either way.
-- The project rules require UART (#2) and a tested way back before `risk/brick` work.
-- If slot A were broken and the A/B rollback or a vendor FOTA ever switched to it, the unit
-  would need BROM or UART recovery, neither of which is proven.
-
-Plan: on a **spare X28**, first write *different* content to a slot-A partition and restore it
-(this proves erase and restore). Only then run the identical-bytes test on this unit, with UART
-attached. Units ship different firmware builds, so each unit restores only from its own backup.
+The initial 2026-10-22 safety audit refused execution on the only unit without UART or a spare.
+UART was subsequently established and the user approved exact identical writes with the disclosed
+same-Mac backup and unproven changed-target recovery limits. That scoped approval does not authorize
+changed bytes, a different partition, slot switching or experimental firmware. Failed/unverified
+results stop without retry or reboot; a separate recovery review is required.
 
 ### Offline recovery preflight (2026-10-28, #4)
 
@@ -507,7 +499,7 @@ plan and your OK). Every partition already reads back correctly over USB (`read_
 
 ## Open questions
 
-- A working USB read (step 6), then a write and restore tested on recoverable hardware.
+- Changed-data restoration on recoverable hardware; USB reads and the scoped identical rewrite now pass.
 - Entering BROM if the preloader itself is damaged (key combination or test point).
 - How OOB/YAFFS2 metadata and bad blocks must be handled on restore (the backup has no OOB).
 - UART access (#2): confirm the candidate footprint and its logic level (see [UART](#uart-debug-console-2-in-progress)),
@@ -519,9 +511,10 @@ The inactive `rootfs_sig_a` identical rewrite was acknowledged, but the first sa
 failed because the host sent an extra raw-upload ACK. A separately approved fresh read-only DA
 session verified the target and all five guards; stock slot B then booted successfully. See the
 [execution evidence and remaining gate](research/first-write-plan.md#observed-execution-2026-10-28-57--60).
-The installer removes the extra ACK; its offline regression passes, but the patched path is not
-hardware-tested. Changed-data restoration remains unproven.
+The installer removes the extra ACK. The later [patched hardware test (#70)](research/patched-identical-write-result.md)
+completed one identical rewrite, all twelve target/guard reads in the same session, and a verified
+stock-B return. Changed-data restoration remains unproven.
 
 The next [changed-data restore proposal](research/changed-data-restore-plan.md) is offline only.
-It requires patched same-session validation, bounded restore tooling and independent review before
-any changed bytes are written.
+Patched same-session validation has passed; the bounded tooling is host-tested. Fresh execution
+gates, safety review and separate approval still apply before any changed bytes are written.

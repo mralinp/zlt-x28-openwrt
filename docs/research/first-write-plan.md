@@ -238,7 +238,9 @@ Its normal END and START handlers already acknowledge both commands. The install
 only that raw-only ACK; the normal completion acknowledgements remain. An offline scripted peer
 reproduces the original failure and checks that patched raw and normal uploads leave the peer ready
 for the next command. The same check also passed against the actual pinned installed `upload`
-method without importing USB code. The fix has **not** been exercised on hardware.
+method without importing USB code. At that stage the fix had not been exercised on hardware;
+the subsequent [#70 result](patched-identical-write-result.md) records a passing identical-mode
+transaction with all same-session reads and normal B return.
 
 This proves an identical-byte erase/program followed by matching fresh-session reads and a normal
 stock-B boot. It does **not** prove restoring changed data, booting slot A, bad-block handling,

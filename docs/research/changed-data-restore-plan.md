@@ -173,5 +173,15 @@ who can edit the code and private receipts.
 All readbacks, source snapshots, chip/identity data and receipts stay in ignored `private/usb-probe`.
 The command closes only its host USB handle, never requests DA shutdown or reboot, and says STOP on
 unverified outcomes. Normal B return remains a separately reviewed power cycle after all original and
-guard reads pass, followed by UART and read-only SSH confirmation. Hardware validation of the host
-ACK fix, identical entry and changed-data restore remains outstanding.
+guard reads pass, followed by UART and read-only SSH confirmation. At #66 preparation, hardware
+validation remained outstanding; the #70 result below establishes identical-mode success only.
+
+## Identical-mode prerequisite observed (#70)
+
+The [patched identical-write test](patched-identical-write-result.md) now passes on hardware:
+one original-byte write, all twelve same-session target/guard reads, independent file rehashing,
+and UART/SSH-confirmed stock-B return. The host patch is installed and all 63 recovery tests pass.
+No `test` or `restore` mode was executed. The changed-data operation still needs fresh preflight,
+UART/copy/storage review, independent safety review and separate exact-scope approval. Its prior
+receipt must match current implementation/unit identities and the 24-hour window; a documentation
+merge does not grant approval or relax those checks.
