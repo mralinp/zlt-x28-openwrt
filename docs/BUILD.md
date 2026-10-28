@@ -350,3 +350,17 @@ passes (705 boot-reachable files scanned, no hits), so the stock clone in `zmtk_
 never writes flash, nor guard against a user later adding such a script to the persistent overlay.
 Stock's success handling is gone with the script: slot A's retry/success records are never cleared by
 the image, so what LK does on later boots (and any fallback to B) is part of #92 and is unverified.
+
+## Physical console shell (#104)
+
+`first_boot.py` adds `ttyS0::askfirst:/bin/ash --login` to `/etc/inittab` (kernel console `ttyS0,921600n1`) and
+refuses a stage without `/bin/ash`. This replaces the earlier no-console profile: failsafe is still removed, SSH is
+still key-only and root's password is still locked, but the UART now gives a root shell after Enter, with no
+password. It is reachable only through the board's UART pads (1.8 V, shifted; see [RECOVERY](RECOVERY.md)). The
+boot-path guard still passes (705 files), and the manifest limits list the console. The first A boot is therefore no
+longer kernel-log only; the write plan should say so once #103 lands.
+
+**Observed offline (2026-10-29):** 10 synthetic tests pass; `private/build/native-ubi-104/` (SquashFS digest
+`b0696c5b...`, padded image `23127d94...`) passed the independent UBI check; the packaged `inittab` shows the single
+console entry, `bin/ash -> busybox` and `dev/console`. **Not verified:** that the prompt appears on hardware, and
+that procd creates `/dev/ttyS0` without devtmpfs (stock does the same for its getty).
