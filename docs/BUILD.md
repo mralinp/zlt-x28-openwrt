@@ -180,3 +180,72 @@ The existing stock module autoload set and modern preinit/core boot still execut
 removing service links is not a whole-system guarantee against hardware activity or flash writes.
 Any later merged/overlaid tree must be rechecked for startup overrides. This profile must not be
 flashed; a candidate requires the outstanding integration and separately approved device operation.
+
+## Experimental UBI packaging (#80)
+
+`tools/build/package_ubi.py` now packages a verified private management profile in Linux. It creates
+SquashFS/XZ, a **fresh empty UBIFS overlay**, and a UBI container with this unit's observed volume
+reservations. This is an offline packaging result, **not flash/boot approval**. Stock boot and signature
+partitions are neither changed nor generated. No captured writable overlay is reused.
+
+Build the local tooling image (public tools only), then run with networking disabled and private
+inputs read-only. The output parent must exist and the output directory must not:
+
+```sh
+docker build -t x28-firmware-tools:ubi -f tools/firmware/Dockerfile tools/firmware
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges --tmpfs /tmp:rw,exec,size=768m \
+  -v "$PWD/tools:/tools:ro" \
+  -v "$PWD/private/build/native-management-78-reviewed:/profile:ro" \
+  -v "$PWD/private/build:/out" x28-firmware-tools:ubi \
+  python3 /tools/build/package_ubi.py --profile /profile --output /out/native-ubi-NEW
+```
+
+The tool verifies the exact profile hash and non-flashable marker, validates archive paths/link
+ancestry before extraction, and refuses a case-insensitive scratch filesystem. SquashFS uses XZ,
+262,144-byte blocks, root ownership, no xattrs, and one compression worker. `mkfs.ubifs` creates
+only an empty tree with minimum I/O 4096, LEB 253952 and maximum 116 LEBs. `ubinize` uses PEB 262144,
+minimum/subpage I/O 4096 and VID offset 4096 (data offset 8192), with dynamic volumes:
+
+- ID 0 `rootfs`: 124 reserved LEBs / 31,490,048 bytes;
+- ID 1 `rootfs_data`: 116 reserved LEBs / 29,458,432 bytes.
+
+Outputs include `rootfs.squashfs`, `rootfs_data.ubifs`, `rootfs-experimental.ubi`, a full 64 MiB
+`rootfs-a-experimental.bin` padded with `ff`, command/version provenance, `manifest.json`, and
+**`NOT-FLASHABLE`**. `INCOMPLETE` remains if packaging/validation fails. Names describe intended
+format/target, not permission to use a flash command. Package/build timestamps and UUIDs mean
+byte-identical reproduction is not promised; record the actual manifest for each run.
+
+The independent parser checks every populated EC/VID header CRC, fixed geometry/copy/compat fields,
+image sequence agreement, both layout copies and all 128 volume-table records, refusing extra
+volumes. Data LEBs must be contiguous/unique and inside the fixed reservation. It checks SquashFS
+format/size, UBIFS superblock CRC and min-I/O/LEB/current/max geometry. It also compares the **entire**
+reconstructed volume payloads to the actual generated filesystem files plus `ff` tails, including
+non-superblock UBIFS data, then repeats inspection after whole-partition padding. Header inspection
+alone is not full UBIFS validation or a kernel mount test.
+
+### Observed packaging result (2026-10-29)
+
+Private output `private/build/native-ubi-80-reviewed/` passed generation and independent checking:
+
+| Item | Result |
+|---|---|
+| SquashFS `bytes_used` | 7,685,384; below the fixed rootfs volume capacity |
+| SquashFS digest over `bytes_used` | `1934e74fbbea68df203b189da35d21fdcd6f6d3686a638de33beb0c4b5ae5f2d` |
+| Populated data LEBs | rootfs 31; fresh overlay 13; layout copies 2 |
+| Full 64 MiB padded-image SHA-256 | `72d8290b3753eff435e635cdfe882751623a551651e0ff28e30281bc6c0c6995` |
+| Tools | squashfs-tools 4.6.1; mkfs.ubifs/ubinize mtd-utils 2.3.0 |
+| Filesystem reconstruction | 1,209 regular files plus links match the private profile; 146 stock modules retained |
+| Fresh overlay | UBI Reader extracted it with no user files; no captured settings imported |
+
+Five synthetic tests pass on Python 3.9 and 3.14, including recomputed-CRC semantic corruption,
+extra volume records, other-overlay-block corruption, invalid geometry/duplicate blocks, and
+input-identity/existing-output rejection. CI needs no vendor inputs or external filesystem tools for
+these tests. The actual build and independent unsquashfs/UBI Reader extraction ran in isolated,
+network-disabled containers without executing image code or accessing the router.
+
+The digest differs from the stock signed digest; this package does not resolve content enforcement
+or create a vendor signature. Key login, physical Ethernet/switch initialization, vendor activation,
+package ownership, device nodes/xattrs, actual fresh-overlay mount behavior, and slot selection/
+reversal remain unproven. The next step is isolated runtime management validation and first-A boot
+planning. There is no proposal to repeat the completed recovery drill or flash this artifact yet.
