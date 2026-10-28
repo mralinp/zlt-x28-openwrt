@@ -47,7 +47,43 @@ The target plus guards total 101 MiB per pass, 202 MiB across the planned pre/po
 1 MiB write. A guard check detects damage after it occurs; it cannot prevent an incorrect DA write
 or prove that every unguarded partition stayed intact.
 
-## Gates before any hardware operation
+## Completed read-only rehearsal (2026-10-28)
+
+**PASS: target plus all five guards, 101 MiB / 105,906,176 bytes.** Before USB entry, the
+hardened tool's 24 host-only tests passed; the live router reported slot B and a full partition
+layout matching the backup. All six local inputs, the DA hash and available host space were checked.
+The user manually power-cycled into preloader; the verified DA was uploaded into RAM.
+Only flash reads were requested, one per partition:
+
+| Readback | Exact bytes | Result |
+|---|---:|---|
+| `rootfs_sig_a` | 1,048,576 | MATCH |
+| `boot_a` | 33,554,432 | MATCH |
+| `rootfs_a` | 67,108,864 | MATCH |
+| `rootfs_sig_b` | 1,048,576 | MATCH |
+| `misc` | 1,048,576 | MATCH |
+| `boot_para` | 2,097,152 | MATCH |
+
+For every read, the DA returned `True`, the file length was exact, and SHA-256 equalled the
+corresponding target/guard hash above. An independent host recheck of all six saved files passed.
+The host reader exited zero. Setup was not warning-free: the log contains `xread: Wrong length`,
+unpatched-extension warnings and an optional extension-builder `TypeError`. Verification depends
+on the successful per-read acknowledgement, exact length and matching hash, not absence of warnings.
+
+Private evidence remains in
+`private/usb-probe/20261028/read-first-write-guards-r64rdhum/` (`result.json`, `console.log`, six
+readbacks). The one-shot host wrapper is scratch, not a newly installed recovery command. An earlier
+host logging-wrapper startup error happened before USB connection; the corrected run above has its
+own directory. Neither raw readbacks, chip identifiers nor console logs are published.
+
+No flash-write/erase command, slot switch, configuration change or automatic reboot was requested.
+This confirms a **point-in-time read baseline**, not write-range safety, erase behavior, or a tested
+rollback. The mandatory reads in a future write session must still run again. Return to Linux after
+this six-partition session has not yet been observed; the earlier single-partition read session did
+return to slot B. Execution approval, the separate backup copy and the rollback gate below remain
+unresolved by this read-only pass.
+
+## Gates before the proposed write
 
 1. **Tool version:** [PR #56](https://github.com/mralinp/zlt-x28-openwrt/pull/56) must be merged and its
    hardened code present. Do not run an older writer. The reviewed recovery-tool tree is commit
