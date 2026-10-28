@@ -38,3 +38,4 @@ jobs:
       - run: python3 tools/recovery/test_changed_restore.py
       - run: python3 tools/recovery/test_restore_entry.py
       - run: python3 tools/build/test_stage_native.py
+      - run: python3 tools/build/test_first_boot.py
