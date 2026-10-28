@@ -329,3 +329,24 @@ assumed from its source, not observed here), whether `load` sets PVIDs from `swi
 built-in switch handler re-applies the same table after `S18` (idempotent in design, unobserved), cold-reset
 persistence, and that socket 4 is the operator-labelled jack (operator-confirmed once, not independently
 measured). Nothing was run on the router.
+
+## Boot-path guard against flash and other-slot writes (#87)
+
+`tools/build/ab_guard.py` runs inside `first_boot.py` and `package_ubi.py` (and standalone on any
+`rootfs-management.tar.gz`). It starts from everything that runs at boot (`inittab`, `rcS`, enabled
+`rc.d` links, `rc.local`, preinit, hotplug, cron, uci-defaults), follows every `/etc|/lib|/usr|/sbin|/bin`
+path those scripts mention (a deliberate over-approximation: a mentioned directory pulls in all its
+scripts), and refuses the build on `ab_image_sync`, `zmtk_boot_done`, `bootctrl`, `platform_do_upgrade`,
+`mtd ... write`, `nandwrite`, `flash_erase`, `ubiupdatevol`, `ubiformat`, `sysupgrade` as a command or
+`of=/dev/{mtd,ubi,block}`. Any `lib/upgrade/*` or `zmtk_boot_done` path is refused even if unreferenced.
+Plain reads (`/dev/mtdblock`, `/sysupgrade.tgz` tests) are allowed.
+
+**Observed (2026-10-29):** six synthetic tests pass (every writer form in an enabled script, in a sourced
+library, and in each root type; unreferenced scripts and plain reads pass). The private #86 profile
+passes (705 boot-reachable files scanned, no hits), so the stock clone in `zmtk_boot_done`
+(`ab_image_sync "_b"` at line 42, retry repair at lines 124-141) has no path into the image.
+
+**Not covered:** this is text only. It does not prove that a vendor ELF, busybox applet or `mount_root`
+never writes flash, nor guard against a user later adding such a script to the persistent overlay.
+Stock's success handling is gone with the script: slot A's retry/success records are never cleared by
+the image, so what LK does on later boots (and any fallback to B) is part of #92 and is unverified.
