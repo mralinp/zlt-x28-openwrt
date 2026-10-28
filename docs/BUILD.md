@@ -137,7 +137,8 @@ This is still **NOT-FLASHABLE**; it is not full hardware or boot integration.
 ```sh
 python3 tools/build/first_boot.py \
   --stage private/build/native-stage-76-final \
-  --public-key ~/.ssh/router.pub --lan-device eth1 \
+  --public-key ~/.ssh/router.pub \
+  --stock private/firmware/20261021/rootfs-b-system.tar.gz \
   --output private/build/native-management-NEW
 ```
 
@@ -147,8 +148,8 @@ password is read/generated/copied. The archive embeds the public key privately a
 `/etc/dropbear/authorized_keys`; public keys and per-unit output are not committed. Input archive
 bytes must match the stage manifest and its `NOT-FLASHABLE` marker. Existing output is refused.
 
-The profile writes static `192.168.70.1/24` on the explicitly supplied `eth0`, `eth1` or valid VLAN
-device. SSH is port 2222, restricted to LAN, with both password-auth options off and all shadow
+The profile writes static `192.168.70.1/24` on `eth0.3` (switch profile below; #86 replaced the earlier
+`--lan-device` choice). SSH is port 2222, restricted to LAN, with both password-auth options off and all shadow
 password fields locked. There is no WAN interface, DHCP server, web service or modem/Wi-Fi service
 activation. A laptop would need a compatible static address; no live network was changed here.
 `eth1` in the private draft is **not a verified physical-port mapping**. Read-only observation of the
@@ -300,3 +301,31 @@ carrier. The candidate currently lacks `swconfig` and the generic switch helper.
 reviewed switch integration before the static LAN configuration can be considered reachable.
 Stock B and all four selection records remain unchanged; a safe A-selection/reversal API is not yet
 established. No setting or partition was changed. See the report for exact live/source evidence.
+
+## Observed socket-4 switch profile (#86)
+
+`first_boot.py` now also needs `--stock` (the case-preserving stock rootfs archive). It copies this
+unit's stock `/sbin/swconfig` (SHA-256 `1fe11f5c9b3a5b04241d49ab689227869ca7d77d4a838fb01e9931954778179c`);
+every `DT_NEEDED` entry already resolved in the staged tree (`libnl-tiny`, `libuci`, `libubox`,
+`libgcc_s`, musl) and an unresolved library refuses the build. LAN is `eth0.3`. `/etc/config/network`
+carries `switch0` with the table observed on stock in #84 (VLAN 1 `1 5t`, 2 `2 5t`, 3 `4 5t`, 4 `0 6t`,
+each untagged port's PVID equal to its VLAN), and `/etc/init.d/x28-switch` (`S18`, before network)
+runs `swconfig dev switch0 load network`, then reads back the enable flag, every VLAN's ports and
+every PVID. A different `swconfig list` result, a failed load or any mismatch writes
+`/tmp/x28-switch.failed` and exits non-zero. No vendor initializer, PHY (`mii_mgr`) or GPIO 24
+write, no `lan_mgr`, modem or Wi-Fi start, and the generic `lib/network/switch.sh` is not shipped.
+
+**Observed offline checks (2026-10-29):** nine synthetic tests pass (Python 3.9), including the init
+script run against a fake `swconfig` that rejects a wrong switch, a load failure and a drifted table.
+The private output `private/build/native-management-86/` (archive
+`b7feca9c4a3bf18443d06224a7cba5bd72e6ce3c5cab6b756df8184ee2bfd40b`) was packaged into
+`private/build/native-ubi-86/` (SquashFS digest `e841e2d5f280429e27ea095bae99fc04124a232ed34fbfb2d739f1800b142a12`,
+31 + 13 LEBs, padded image `9d433b66…`); the independent UBI check passed. In a network-disabled container
+the image's musl loader resolved all `swconfig` libraries and the image's own `uci` parsed the network
+config. The candidate stays **NOT-FLASHABLE**.
+
+**Not verified:** the real `swconfig` against the real driver (output format of the `get` readbacks is
+assumed from its source, not observed here), whether `load` sets PVIDs from `switch_port`, whether netifd's
+built-in switch handler re-applies the same table after `S18` (idempotent in design, unobserved), cold-reset
+persistence, and that socket 4 is the operator-labelled jack (operator-confirmed once, not independently
+measured). Nothing was run on the router.
