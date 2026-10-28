@@ -512,3 +512,12 @@ plan and your OK). Every partition already reads back correctly over USB (`read_
 - How OOB/YAFFS2 metadata and bad blocks must be handled on restore (the backup has no OOB).
 - UART access (#2): confirm the candidate footprint and its logic level (see [UART](#uart-debug-console-2-in-progress)),
   and the A/B rollback rules (#3).
+
+### First identical rewrite and host protocol fix (2026-10-28)
+
+The inactive `rootfs_sig_a` identical rewrite was acknowledged, but the first same-session read
+failed because the host sent an extra raw-upload ACK. A separately approved fresh read-only DA
+session verified the target and all five guards; stock slot B then booted successfully. See the
+[execution evidence and remaining gate](research/first-write-plan.md#observed-execution-2026-10-28-57--60).
+The installer removes the extra ACK; its offline regression passes, but the patched path is not
+hardware-tested. Changed-data restoration remains unproven.

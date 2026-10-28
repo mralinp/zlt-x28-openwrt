@@ -14,6 +14,7 @@ Local changes to the installed copy (the source checkout stays pristine):
 - check_sla(): this board's DA answers the DA.SLA property query with nothing,
   and mtkclient called .decode() on False;
 - get_hw_info(): this DA reports NAND with an empty page_parity_size field (unused);
+- upload(): omit the extra raw-upload ACK; END/START already acknowledge completion;
 - upload_da() (newer mtkclient only): building the optional DA extensions crashes on this
   DA (a function lookup returns None); skip the extensions instead of aborting.
 """
@@ -31,6 +32,9 @@ REPO_URL = "https://github.com/bkerler/mtkclient.git"
 SLA_CALL = '        data = self.get_sys_property(key="DA.SLA", length=0x200000)\n'
 EXT_CALL = "            if self.mtk.daloader.patch:\n                xdata = self.xmlft.patch()\n"
 PATCHES = [  # (file under site-packages/mtkclient, old text, new text, required)
+    ("Library/DA/xmlflash/xml_lib.py",
+     "                if raw:\n                    self.ack()\n",
+     "                # X28 patch: END/START already acknowledge flash upload completion.\n", True),
     ("Library/DA/xmlflash/xml_lib.py", SLA_CALL,
      SLA_CALL + "        if not data:  # X28 patch: DA returns no DA.SLA property\n"
                 "            return False\n", True),
