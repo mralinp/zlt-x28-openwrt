@@ -46,7 +46,7 @@ prove a way back, then build.
 | Vendor modem/cellular binaries on that userspace | ✅ link with musl's loader (static + runtime link test) |
 | Restore a partition over USB | ✅ exact changed-padding page restored and stock B returned; [scope and limits](docs/research/changed-page-restore-result.md) |
 | UART console | ✅ shifted RX at 921600; boot and recovery logs captured |
-| Bootable native image | 🗓️ [private staging + management profile built](docs/BUILD.md#first-boot-management-profile-78); runtime/UBI/first-A integration pending |
+| Bootable native image | 🗓️ [experimental UBI packaged](docs/BUILD.md#experimental-ubi-packaging-80); runtime/signature/first-A readiness pending |
 | Stage 1 overlay on stock firmware (LuCI on `:4153`, vendor bridge, SMS) | ✅ working; voice blocked by the SIM |
 
 Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**.
