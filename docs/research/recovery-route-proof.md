@@ -86,6 +86,22 @@ Unanswered: whether an invalid slot record is fatal before the USB handshake. To
 walking callers of the `nand_read`/partition read of `misc` (string `get part misc fail try para`) or by running a
 full Ghidra auto-analysis with the relocation applied. If that stays unclear, check 3 is the only way to know.
 
+## Check 1, attempt 3 (2026-10-29): AB module still not found
+
+Extra scans over `pl.bin` for any code that reaches the AB strings (`[QL_AB]`, `[AB] ...`, `no valid slot`,
+`rollback_slot`, `ab init fail`, `get part misc fail`):
+
+- Thumb `ldr`/`ldr.w` + `add rX,pc` and ARM `ldr` + `add rd,pc,rm` (PC-relative offsets): 312 string references
+  resolved, none to those strings.
+- Absolute pointers: only the four-entry table at file offsets `0x3d4c4-0x3d6ec` (base `0x208488`) points at them.
+  Thumb `movw/movt` pairs (no consecutive pair exists) and ARM `movw/movt` (one value, unrelated).
+- The main function reaches globals through a GOT whose base is `0x246564` (file `0x3e0dc`): `ldr rX,[pc]` literal +
+  `add pc`, then `[base + literal]`. No GOT-relative literal lands on the descriptor table's records.
+
+So the AB module is reached through something these scans do not model (an indirect call table, a stage copied to a
+different base, or code in a region not in this payload). Further hand scanning has low yield; a full Ghidra
+auto-analysis with the GOT/relocations applied, or a live observation (check 3), are the remaining routes.
+
 ## Decision rule for gate 6
 
 - `rootfs_a` sessions: the preloader window precedes nothing they change (`misc` still selects B), so gate 6 is
