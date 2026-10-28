@@ -128,3 +128,55 @@ present. Initial modem/mount/network/Wi-Fi activation, device-node/xattr policy,
 access, fresh overlay policy, UBI packaging, signed-content handling and slot selection are unfinished.
 The stage has no operational boot guarantee and must not be flashed or booted. Next work integrates
 and validates those actual boot-tree requirements before producing a candidate image.
+
+## First-boot management profile (#78)
+
+`tools/build/first_boot.py` applies a narrow management policy to a verified #76 staging archive.
+This is still **NOT-FLASHABLE**; it is not full hardware or boot integration.
+
+```sh
+python3 tools/build/first_boot.py \
+  --stage private/build/native-stage-76-final \
+  --public-key ~/.ssh/router.pub --lan-device eth1 \
+  --output private/build/native-management-NEW
+```
+
+The public key is parsed as one plain Ed25519 or RSA key (RSA at least 2048 bits); options, private
+keys, multiple lines and malformed blobs are refused. Comments are discarded. No private key or
+password is read/generated/copied. The archive embeds the public key privately as mode-0600
+`/etc/dropbear/authorized_keys`; public keys and per-unit output are not committed. Input archive
+bytes must match the stage manifest and its `NOT-FLASHABLE` marker. Existing output is refused.
+
+The profile writes static `192.168.70.1/24` on the explicitly supplied `eth0`, `eth1` or valid VLAN
+device. SSH is port 2222, restricted to LAN, with both password-auth options off and all shadow
+password fields locked. There is no WAN interface, DHCP server, web service or modem/Wi-Fi service
+activation. A laptop would need a compatible static address; no live network was changed here.
+`eth1` in the private draft is **not a verified physical-port mapping**. Read-only observation of the
+stock unit found `br0` using `eth0.1/.2/.3`, `eth1` and Wi-Fi/USB peers; it does not establish that
+plain generic netifd initialization will program the switch or expose a working port.
+
+Enabled startup links are limited to urngd, boot, system, sysctl, log, dropbear and network. Each
+retained rc name must be a symlink to the exact corresponding executable regular init script; an
+allowed basename pointing elsewhere is refused. Other rc links, board/default scripts, upgrade
+helpers, previous SSH keys and `zmtk_boot_done` paths are removed. Normal inittab has no interactive
+getty/askfirst entry. Packaged `lib/preinit/*failsafe*` hooks are removed and
+`pi_preinit_no_failsafe="y"` is set. This intentionally removes normal OpenWrt failsafe recovery;
+it does not establish USB/BROM or arbitrary-damage recovery. `/etc/rc.local` is a no-op and fstab
+contains no shared-volume/swap entries. Stock vendor mount/restore init is not imported: that path
+would create volumes and write shared NVRAM/config and cannot be enabled as an unreviewed default.
+
+**Observed offline checks:** five synthetic tests pass on Python 3.9 and 3.14, covering malformed
+keys/device injection, changed-stage identity, forbidden startup paths, exact rc targets, all-account
+locks, failsafe removal, and output preservation. The private draft
+`private/build/native-management-78-reviewed/` was extracted in an isolated network-disabled Linux
+container. Target UCI parsed the generated network/Dropbear configuration and the effective startup
+links/account locks matched the manifest. No SSH/network/vendor daemon was started. The prior #76
+userspace CI build also passed after its merge.
+
+**Still pending:** actual key authentication with locked root; kernel/driver/modem/mount/Wi-Fi
+activation; physical switch setup; fresh overlay implementation; package registration; device nodes/
+xattrs; UBI generation and inspection; signature-content behavior; safe slot selection/reversal.
+The existing stock module autoload set and modern preinit/core boot still execute in a future boot;
+removing service links is not a whole-system guarantee against hardware activity or flash writes.
+Any later merged/overlaid tree must be rechecked for startup overrides. This profile must not be
+flashed; a candidate requires the outstanding integration and separately approved device operation.
