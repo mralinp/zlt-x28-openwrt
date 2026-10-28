@@ -170,7 +170,8 @@ class SpecTests(unittest.TestCase):
         return s.rootfs_a_spec('a' * 64), s.misc_spec('a' * 64)
 
     def test_real_specs_guard_both_slots_and_never_the_target(self):
-        every = {'boot_a', 'rootfs_sig_a', 'rootfs_sig_b', 'boot_para', 'lk_a', 'tee_a', 'boot_b', 'rootfs_b', 'lk_b', 'tee_b'}
+        every = {'boot_a', 'rootfs_sig_a', 'rootfs_sig_b', 'boot_para', 'lk_a', 'tee_a', 'boot_b', 'rootfs_b', 'lk_b', 'tee_b',
+                 'proinfo', 'md1dsp_a', 'md1dsp_b', 'mcf1_a', 'mcf1_b', 'mcf2_a', 'mcf2_b'}
         rootfs_a, misc = self.specs()
         self.assertEqual({g[0] for g in rootfs_a.guards}, every | {'misc'})
         self.assertEqual({g[0] for g in misc.guards}, every | {'rootfs_a'})
