@@ -1,7 +1,8 @@
 # Changed-data restore: offline proposal (#62)
 
 Prepared 2026-10-28 after the [first identical rewrite](first-write-plan.md#observed-execution-2026-10-28-57--60).
-**Not ready to execute.** This document authorizes no write, power cycle, slot switch or SDK image.
+**Historical proposal; executed under separate approval in [#72](changed-page-restore-result.md).**
+This document itself authorizes no write, power cycle, slot switch or SDK image.
 The user has one unit and accepts replacement risk; calibration/identity loss remains a separate risk.
 
 ## Objective and exact candidate
@@ -185,3 +186,11 @@ No `test` or `restore` mode was executed. The changed-data operation still needs
 UART/copy/storage review, independent safety review and separate exact-scope approval. Its prior
 receipt must match current implementation/unit identities and the 24-hour window; a documentation
 merge does not grant approval or relax those checks.
+
+## Changed-page test completed (#72)
+
+The separately approved [hardware result](changed-page-restore-result.md) is PASS: exact candidate,
+all staging guards, original restore and all final guards verified, followed by stock-B return.
+Two acknowledged writes and eighteen same-session exact reads were independently checked. This
+supersedes earlier pending-status statements for the narrow planned experiment; the broader failure,
+OOB/bad-block and boot-policy limits above remain. No additional device operation is authorized.

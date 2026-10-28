@@ -63,3 +63,6 @@ not demonstrate restoration of changed data, arbitrary damaged-target recovery, 
 a damaged preloader route, slot-A boot, signature-failure fallback or post-boot content enforcement.
 The [changed-data test](changed-data-restore-plan.md) remains a separate operation requiring approval;
 its prior-identical gate is bounded to matching implementation/unit identities and a 24-hour window.
+
+The later [#72 result](changed-page-restore-result.md) completes the separate narrow changed-page
+restore experiment. The broader recovery and boot-policy exclusions above remain.
