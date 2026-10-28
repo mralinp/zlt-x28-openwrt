@@ -64,7 +64,7 @@ class PolicyTests(unittest.TestCase):
                               'etc/uci-defaults/99-unsafe':b'mtd write', 'etc/rc.local':b'mtd write',
                               'etc/fstab':b'/dev/other /data ubifs rw 0 0',
                               'etc/rc.d/S99zmtk_boot_done':b'unsafe', 'etc/board.d/02_network':b'generic',
-                              'lib/upgrade/platform.sh':b'unsafe', 'lib/preinit/99_10_failsafe_login':b'ash --login', 'lib/preinit/00_preinit.conf':b'pi_preinit_no_failsafe=""\n','lib/libc.so':b'musl'}.items():put(t,name,data)
+                              'lib/upgrade/platform.sh':b'unsafe', 'lib/preinit/99_10_failsafe_login':b'ash --login', 'lib/preinit/00_preinit.conf':b'pi_preinit_no_failsafe=""\n','lib/libc.so':b'musl','bin/ash':b'busybox'}.items():put(t,name,data)
             m=tarfile.TarInfo('etc/rc.d/S19dropbear');m.type=tarfile.SYMTYPE;m.linkname='../init.d/dropbear';t.addfile(m)
             m=tarfile.TarInfo('etc/rc.d/S20network');m.type=tarfile.SYMTYPE;m.linkname='../init.d/network';t.addfile(m)
         (self.stage/'manifest.json').write_text(json.dumps({'flashable':False,'archive_sha256':f.digest(self.archive.read_bytes())}))
@@ -85,7 +85,8 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn('etc/uci-defaults/99-unsafe',tree)
         self.assertNotIn('lib/preinit/99_10_failsafe_login',tree)
         self.assertIn(b'pi_preinit_no_failsafe="y"',tree['lib/preinit/00_preinit.conf'][1])
-        self.assertNotIn('askfirst',tree['etc/inittab'][1].decode())
+        self.assertEqual([l for l in tree['etc/inittab'][1].decode().splitlines() if 'askfirst' in l],['ttyS0::askfirst:/bin/ash --login'])
+        self.assertNotIn('login.sh',tree['etc/inittab'][1].decode())
         self.assertIn(b"option device 'eth0.3'",tree['etc/config/network'][1])
         self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/dropbear/authorized_keys'][0].mode,0o600)
@@ -156,6 +157,15 @@ class PolicyTests(unittest.TestCase):
                     m.size=6;t.addfile(m,io.BytesIO(b'unsafe'))
             (self.stage/'manifest.json').write_text(json.dumps({'flashable':False,'archive_sha256':f.digest(self.archive.read_bytes())}))
             with self.assertRaises(ValueError):f.integrate(self.stage,self.key,self.stock,self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_console_shell_needs_ash(self):
+        with tarfile.open(self.archive,'w:gz') as t:
+            for name in ('etc/inittab','etc/shadow','etc/init.d/dropbear','etc/init.d/network','lib/libc.so'):put(t,name,b'root:::0:99999:7:::\n' if name=='etc/shadow' else b'x')
+            for link in ('S19dropbear','S20network'):
+                m=tarfile.TarInfo('etc/rc.d/'+link);m.type=tarfile.SYMTYPE;m.linkname='../init.d/'+link[3:];t.addfile(m)
+        (self.stage/'manifest.json').write_text(json.dumps({'flashable':False,'archive_sha256':f.digest(self.archive.read_bytes())}))
+        with self.assertRaises(ValueError):f.integrate(self.stage,self.key,self.stock,self.output)
         self.assertFalse(self.output.exists())
 
     def test_existing_output_is_not_overwritten(self):
