@@ -212,6 +212,39 @@ attached. Units ship different firmware builds, so each unit restores only from 
 
 ## UART (debug console, #2): read side confirmed
 
+### Verified setup (2026-10-28)
+
+Read-only capture works on this unit with: board TX pad (idles at 1.8 V) -> level shifter (1.8 V side to
+3.3 V side) -> USB-TTL dongle RX, with a **common GND** between board, shifter and dongle. Baud is
+**921600 8N1** (the kernel command line says so; the unit decoded 100% printable text at that rate). Another X28
+was reported to use 115200; do not assume it, check `console=` in the boot log or the kernel command line.
+
+Symptoms of a wrong setup, all seen while getting here:
+- **Missing or broken GND:** random bytes at every baud, or a line stuck at `0xFF`. The RX LED still blinks.
+- **3.3 V adapter reading the 1.8 V pad directly:** noise, no decodable text (a CP210x needs about 2 V for a high).
+- **Wrong tool, not wrong wiring:** on macOS `stty -f DEV 921600; cat DEV` captures at **9600**, because the
+  port settings reset when `stty` exits. Open the port once and set the speed on that descriptor
+  (Python `termios` plus `fcntl.ioctl(fd, 0x80045402, array('i', [baud]))`, or `screen DEV 921600`).
+- **Loopback check:** short dongle TX to RX (or run it through the shifter) and send a test string. It tests the
+  dongle and shifter only, not the board.
+
+Not yet recorded: which pad of the 3-hole footprint is TX, and the shifter part used.
+
+### Login shell on the UART (2026-10-28)
+
+The vendor image ships with the getty commented out, so the console is output-only: Enter echoes `\r\n` and no
+`login:` ever appears. Write path through the shifter works (a CR is echoed back). To get a shell:
+
+```sh
+cp -p /etc/inittab /etc/inittab.bak-uart            # check it is non-empty
+sed 's/^# console::respawn/console::respawn/' /etc/inittab.bak-uart > /tmp/i && cat /tmp/i > /etc/inittab
+```
+
+The line is `console::respawn:/sbin/getty -L ttyS0 921600 -t 60 vt100`. BusyBox init reads inittab at boot (or on
+`kill -HUP 1`, not tried here). Way back: `cp -p /etc/inittab.bak-uart /etc/inittab`. The change is on the
+overlay, so check it survives a firmware restore. A root login on the console needs a real password. Terminal:
+`python3 term.py 921600` (a macOS-safe terminal that sets the speed on the open port; `screen` cannot do 921600).
+
 **2026-10-26: the console was read at 921600 8N1 during a power-cycle** (preloader, LK and kernel are all visible); see
 [research/uart-boot-log.md](research/uart-boot-log.md). The write side (typing to the console) is not wired yet.
 The notes below are the earlier search for the pads and the level rules, kept for the next unit.
