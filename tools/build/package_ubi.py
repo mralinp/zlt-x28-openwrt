@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -92,10 +93,13 @@ def package(profile,output):
         (tree/'CaseProbe').unlink()
         with tarfile.open(fileobj=io.BytesIO(raw)) as tar:tar.extractall(tree,filter='tar')
         sq=output/'rootfs.squashfs';ubifs=output/'rootfs_data.ubifs';ubi=output/'rootfs-experimental.ubi'
-        commands=[['mksquashfs',str(tree),str(sq),'-noappend','-comp','xz','-b','262144','-all-root','-no-xattrs','-processors','1'],
+        commands=[['mksquashfs',str(tree),str(sq),'-noappend','-comp','xz','-b','262144','-all-root','-no-xattrs','-processors','1',
+                   '-p','dev/console c 600 0 0 5 1'],  # kernel has no DEVTMPFS; stock also ships a static console node
                   ['mkfs.ubifs','-r',str(overlay_tree),'-m','4096','-e',str(LEB),'-c','116','-o',str(ubifs)]]
         with (output/'packaging.log').open('w') as log:
             for command in commands:subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
+            listing=subprocess.run(['unsquashfs','-ll',str(sq)],capture_output=True,text=True,check=True).stdout
+            require(re.search(r'^crw------- root/root\s+5,\s*1 \S+ \S+ squashfs-root/dev/console$',listing,re.M),'static /dev/console missing')
             require(sq.stat().st_size<=124*LEB and ubifs.stat().st_size<=116*LEB,'filesystem exceeds fixed volume reservation')
             config=work/'ubinize.ini';config.write_text(f'[rootfs]\nmode=ubi\nimage={sq}\nvol_id=0\nvol_type=dynamic\nvol_name=rootfs\nvol_size={124*LEB}\n\n[rootfs_data]\nmode=ubi\nimage={ubifs}\nvol_id=1\nvol_type=dynamic\nvol_name=rootfs_data\nvol_size={116*LEB}\n')
             command=['ubinize','-o',str(ubi),'-p',str(PEB),'-m','4096','-s','4096','-O','4096',str(config)]
