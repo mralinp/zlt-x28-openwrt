@@ -314,3 +314,14 @@ strings -n 5 $B/mtd38-lk_b.bin | grep -E 'bootslot=|bootctrl|ql_raw_data|ROOTFS_
   the kernel; the LK and Quectel boot-control behaviour may be documented by Quectel for the RG500L platform.
 - **Vendor update path**: read-only inspection of the stock FOTA/upgrade scripts shows how the vendor itself
   switches slots and writes `rootfs_sig_*`.
+
+### Live selection baseline rechecked (#84, 2026-10-29)
+
+A fresh read-only session confirmed `bootslot=b`, `ubi.mtd=42` and the full original partition
+layout. All four `misc` records at `0x800`, `0x40800`, `0x80800`, `0xc0800` remain
+`00414230ffffffff0e0001000f000100`; the entire partition matches its original hash. `qraw` also
+matches its original bytes, with candidate words at `0x0c`/`0x4000c` still 2. This does not identify
+a consumer or a safe slot-switch API. Live `S99zmtk_boot_done` and its script/helper hashes match
+the archived clone-path evidence above. No helper, metadata write, slot switch or reboot was used.
+See [live native-boot prerequisites](research/live-native-boot-prerequisites.md) for the record and
+Ethernet findings; a separate exact selection/reversal plan is still required before an A boot.
