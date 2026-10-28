@@ -291,3 +291,12 @@ Still unverified: this unit's actual public-key/client combination, full Dropbea
 procd/overlay boot, physical Ethernet/switch setup, vendor activation, signed-content acceptance and
 slot selection/reversal. The candidate remains **NOT-FLASHABLE**. Next work targets effective first-A
 boot/management behavior and exact slot policy, without another recovery-write rehearsal.
+
+## Live management and slot prerequisites (#84)
+
+The [read-only device check](research/live-native-boot-prerequisites.md) found the connected stock
+switch path on VLAN 3 (`4 5t`), with `eth0.3` carrying traffic and draft-selected `eth1` lacking
+carrier. The candidate currently lacks `swconfig` and the generic switch helper. It needs explicit
+reviewed switch integration before the static LAN configuration can be considered reachable.
+Stock B and all four selection records remain unchanged; a safe A-selection/reversal API is not yet
+established. No setting or partition was changed. See the report for exact live/source evidence.
