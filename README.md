@@ -23,7 +23,8 @@
 
 > [!WARNING]
 > **Your device, your risk.** The X28 is usually someone's only internet connection, and the project works on
-> its flash. Nothing here writes flash yet: the first restore test waits for UART access and a spare unit. Read
+> its flash. A bounded inactive-slot changed-page restore test has passed; arbitrary recovery and a custom-image
+boot remain unproven. Read
 > [docs/RECOVERY.md](docs/RECOVERY.md) before touching anything. Not affiliated with ZLT, Tozed, MediaTek or Quectel.
 
 ## Why
@@ -43,9 +44,9 @@ prove a way back, then build.
 | Firmware inventory (kernel config, modules, vendor packages, runtime deps) | ✅ done |
 | OpenWrt 23.05.5 userspace (fw3 + iptables-legacy, LuCI) | ✅ builds in CI; released as `v0.1.0` (pre-release) |
 | Vendor modem/cellular binaries on that userspace | ✅ link with musl's loader (static + runtime link test) |
-| Restore a partition over USB | ⏸️ script ready; **not run** (needs UART or a spare unit) |
-| UART console | 🚧 candidate pads found; logic level to be measured |
-| Bootable native image | 🗓️ next: local assembly with the vendor half, then the inactive A/B slot |
+| Restore a partition over USB | ✅ exact changed-padding page restored and stock B returned; [scope and limits](docs/research/changed-page-restore-result.md) |
+| UART console | ✅ shifted RX at 921600; boot and recovery logs captured |
+| Bootable native image | 🗓️ [input/boot audit complete](docs/research/native-image-readiness.md); local assembly and first-A boot plan next |
 | Stage 1 overlay on stock firmware (LuCI on `:4153`, vendor bridge, SMS) | ✅ working; voice blocked by the SIM |
 
 Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**.
@@ -64,7 +65,7 @@ flowchart LR
         V --> A
         A --> IMG["rootfs_a image"]
     end
-    IMG -. "USB preloader + DA<br/>(after UART / spare unit)" .-> X28[("ZLT X28<br/>inactive slot A")]
+    IMG -. "USB preloader + DA<br/>(after image/boot review + approval)" .-> X28[("ZLT X28<br/>inactive slot A")]
 ```
 
 - **Open half in CI.** Official 23.05.5 packages, assembled with ImageBuilder. The firewall is fw3 because the
@@ -72,7 +73,8 @@ flowchart LR
 - **Vendor half stays local.** The stock kernel, modules and vendor binaries are proprietary and specific to a
   firmware build, so they are taken from **your own unit's backup** and never enter this public repo or CI.
 - **Recovery path.** Preloader USB download (USB-A-to-C cable) with Quectel's T750 download agent and a
-  pinned, patched mtkclient. It reads the whole flash; writing waits for the safety prerequisites.
+  pinned, patched mtkclient. It reads the whole flash; the tested two-write page restore keeps its explicit scope and guards.
+  A custom-image write still needs its own reviewed artifact and approval.
 
 ## Reproduce the results
 

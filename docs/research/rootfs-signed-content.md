@@ -172,11 +172,11 @@ Expected: `Verified OK`. This checks the signature using the extracted public ke
 
 1. **Read-only positive baseline: passed.** The live hash, signed metadata, offline signatures,
    and stock backup agree. This is suitable as a preflight for later experiments, not permission to flash.
-2. **Recovery first (#4): not demonstrated.** The existing `write_verify.py lk_a` dry run passed:
-   active B, verified 2 MiB source at offset `0x11200000`, guards `mcupm_a`, `tee_a`, `lk_b`, `misc`,
-   and `boot_para`. No USB connection or write occurred. Rewriting identical bytes would not prove
-   erase behavior or restoration of changed data; a separate recoverable unit remains the documented
-   place for that proof. UART read access is established, but UART does not itself restore NAND.
+2. **Recovery first: narrow #72 PASS.** The [changed-page result](changed-page-restore-result.md)
+   demonstrates one exact 4 KiB padding change/restore in `rootfs_sig_a`, eighteen matching checks,
+   and stock-B return. It does not establish arbitrary `rootfs_a` recovery, interrupted-run restoration,
+   bad-block/OOB correctness or safe A selection. The first custom image still requires a reviewed
+   image-specific write/restore operation. UART itself is not a NAND restore mechanism.
 3. **Separate failure experiments, after recovery proof and explicit approval.** A bad certificate tests
    LK's error/halt/watchdog/slot behavior. A valid stock certificate paired with different rootfs bytes
    tests content enforcement. The latter must remain structurally valid and mountable: UBI, SquashFS,
@@ -192,7 +192,8 @@ Expected: `Verified OK`. This checks the signature using the extracted public ke
 The user confirmed on 2026-10-28 that this is still the only X28. An independent router-safety
 review approved the documentation/read-only baseline and retained the failure-test stop below.
 
-**Current verdict:** GO for the completed read-only baseline; NO-GO for a modified-image boot on the
-only unit while changed-data restoration and safe slot selection remain unproven. No risky command
-sequence is supplied as though it were ready. The next decision is the recoverable test hardware and
-restore demonstration, not another round of speculative NAND call tracing.
+**Current verdict (updated after #72/#74):** the bounded recovery experiment passes. GO for
+[offline native-image assembly](native-image-readiness.md); no modified-image boot is ready while
+the actual candidate, safe slot-selection/reversal and cross-slot clone prevention remain unreviewed.
+The signed-content consumer is still unresolved, so image acceptance must not be assumed. No risky
+command sequence is supplied as though it were ready, and no repeat recovery drill is proposed.
