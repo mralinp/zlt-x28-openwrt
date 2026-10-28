@@ -32,6 +32,16 @@ Slot selection lives in `misc`, which still says B. So:
 With no bad blocks, the physical block `n` of the image is the block `n` the UBI attach expects, so no
 bad-block remapping is needed. A new bad block appearing during the write must stop the session.
 
+## Status of the tools
+
+`tools/recovery/slot_session.py` (this repo, host-tested with a fake DA) is the **engine** for both
+sessions below: fixed target, original/candidate hash binding, per-spec candidate validator
+(`rootfs_a`: different 64 MiB image that passes `package_ubi.inspect`; `misc`: exactly the four-copy
+A selection), neighbor guards re-read before and after, one write, no retry/reboot, restore tolerant of a
+half-written target. Checked against the real private candidate and `misc` dump. **Not built:** the
+attested entry command (receipts, UART/backup-copy/free-space checks, typed confirmation, restore claim)
+modelled on `restore_entry.py`, and the hardware identical-write passes. No device I/O exists in the engine.
+
 ## Step 1: `rootfs_a` write session (tool to build: #99)
 
 A new bounded session next to `changed_restore.py`, with the same shape: no connect/retry/reboot options,
