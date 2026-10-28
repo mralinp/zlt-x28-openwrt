@@ -144,8 +144,8 @@ proof that no callback is subsequently replaced.
 
 This vendor `nand_read` calls `nand_operation` at `0x77a12c` with `w6 = 1` (read).
 `nand_operation` selects `nandx_read` (`0x76f6cc`) at `0x779a40–0x779a64` for that argument;
-its three indirect operation calls use that selection. `nandx_read` reaches additional lower-level
-operations, including an indirect call at `0x76f974`; that layer is not resolved here.
+its three indirect operation calls use that selection. The later `nandx_read` callback at `0x76f974`
+is traced through initialization below; some deeper hardware/ECC calls remain unresolved.
 No hash-list verification was identified in these inspected wrapper bodies.
 
 The common `_mcount` entry at `0x1e4a0` loads `ftrace_trace_function` (symbol offset `0x1b8daa0`)
@@ -153,6 +153,44 @@ at `0x1e4a8–0x1e4ac`, skips the callback if it equals `ftrace_stub` (`0x1e4d8`
 calls it at `0x1e4cc`. Thus the instrumentation call is an actual indirect boundary; its runtime
 target cannot be inferred from this static Image. Lower-level callbacks, instrumentation state,
 and other paths remain explicit limits of the negative result.
+
+**NAND initialization and controller dispatch:** `nandx_init` calls `nand_chip_init` at `0x77028c`,
+stores its result at offset zero in the allocated context (`0x770310`), and publishes that context
+as `g_nandx` at Image offset `0x1fe2018` (`0x770314–0x770320`). `nandx_read` loads this context
+at `0x76f6fc–0x76f700`, then uses the chip object's callback at offset `0x50` at `0x76f96c–0x76f974`.
+
+The initial assignment is `nand_chip_read_page` (`0x76e6ac`), installed at `0x76ecc4–0x76eccc`.
+It is **not necessarily the final callback**: `nand_probe` stores mode byte 1 at configuration offset
+`0x48` at `0x77b1e4–0x77b1ec`, then calls `nandx_init` at `0x77b23c`. `nand_chip_init` tests that
+byte at `0x76ed18–0x76ed1c`; the nonzero branch calls the NAND initializer at `0x77298c` from
+`0x76edf4`. This initializer replaces the chip's offset-`0x50` callback with
+`nand_chip_slc_read_page` (`0x771f4c`) at `0x772ac4–0x772acc`.
+
+`nand_chip_slc_read_page` selects among operations at offsets `0xf0`, `0xf8`, and `0xd8` of its
+NAND object (`0x771f70–0x771fb4`). The default `0xd8` value preserves the original
+`nand_chip_read_page` callback (`0x772a40–0x772a44`); mode flags at `0xb0/0xb1` are initialized
+to zero at `0x772a38–0x772a3c`. This establishes setup, not the flags' later runtime values.
+The base read dispatch uses NAND addressing, page-read, and data-read callbacks
+(`0x76e734`, `0x76e744`, `0x76e780`). Base initialization assigns them at
+`0x76e5dc–0x76e5fc`. The data-read routine calls the controller's offset-`0x68` callback at
+`0x76e17c`; `nfi_init` assigns `nfi_read_sectors` (`0x77313c`) there at `0x7758f8–0x775900`.
+
+`nfi_read_sectors` dispatches through five controller callbacks. Their assignments in `nfi_init`
+(`0x775828–0x775860`) resolve to `rw_prepare` (`0x773ad0`), `rw_trigger` (`0x772ec4`),
+`rw_wait_done` (`0x774184`), `rw_data` (`0x7750b8`), and `rw_complete` (`0x773698`).
+These routines contain further indirect hardware/ECC operations; this is not a closed whole-kernel
+call graph. Kallsyms contains duplicate local names, including `nand_init` and `rw_prepare`;
+use these explicit offsets rather than selecting a function solely by name.
+
+**Read-only live observation (2026-10-28):** key-only SSH with `BatchMode=yes` and
+`StrictHostKeyChecking=yes` read `/sys/class/mtd/mtd0/device/uevent`: `DRIVER=mtk-nand`,
+`OF_FULLNAME=/nfi@11005000`, `OF_COMPATIBLE_0=mediatek,mt6880-nfc`.
+`/proc/sys/kernel/ftrace_enabled` returned `1`, `current_tracer` returned `nop`, and
+`available_tracers` returned `function nop` under `/sys/kernel/debug/tracing`.
+`enabled_functions`, `set_ftrace_filter`, and `set_ftrace_notrace` were absent. These observations
+identify the driver and selected tracer; they do not establish the exact ftrace callback pointer,
+exclude all tracing clients, or demonstrate enforcement on altered data. No tracing setting was
+changed, no vendor helper was executed, and no partition was written.
 
 **Unknown:** whether any kernel or userspace component enforces this metadata through indirect,
 constructed, or otherwise unnamed access. Absence of literal names is not proof of absence of
