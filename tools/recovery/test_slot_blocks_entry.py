@@ -203,6 +203,24 @@ class GuardCrossCheckTests(unittest.TestCase):
             e.check_guards(parts, b.sig_block_spec(sig_a, k)[0].guards)
 
 
+class WaiverTests(unittest.TestCase):
+    def test_waiver_drops_only_the_tools_hash(self):
+        sig = bytes(range(256)) * 4096
+        old = ss.ROOTFS_SIG
+        try:
+            ss.ROOTFS_SIG = e.digest(sig)
+            spec, _ = b.sig_block_spec(sig, 1)
+        finally:
+            ss.ROOTFS_SIG = old
+        base = {'da': 'd', 'host': 'h', 'tools': 't', 'unit': 'u'}
+        strict, waived = e.sig_prior_expect(base, spec, False), e.sig_prior_expect(base, spec, True)
+        self.assertIn('tools', strict)
+        self.assertNotIn('tools', waived)
+        self.assertEqual({k: v for k, v in strict.items() if k != 'tools'}, waived)
+        for k in ('da', 'host', 'unit', 'original', 'candidate', 'rootfs_a', 'target'):
+            self.assertIn(k, waived)
+
+
 class GateTests(unittest.TestCase):
     def run_main(self, *argv):
         with patch.object(sys, 'argv', ['slot_blocks_entry.py', *argv]):
@@ -215,6 +233,8 @@ class GateTests(unittest.TestCase):
                      ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--resume', '/y'),
                      ('misc-blocks', 'probe-restore', '--resume', '/x'), ('misc-blocks', 'probe-restore', '--resume', '/x', '--observed-copy', '5'),
                      ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--observed-copy', '2'),
+                     ('misc-blocks', 'probe-restore', '--resume', '/x', '--observed-copy', '2', '--waive-sig-tools'),
+                     ('sig-block', 'identical', '--block', '1', '--waive-sig-tools'),
                      ('misc-blocks', 'select', '--prior-probe-restore', '/x', '--prior-rootfs-a', '/y', '--last-copy', '1')):
             with self.assertRaises(ValueError, msg=argv):
                 self.run_main(*argv)

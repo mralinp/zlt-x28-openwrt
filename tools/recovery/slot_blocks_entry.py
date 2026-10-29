@@ -107,6 +107,15 @@ def load_restore_prior(run, expect, header, old_sha_of):
 PREFIX_GUARDS = {'rootfs_b'}
 
 
+def sig_prior_expect(base_id, sig_spec, waive_tools):
+    """Identity a sig-block rehearsal must carry. The owner may waive the tool hash only (never unit, DA, host or image)."""
+    expect = {**base_id, 'target': sig_spec.name, 'original': sig_spec.original_sha, 'candidate': sig_spec.candidate_sha,
+              'rootfs_a': session.ROOTFS_A_SHA}
+    if waive_tools:
+        del expect['tools']
+    return expect
+
+
 def check_guards(parts, guards):
     """Every guard's address, size and (static) hash must match the verified backup table; a typo stops the build."""
     live = {'rootfs_a'}  # rootfs_a is checked against the approved candidate, not the backup
@@ -170,6 +179,7 @@ def main():
     ap.add_argument('--observed-copy', type=int, help='probe-restore: the copy 1..4 whose A priority the UART showed')
     ap.add_argument('--prior-rootfs-a', type=Path)
     ap.add_argument('--resume', type=Path)
+    ap.add_argument('--waive-sig-tools', action='store_true', help='probe only: accept a sig-block rehearsal made with different tool files')
     args = ap.parse_args()
     if (args.target, args.mode) not in PRIOR:
         raise ValueError(f'{args.mode} is not a {args.target} mode')
@@ -180,6 +190,8 @@ def main():
     for flag in ('prior_sig_block', 'prior_probe_restore', 'prior_rootfs_a', 'resume'):
         if getattr(args, flag) is not None and flag not in [w[0] for w in wanted]:
             raise ValueError(f'--{flag.replace("_", "-")} is not valid for {args.target} {args.mode}')
+    if args.waive_sig_tools and args.mode != 'probe':
+        raise ValueError('--waive-sig-tools is for probe only')
     if (args.mode == 'probe-restore') != (args.observed_copy is not None) or (args.observed_copy not in (None, 1, 2, 3, 4)):
         raise ValueError('--observed-copy 1..4 is required for probe-restore only')
     if (args.target == 'sig-block') != (args.block is not None):
@@ -228,14 +240,13 @@ def main():
         identity = {'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': after_sha, 'rootfs_a': rootfs_a_sha or session.ROOTFS_A_SHA, **base_id}
         image_sha = after_sha if not args.mode.endswith('restore') else session.MISC_SHA
         extra = (f' ORDER {"".join(map(str, order))}' + (f' ROOTFS-A {rootfs_a_sha[:12]}' if args.mode == 'select' else '') +
-                 (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ' BROM-ROUTE-PROVEN')
+                 (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ('' if not args.waive_sig_tools else ' TOOLS-WAIVED') + ' BROM-ROUTE-PROVEN')
     priors = {}
     for flag, kind, verified in wanted:
         run = getattr(args, flag)
         if kind == 'sig':
             sig_spec, _ = blocks.sig_block_spec(Path(parts['rootfs_sig_a']['image']).read_bytes(), json.loads((Path(run) / 'receipt.json').read_text()).get('block'))
-            priors[flag] = entry.load_prior(run, {**base_id, 'target': sig_spec.name, 'original': sig_spec.original_sha,
-                                                  'candidate': sig_spec.candidate_sha, 'rootfs_a': session.ROOTFS_A_SHA}, sig_spec, 'identical', True)
+            priors[flag] = entry.load_prior(run, sig_prior_expect(base_id, sig_spec, args.waive_sig_tools), sig_spec, 'identical', True)
         elif kind == 'probe-restore':
             before_pr = Path(parts['misc']['image']).read_bytes()
             old_blocks = blocks.blocks(before_pr)
