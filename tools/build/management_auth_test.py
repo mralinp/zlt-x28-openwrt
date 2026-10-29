@@ -38,7 +38,7 @@ def main():
         for setting in ("PasswordAuth='off'","RootPasswordAuth='off'","RootLogin='on'","Port='2222'","Interface='lan'"):
             check(setting in config.stdout,'unexpected authentication policy: '+setting)
         root_account=next(row for row in (root/'etc/shadow').read_text().splitlines() if row.startswith('root:'))
-        check(root_account.split(':')[1]=='!','expected locked root password')
+        check(root_account.split(':')[1]=='','expected an empty root password (stock OpenWrt; SSH stays key-only)')
         (root/'tmp').mkdir(exist_ok=True);(root/'root').mkdir(exist_ok=True)
         keydir=root/'etc/dropbear';keydir.mkdir(exist_ok=True)
         for name in ('host','client','wrong'):
@@ -56,7 +56,7 @@ def main():
             def client(name,marker):
                 return run(['/usr/bin/dbclient','-T','-y','-i','/tmp/'+name,'-p','2222','root@127.0.0.1','echo '+marker])
             good=client('client','EXPECTED_KEY_OK')
-            check(good.returncode==0 and good.stdout.strip()=='EXPECTED_KEY_OK','authorized key rejected with locked root')
+            check(good.returncode==0 and good.stdout.strip()=='EXPECTED_KEY_OK','authorized key rejected with empty root password')
             wrong=client('wrong','UNEXPECTED_AUTH')
             check(server.poll() is None and wrong.returncode!=0 and 'UNEXPECTED_AUTH' not in wrong.stdout
                   and any(reason in wrong.stderr for reason in ('No auth methods could be used','Permission denied')),
@@ -67,7 +67,7 @@ def main():
                   and any(reason in absent.stderr for reason in ('No auth methods could be used','Permission denied')),
                   'empty-authorization test did not produce a live-server authentication rejection')
             print(json.dumps({'result':'PASS','authorized_key':True,'wrong_key_rejected':True,'empty_authorization_rejected':True,
-                              'root_password_locked':True,'candidate_sha256':manifest['rootfs_sha256'],
+                              'root_password_empty_ssh_still_key_only':True,'candidate_sha256':manifest['rootfs_sha256'],
                               'scope':'direct packaged Dropbear on isolated loopback; no native boot/procd/LAN proof'},indent=2))
         finally:
             server.terminate()

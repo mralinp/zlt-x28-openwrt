@@ -22,7 +22,7 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -206,6 +206,7 @@ def integrate(stage,key,stock_path,output):
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
+    enable(95,'done')  # `mount_root done`: without it mount_root discards the overlay at every boot (#143)
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
     put('etc/config/dhcp',"""config dnsmasq
  option domainneeded '1'
@@ -245,8 +246,8 @@ config dhcp 'wan'
     if 'usr/lib/opkg/status' in tree:  # or opkg would still list it and could reinstall it
         stanzas=tree['usr/lib/opkg/status'][1].decode().split('\n\n')
         put('usr/lib/opkg/status','\n\n'.join(x for x in stanzas if not x.startswith('Package: procd-ujail\n')))
-    # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. Root's password
-    # stays locked; this is the single way in if switch/network init fails, since failsafe is removed.
+    # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. This is the single
+    # way in if switch/network init fails, since failsafe is removed.
     if 'bin/ash' not in tree:raise ValueError('missing /bin/ash for the console shell')
     put('etc/inittab','::sysinit:/etc/init.d/rcS S boot\n::shutdown:/etc/init.d/rcS K shutdown\nttyS0::askfirst:/bin/ash --login\n')
     put('etc/config/network',f"""config interface 'loopback'
@@ -279,11 +280,12 @@ config interface 'wan'
  option mdns '0'
 """)
     put('etc/dropbear/authorized_keys',key,0o600)
+    # Like stock OpenWrt root starts with an empty password so LuCI can log in and ask for one; dropbear stays key-only.
     rows=tree['etc/shadow'][1].decode().splitlines();found=False;locked=[]
     for row in rows:
         fields=row.split(':')
         if len(fields)!=9:raise ValueError('malformed shadow record')
-        fields[1]='!';locked.append(':'.join(fields));found|=fields[0]=='root'
+        fields[1]='' if fields[0]=='root' else '!';locked.append(':'.join(fields));found|=fields[0]=='root'
     if not found:raise ValueError('missing root account')
     put('etc/shadow','\n'.join(locked)+'\n',0o600)
     put('etc/rc.local','#!/bin/sh\nexit 0\n',0o755)

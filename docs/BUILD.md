@@ -402,3 +402,11 @@ longer kernel-log only; the write plan should say so once #103 lands.
 `b0696c5b...`, padded image `23127d94...`) passed the independent UBI check; the packaged `inittab` shows the single
 console entry, `bin/ash -> busybox` and `dev/console`. **Not verified:** that the prompt appears on hardware, and
 that procd creates `/dev/ttyS0` without devtmpfs (stock does the same for its getty).
+
+## Root password and overlay persistence (#143)
+
+Like stock OpenWrt, root starts with an **empty password**: LuCI accepts it and asks you to set one (Network is LAN only; the
+`wan` firewall zone rejects input). SSH is unchanged: Dropbear stays key-only (`PasswordAuth` and `RootPasswordAuth` off), so an
+empty or any password never works over SSH. The image also enables `S95done` (`mount_root done`); without it `mount_root`
+reports 'overlay filesystem has not been fully initialized yet' and discards the overlay at every boot, losing passwords, host
+keys and settings. Set the password in LuCI (System > Administration) or with `passwd` over SSH.
