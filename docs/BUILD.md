@@ -330,6 +330,23 @@ built-in switch handler re-applies the same table after `S18` (idempotent in des
 persistence, and that socket 4 is the operator-labelled jack (operator-confirmed once, not independently
 measured). Nothing was run on the router.
 
+## Live LAN, DHCP and front LEDs on slot A (#122)
+
+Applied by hand on the running slot-A unit (2026-10-29); not yet in `first_boot.py`.
+
+- **LAN:** `br-lan` bridges `eth0.1 eth0.2 eth0.3 eth1` (sockets 1, 2, 4, 0), like stock `br0`; the switch table
+  above is unchanged, so `x28-switch` still validates it. `lan` is static `192.168.70.1/24` on `br-lan`.
+- **DHCP/DNS:** the vendor kernel has `CONFIG_NAMESPACES` off, so procd's `ujail` fails and every jailed service
+  (dnsmasq, sysntpd) exits at start. With `procd-ujail` removed procd runs them unjailed and dnsmasq serves DHCP
+  and DNS on the LAN. Images for this kernel must not ship `procd-ujail`.
+- **LEDs:** the front LEDs sit behind the Tozed `tz_gpio_leds` driver, not `/sys/class/leds`. `package/x28-leds`
+  writes `{u32 status, u32 type, u32 interval_ms}` records to `/dev/tz_gpio_leds` (format from the stock
+  kernel's `tz_gpio_leds_write`; types from the device tree and stock `gpiod`): power `0x62`, Wi-Fi `0x06`,
+  4G `0x0b`, 5G `0x0c`, signal red `0x20`, green `0x30`, blue `0x40`. `x28-leds selftest` checks the encoding
+  and the state mapping.
+- **Overlay:** `/usr` on this unit is unwritable until reboot (an earlier upper-dir removal), so `x28-leds`
+  installs to `/sbin`.
+
 ## Boot-path guard against flash and other-slot writes (#87)
 
 `tools/build/ab_guard.py` runs inside `first_boot.py` and `package_ubi.py` (and standalone on any

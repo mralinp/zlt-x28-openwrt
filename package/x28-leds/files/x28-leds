@@ -1,0 +1,80 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Front LEDs of the X28 through the Tozed tz_gpio_leds driver (no /sys/class/leds entries).
+# One write = {u32 status, u32 type, u32 interval_ms} little-endian; status 0 off, 1 on, 2 blink. Unknown types are
+# ignored by the driver. Types come from the device tree and stock gpiod.
+
+DEV=${X28_LEDS_DEV:-/dev/tz_gpio_leds}
+POWER=98 WIFI=6 LTE=11 NR=12 RED=32 GREEN=48 BLUE=64
+
+oct() { printf '\\%03o' "$1"; }
+
+# Single printf so the driver gets the whole 12-byte record in one write().
+record() { printf "$(oct "$2")\\000\\000\\000$(oct "$1")\\000\\000\\000$(oct $(($3 % 256)))$(oct $(($3 / 256)))\\000\\000"; }
+
+at() { mipc_wan_cli --at_cmd "$1" 2>/dev/null | sed -n "s/^$2: //p"; }
+
+# wan, wifi: 1 when up; rsrp, ssrsrp: CESQ fields 6 and 8; act: COPS AcT, last so it can be empty (not registered).
+# Prints "type status interval" for every LED.
+decide() {
+	wan=$1 wifi=$2 rsrp=$3 ssrsrp=$4 act=$5
+	echo "$POWER 1 0"
+	echo "$WIFI $wifi 0"
+	link="2 500"; [ "$wan" = 1 ] && link="1 0"
+	case "$act" in 7|10|13) echo "$LTE $link" ;; *) echo "$LTE 0 0" ;; esac
+	case "$act" in 11|12|13) echo "$NR $link" ;; *) echo "$NR 0 0" ;; esac
+	dbm=
+	case "$act" in 11|12|13) [ "${ssrsrp:-255}" -lt 255 ] && dbm=$((ssrsrp - 157)) ;; esac
+	[ -z "$dbm" ] && [ -n "$act" ] && [ "${rsrp:-255}" -lt 255 ] && dbm=$((rsrp - 141))
+	r=0 g=0 b=0
+	if [ -z "$act" ]; then b=2
+	elif [ -z "$dbm" ]; then :
+	elif [ "$dbm" -ge -95 ]; then g=1
+	elif [ "$dbm" -ge -110 ]; then r=1 g=1
+	else r=1
+	fi
+	echo "$RED $r 500"
+	echo "$GREEN $g 500"
+	echo "$BLUE $b 500"
+}
+
+poll() {
+	act=$(at 'AT+COPS?' '+COPS' | awk -F, 'NF>=4{print $4+0}')
+	cesq=$(at 'AT+CESQ' '+CESQ')
+	rsrp=$(echo "$cesq" | cut -d, -f6) ssrsrp=$(echo "$cesq" | cut -d, -f8)
+	wan=0; [ "$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e '@.up')" = true ] && wan=1
+	wifi=0; ip link show up 2>/dev/null | grep -qE '^[0-9]+: (ra|rax|wlan)[0-9]' && wifi=1
+	decide "$wan" "$wifi" "$rsrp" "$ssrsrp" "$act"
+}
+
+apply() {
+	echo "$1" | while read -r type status interval; do
+		[ "$status" = 2 ] || interval=0
+		record "$type" "$status" "$interval" > "$DEV"
+	done
+}
+
+selftest() {
+	got=$(record 11 2 500 | hexdump -ve '1/1 "%02x"')
+	[ "$got" = 020000000b000000f4010000 ] || { echo "record: $got"; return 1; }
+	check() { got=$(decide $1 | tr '\n' ';'); [ "$got" = "$2" ] || { echo "decide $1: $got"; return 1; }; }
+	check '1 0 58 255 13' "98 1 0;6 0 0;11 1 0;12 1 0;32 0 500;48 1 500;64 0 500;" &&
+	check '0 1 35 255 7' "98 1 0;6 1 0;11 2 500;12 0 0;32 1 500;48 1 500;64 0 500;" &&
+	check '1 0 255 40 11' "98 1 0;6 0 0;11 0 0;12 1 0;32 1 500;48 0 500;64 0 500;" &&
+	check '0 0 255 255' "98 1 0;6 0 0;11 0 0;12 0 0;32 0 500;48 0 500;64 2 500;" &&
+	echo "selftest ok"
+}
+
+case "$1" in
+	selftest) selftest ;;
+	once) apply "$(poll)" ;;
+	off) apply "$(for t in $POWER $WIFI $LTE $NR $RED $GREEN $BLUE; do echo "$t 0 0"; done)" ;;
+	*)
+		last=
+		while :; do
+			state=$(poll)
+			[ "$state" = "$last" ] || { apply "$state"; last=$state; }
+			sleep 10
+		done
+		;;
+esac
