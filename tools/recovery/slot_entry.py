@@ -203,9 +203,9 @@ def main():
     live = 'a' if spec.base_sha and args.mode != 'restore' else 'b'  # base mode: misc selects A, the unit runs the base image
     if args.mode != 'restore' and active_slot(table) != live:
         raise ValueError(f'live SSH must confirm {live.upper()} and exact full layout')
-    base = PRIVATE / 'usb-probe'
-    base.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if shutil.disk_usage(base).free < 1024 * 1024 * 1024:
+    probe_dir = PRIVATE / 'usb-probe'
+    probe_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if shutil.disk_usage(probe_dir).free < 1024 * 1024 * 1024:
         raise ValueError('less than 1 GiB free for captures and sources')
     if not sys.stdin.isatty():
         raise ValueError('typed confirmation needs an interactive terminal')
@@ -218,7 +218,7 @@ def main():
         print('WARNING: backup copy is on the same filesystem; host disk loss would lose both copies.')
     if input(f'Type exactly {expected_phrase!r} to attest those checks and authorize this operation: ') != expected_phrase:
         raise ValueError('operation not confirmed')
-    run = Path(tempfile.mkdtemp(prefix=f'slot-{args.target}-{args.mode}-', dir=base)).resolve()
+    run = Path(tempfile.mkdtemp(prefix=f'slot-{args.target}-{args.mode}-', dir=probe_dir)).resolve()
     receipt = {'schema': 2, 'run': str(run), 'target': args.target, 'mode': args.mode, 'status': 'STARTED', 'identity': identity,
                'created': time.time(), 'uart': str(uart), 'same_disk_backup': same_disk,
                'priors': {k: str(getattr(args, k).resolve()) for k in priors}}

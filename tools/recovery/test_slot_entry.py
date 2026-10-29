@@ -149,5 +149,13 @@ class GateTests(unittest.TestCase):
             e.load_prior(t.make(sha='b' * 64, ident=IDENT), ident, base, 'identical', True)  # receipt without the base
 
 
+    def test_main_never_rebinds_the_base_image(self):
+        # Once shadowed by the usb-probe directory, run_session got a Path as the base and every --write failed after the claim.
+        import ast
+        main = next(n for n in ast.parse(Path(e.__file__).read_text()).body if isinstance(n, ast.FunctionDef) and n.name == 'main')
+        stores = [n for n in ast.walk(main) if isinstance(n, ast.Name) and n.id == 'base' and isinstance(n.ctx, ast.Store)]
+        self.assertEqual(len(stores), 1)
+
+
 if __name__ == '__main__':
     unittest.main()
