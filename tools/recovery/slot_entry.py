@@ -86,7 +86,8 @@ def load_inputs(backup, loader, target, mode, candidate_dir):
     host = digest(host_identity().encode())
     here = Path(__file__).parent
     tools = b''.join((here / n).read_bytes() for n in ('slot_entry.py', 'slot_session.py', 'restore_entry.py', 'common.py',
-                                                      'read_by_name.py', 'write_verify.py', 'setup_mtkclient.py'))
+                                                      'read_by_name.py', 'write_verify.py', 'setup_mtkclient.py',
+                                                      'changed_restore.py', 'read_verify.py'))
     tools += b''.join((here.parent / 'build' / n).read_bytes() for n in ('package_ubi.py', 'stage_native.py'))
     identity = {'target': target, 'original': spec.original_sha, 'candidate': spec.candidate_sha, 'rootfs_a': rootfs_a_sha,
                 'da': DA_HASH, 'host': host, 'tools': digest(tools), 'unit': by_name['proinfo']['sha256']}
@@ -207,11 +208,6 @@ def main():
                'created': time.time(), 'uart': str(uart), 'same_disk_backup': same_disk,
                'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
     save(run, receipt)
-    if args.resume:
-        claim_restore(args.resume.resolve(), run)
-        prior = priors['resume']
-        prior['status'] = 'RESTORE_ATTEMPTED'
-        save(args.resume.resolve(), prior)  # Consume before connecting: never blindly retry a restore.
     mtk = None
     previous_cwd = Path.cwd()
     try:
@@ -222,6 +218,11 @@ def main():
         xml_module = sys.modules.get('mtkclient.Library.DA.xmlflash.xml_lib')
         if xml_module is None or sha256_file(Path(xml_module.__file__)) != identity['host']:
             raise ValueError('loaded XML implementation differs from verified host')
+        if args.resume:  # claimed only once the DA, unit identity and host library are verified, and just before the session:
+            claim_restore(args.resume.resolve(), run)  # a USB failure before this point does not spend the tooled restore
+            prior = priors['resume']
+            prior['status'] = 'RESTORE_ATTEMPTED'
+            save(args.resume.resolve(), prior)
         session.run_session(mtk.daloader, spec, original, candidate, run, mode=args.mode)
         receipt['status'] = 'VERIFIED'
         print('Target and guards verified. No reboot issued; review UART before approving the next step.')
