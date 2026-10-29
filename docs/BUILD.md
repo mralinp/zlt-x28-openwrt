@@ -358,6 +358,13 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   band with a random per-device key.
   Stock LuCI 23.05 builds Wireless Security choices only for `mac80211`/`broadcom` radios, so the builder inserts an
   `mtwifi` branch (WPA2-PSK, WPA3-SAE, mixed modes) into `wireless.js`; it refuses a LuCI build without the anchor.
+- **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
+  `/dev/block/<name>` links from `/proc/mtd` plus active-slot aliases, mounts the vendor yaffs2 partitions, starts the
+  vendor daemons through their own stock init scripts (`nvram_daemon` once, `ccci_fsd`, `ccci_mdinit`, `ql_ril_service`,
+  `ql_netd`, `mipc_submonitor`, `atci_service`, `atcid`), creates the one-ACM USB gadget, sends `AT+CFUN=1` and `ifup wan`,
+  in the background. The builder copies those init scripts, their binaries (with ELF dependencies) and `vendor/etc`
+  from the stock rootfs. Verified live without a reboot: with everything above ccci stopped and the gadget removed, the
+  script brought `wan` back in 25 s. A real reboot test waits for slot A to be marked successful (A retry 4, success 0).
 - **Overlay:** `/usr` on this unit is unwritable until reboot (an earlier upper-dir removal), so `x28-leds`
   installs to `/sbin`.
 

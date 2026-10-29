@@ -53,6 +53,9 @@ else:sys.exit(2)
 '''
 
 
+MODEM_SERVICES='1nvram_daemon 2ccci_fsd 3ccci_mdinit ql_ril_service ql_netd.init mipc_submonitor.init atci_service atcid'.split()
+
+
 class PolicyTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
@@ -80,6 +83,12 @@ class PolicyTests(unittest.TestCase):
             put(t,'rootfs/sbin/swconfig',elf(['libuci.so','libnl-tiny.so','libc.so']))
             put(t,'rootfs/usr/lib/libnl-tiny.so',elf(['libc.so']));put(t,'rootfs/lib/libuci.so',elf(['libc.so']))
             for name in f.WIFI_PROFILES:put(t,'rootfs/'+name,b'Default\nSSID1=stock\n')
+            for service in MODEM_SERVICES:
+                binary=service.split('.')[0].lstrip('123')
+                put(t,'rootfs/etc/init.d/'+service,f'procd_set_param command /usr/bin/{binary} 0\n'.encode())
+                put(t,'rootfs/usr/bin/'+binary,elf(['libmodem.so']))
+            put(t,'rootfs/usr/lib/libmodem.so',elf(['libc.so']));put(t,'rootfs/usr/bin/mipc_wan_cli',elf(['libc.so']))
+            put(t,'rootfs/etc/quectel-project-version',b'v1\n');put(t,'rootfs/vendor/etc/md/apncfg/001_01.conf',b'apn\n')
 
     def test_policy_removes_shells_unsafe_services_and_defines_key_only_lan(self):
         r=f.integrate(self.stage,self.key,self.stock,self.output)
@@ -105,6 +114,11 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(tree['etc/rc.d/S99x28-leds'][0].linkname,'../init.d/x28-leds')
         self.assertIn('/dev/tz_gpio_leds',tree['sbin/x28-leds'][1].decode())
         self.assertEqual(tree['sbin/x28-leds'][0].mode,0o755)
+        self.assertEqual(tree['etc/rc.d/S19x28-modem'][0].linkname,'../init.d/x28-modem')
+        for service in MODEM_SERVICES:self.assertIn('etc/init.d/'+service,tree)
+        for name in ('usr/bin/atcid','usr/bin/nvram_daemon','usr/lib/libmodem.so','usr/bin/mipc_wan_cli','etc/quectel-project-version',
+                     'vendor/etc/md/apncfg/001_01.conf'):self.assertIn(name,tree)
+        self.assertFalse(any(n.startswith('etc/rc.d/') and 'ccci' in n for n in tree))  # x28-modem starts them, not rc.d
         for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
         js=tree[f.LUCI_WIRELESS][1].decode()
         self.assertIn("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2'",js)
