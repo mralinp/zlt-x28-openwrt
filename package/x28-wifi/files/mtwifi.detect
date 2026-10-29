@@ -1,0 +1,30 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# `wifi config` defaults for the MT7915 DBDC: one WPA2 AP per band on lan, with a random per-device key
+# (shown and changed in LuCI under Network > Wireless).
+
+detect_mtwifi() {
+	local band name key
+	[ -d /sys/class/net/ra0 ] || return 0
+	for band in 2g 5g; do
+		name=radio_$band
+		[ -n "$(uci -q get wireless.$name)" ] && continue
+		key="$(head -c 12 /dev/urandom | hexdump -ve '1/1 "%02x"')"
+		uci -q batch <<-UCI
+			set wireless.$name=wifi-device
+			set wireless.$name.type=mtwifi
+			set wireless.$name.band=$band
+			set wireless.$name.channel=auto
+			set wireless.$name.htmode=$([ $band = 2g ] && echo HT40 || echo HE80)
+			set wireless.$name.country=US
+			set wireless.default_$name=wifi-iface
+			set wireless.default_$name.device=$name
+			set wireless.default_$name.network=lan
+			set wireless.default_$name.mode=ap
+			set wireless.default_$name.ssid=X28-$(echo $band | tr g G)
+			set wireless.default_$name.encryption=psk2
+			set wireless.default_$name.key=$key
+		UCI
+	done
+	uci -q commit wireless
+}
