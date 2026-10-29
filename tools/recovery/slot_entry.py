@@ -52,8 +52,10 @@ def verified_backup(backup, loader):
     return table, by_name
 
 
-def load_inputs(backup, loader, target, mode, candidate_dir):
-    """Verified originals, the pinned candidate and the spec; raises on any identity mismatch."""
+def load_inputs(backup, loader, target, mode, candidate_dir, base_dir=None):
+    """Verified originals, the pinned candidate and the spec; raises on any identity mismatch.
+
+    base_dir (rootfs_a only, #137): package_ubi output of the image already on rootfs_a; identical/write start from it."""
     table, by_name = verified_backup(backup, loader)
     original = Path(by_name[target]['image']).read_bytes()
     manifest = json.loads((candidate_dir / 'manifest.json').read_text())
@@ -61,8 +63,15 @@ def load_inputs(backup, loader, target, mode, candidate_dir):
     rootfs_a_sha = manifest.get('padded_sha256')
     if rootfs_a_sha != digest(rootfs_a_image):
         raise ValueError('candidate does not match its build manifest')
+    base = None
+    if base_dir is not None:
+        if target != 'rootfs_a':
+            raise ValueError('--base-dir is only valid for rootfs_a')
+        base = (base_dir / 'rootfs-a-experimental.bin').read_bytes()
+        if json.loads((base_dir / 'manifest.json').read_text()).get('padded_sha256') != digest(base):
+            raise ValueError('base does not match its build manifest')
     if target == 'rootfs_a':
-        spec, candidate = session.rootfs_a_spec(rootfs_a_sha), rootfs_a_image
+        spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else ''), rootfs_a_image
     else:
         spec = session.misc_spec(rootfs_a_sha)
         candidate = bytearray(original)
@@ -90,8 +99,8 @@ def load_inputs(backup, loader, target, mode, candidate_dir):
                                                       'changed_restore.py', 'read_verify.py'))
     tools += b''.join((here.parent / 'build' / n).read_bytes() for n in ('package_ubi.py', 'stage_native.py'))
     identity = {'target': target, 'original': spec.original_sha, 'candidate': spec.candidate_sha, 'rootfs_a': rootfs_a_sha,
-                'da': DA_HASH, 'host': host, 'tools': digest(tools), 'unit': by_name['proinfo']['sha256']}
-    return by_name, table, original, candidate, spec, identity
+                'base': spec.base_sha, 'da': DA_HASH, 'host': host, 'tools': digest(tools), 'unit': by_name['proinfo']['sha256']}
+    return by_name, table, original, candidate, spec, identity, base
 
 
 def load_prior(run, expect, spec, mode, verified):
@@ -118,7 +127,8 @@ def load_prior(run, expect, spec, mode, verified):
     events = [json.loads(line) for line in raw.splitlines()]
     header = {'mode': mode, 'target': target, 'target_offset': spec.addr, 'target_length': spec.size,
               'candidate_sha256': spec.candidate_sha if mode == 'write' else None}
-    attempt = {'write_attempt': mode, 'sha256': spec.candidate_sha if mode == 'write' else spec.original_sha}
+    start = spec.original_sha if mode == 'restore' or not spec.base_sha else spec.base_sha
+    attempt = {'write_attempt': mode, 'sha256': spec.candidate_sha if mode == 'write' else start}
     if not events or events[0] != header or [e for e in events if 'write_attempt' in e] != [attempt]:
         raise ValueError('journal target, image or write history mismatch; no automatic retry')
     if verified:
@@ -130,8 +140,10 @@ def load_prior(run, expect, spec, mode, verified):
 
 def phrase(spec, mode, rootfs_a_sha, same_disk):
     # identical and restore write the original; the phrase names the bytes that will land on the target
-    image = spec.candidate_sha if mode == 'write' else spec.original_sha
+    image = spec.candidate_sha if mode == 'write' else (spec.base_sha if spec.base_sha and mode == 'identical' else spec.original_sha)
     text = f'WRITE {mode} {spec.name} {image[:12]}'
+    if spec.base_sha and mode != 'restore':
+        text += f' BASE {spec.base_sha[:12]} MISC-SELECTS-A'
     if spec.name == 'misc':
         text += f' ROOTFS-A {rootfs_a_sha[:12]} BROM-ROUTE-PROVEN'
     return text + (' SAME-DISK' if same_disk else '')
@@ -145,6 +157,7 @@ def main():
     ap.add_argument('--backup', type=Path, default=DEFAULT_BACKUP)
     ap.add_argument('--loader', type=Path, default=VENDOR_DA)
     ap.add_argument('--candidate-dir', type=Path, help='package_ubi output directory of the approved rootfs_a image (all sessions)')
+    ap.add_argument('--base-dir', type=Path, help='rootfs_a only: package_ubi output of the image now on rootfs_a; identical/write start from it, misc may select A')
     ap.add_argument('--backup-copy', type=Path, help='verified second complete-captured-partitions.tar')
     ap.add_argument('--uart-log', type=Path)
     ap.add_argument('--prior-identical', type=Path)
@@ -161,10 +174,11 @@ def main():
     if args.candidate_dir is None:
         raise ValueError('--candidate-dir (the package_ubi output of the approved rootfs_a) is required for every session')
     backup, loader = args.backup.resolve(strict=True), args.loader.resolve(strict=True)
-    parts, table, original, candidate, spec, identity = load_inputs(
-        backup, loader, args.target, args.mode, args.candidate_dir.resolve(strict=True))
+    parts, table, original, candidate, spec, identity, base = load_inputs(
+        backup, loader, args.target, args.mode, args.candidate_dir.resolve(strict=True),
+        args.base_dir.resolve(strict=True) if args.base_dir else None)
     rootfs_a_sha = identity['rootfs_a']
-    specs = {'rootfs_a': session.rootfs_a_spec(rootfs_a_sha), 'misc': session.misc_spec(rootfs_a_sha)}
+    specs = {'rootfs_a': session.rootfs_a_spec(rootfs_a_sha, identity['base'] if args.target == 'rootfs_a' else ''), 'misc': session.misc_spec(rootfs_a_sha)}
     priors = {}
     for flag, target, mode, verified in wanted:
         # Every prior is bound to this unit, host, tools and the same approved rootfs_a image (from the manifest, not a receipt).
@@ -186,11 +200,12 @@ def main():
         raise ValueError('second archive copy is missing, same file, or invalid')
     same_disk = copy.stat().st_dev == archive.stat().st_dev
     check_uart(uart)
-    if args.mode != 'restore' and active_slot(table) != 'b':
-        raise ValueError('live SSH must confirm B and exact full layout')
-    base = PRIVATE / 'usb-probe'
-    base.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if shutil.disk_usage(base).free < 1024 * 1024 * 1024:
+    live = 'a' if spec.base_sha and args.mode != 'restore' else 'b'  # base mode: misc selects A, the unit runs the base image
+    if args.mode != 'restore' and active_slot(table) != live:
+        raise ValueError(f'live SSH must confirm {live.upper()} and exact full layout')
+    probe_dir = PRIVATE / 'usb-probe'
+    probe_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if shutil.disk_usage(probe_dir).free < 1024 * 1024 * 1024:
         raise ValueError('less than 1 GiB free for captures and sources')
     if not sys.stdin.isatty():
         raise ValueError('typed confirmation needs an interactive terminal')
@@ -203,7 +218,7 @@ def main():
         print('WARNING: backup copy is on the same filesystem; host disk loss would lose both copies.')
     if input(f'Type exactly {expected_phrase!r} to attest those checks and authorize this operation: ') != expected_phrase:
         raise ValueError('operation not confirmed')
-    run = Path(tempfile.mkdtemp(prefix=f'slot-{args.target}-{args.mode}-', dir=base)).resolve()
+    run = Path(tempfile.mkdtemp(prefix=f'slot-{args.target}-{args.mode}-', dir=probe_dir)).resolve()
     receipt = {'schema': 2, 'run': str(run), 'target': args.target, 'mode': args.mode, 'status': 'STARTED', 'identity': identity,
                'created': time.time(), 'uart': str(uart), 'same_disk_backup': same_disk,
                'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
@@ -223,7 +238,7 @@ def main():
             prior = priors['resume']
             prior['status'] = 'RESTORE_ATTEMPTED'
             save(args.resume.resolve(), prior)
-        session.run_session(mtk.daloader, spec, original, candidate, run, mode=args.mode)
+        session.run_session(mtk.daloader, spec, original, candidate, run, mode=args.mode, base=base)
         receipt['status'] = 'VERIFIED'
         print('Target and guards verified. No reboot issued; review UART before approving the next step.')
     except BaseException:
