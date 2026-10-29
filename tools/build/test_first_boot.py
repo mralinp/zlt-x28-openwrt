@@ -78,6 +78,7 @@ class PolicyTests(unittest.TestCase):
         with tarfile.open(self.stock,'w:gz') as t:
             put(t,'rootfs/sbin/swconfig',elf(['libuci.so','libnl-tiny.so','libc.so']))
             put(t,'rootfs/usr/lib/libnl-tiny.so',elf(['libc.so']));put(t,'rootfs/lib/libuci.so',elf(['libc.so']))
+            for name in f.WIFI_PROFILES:put(t,'rootfs/'+name,b'Default\nSSID1=stock\n')
 
     def test_policy_removes_shells_unsafe_services_and_defines_key_only_lan(self):
         r=f.integrate(self.stage,self.key,self.stock,self.output)
@@ -103,6 +104,9 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(tree['etc/rc.d/S99x28-leds'][0].linkname,'../init.d/x28-leds')
         self.assertIn('/dev/tz_gpio_leds',tree['sbin/x28-leds'][1].decode())
         self.assertEqual(tree['sbin/x28-leds'][0].mode,0o755)
+        for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
+        self.assertIn('add_driver mtwifi',tree['lib/netifd/wireless/mtwifi.sh'][1].decode())
+        self.assertIn('append DRIVERS "mtwifi"',tree['lib/wifi/mtwifi.sh'][1].decode())
         self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/dropbear/authorized_keys'][0].mode,0o600)
         self.assertTrue(all(row.split(b':')[1]==b'!' for row in tree['etc/shadow'][1].splitlines()))

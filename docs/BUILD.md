@@ -350,6 +350,12 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   kernel's `tz_gpio_leds_write`; types from the device tree and stock `gpiod`): power `0x62`, Wi-Fi `0x06`,
   4G `0x0b`, 5G `0x0c`, signal red `0x20`, green `0x30`, blue `0x40`. `x28-leds selftest` checks the encoding
   and the state mapping.
+- **Wi-Fi (#127):** MT7915 DBDC on `mt_wifi` (no nl80211): `ra0` 2.4 GHz, `rai0` 5 GHz, which the driver registers as a
+  virtual interface of `ra0` (opens only while `ra0` is up). `package/x28-wifi` is a netifd wireless handler (`mtwifi`):
+  it renders `/etc/wireless/mediatek/mt7915.dbdc.b0/b1.dat` from `/etc/config/wireless` on a saved stock copy and
+  hands the interface to netifd, which bridges it into `lan`. The image copies `l1profile.dat` and both profiles from
+  the stock rootfs; calibration stays in `/mnt/vendor/nvcfg/e2p`. First boot's `wifi config` creates one WPA2 AP per
+  band with a random per-device key.
 - **Overlay:** `/usr` on this unit is unwritable until reboot (an earlier upper-dir removal), so `x28-leds`
   installs to `/sbin`.
 

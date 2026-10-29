@@ -94,10 +94,14 @@ drv_mtwifi_setup() {
 	for_each_interface "ap" mtwifi_setup_vif
 	[ -n "$vif_name" ] || { wireless_setup_failed NO_AP; return 1; }
 	set -- $vif_auth $(mtwifi_bw "$htmode")
+	[ "$channel" != auto ] || channel=0
 	ip link set dev "$ifname" down 2>/dev/null
 	mtwifi_render "$dat" "SSID1=$vif_ssid" "AuthMode=$1" "EncrypType=$2" "WPAPSK1=$vif_key" "HideSSID=$vif_hidden" \
 		"NoForwarding=$vif_isolate" "Channel=${channel:-0}" "CountryCode=${country:-US}" "HT_BW=$3" "VHT_BW=$4" ||
 		{ wireless_setup_failed PROFILE_WRITE; return 1; }
+	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
+	# sets up both radios at once. shortcut: with 2g disabled ra0 still comes up and beacons its last profile.
+	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
 	ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	wireless_add_vif "$vif_name" "$ifname"
 	wireless_set_up

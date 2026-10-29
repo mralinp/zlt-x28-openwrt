@@ -28,6 +28,9 @@ LAN = 'br-lan'
 # Sockets 1, 2, 4 (#84: port 4, untagged VLAN 3) and 0, one VLAN each; stock bridges them all into br0 (#122).
 LAN_PORTS = ('eth0.1','eth0.2','eth0.3','eth1')
 LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
+WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
+# mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
+WIFI_PROFILES = ('etc/wireless/l1profile.dat','etc/wireless/mediatek/mt7915.dbdc.b0.dat','etc/wireless/mediatek/mt7915.dbdc.b1.dat')
 # vlan: (ports, untagged port whose PVID is that vlan). Copied from the observed stock table.
 SWITCH = {1:('1 5t',1),2:('2 5t',2),3:('4 5t',4),4:('0 6t',0)}
 SWITCH_UCI = "\nconfig switch\n option name 'switch0'\n option reset '1'\n option enable_vlan '1'\n" + ''.join(
@@ -108,7 +111,11 @@ def integrate(stage,key,stock_path,output):
         raise ValueError('staging identity/marker mismatch')
     stock_bytes=Path(stock_path).read_bytes()
     tree=load_archive(io.BytesIO(raw));removed=[]
-    swconfig_added=add_swconfig(tree,load_archive(io.BytesIO(stock_bytes),'rootfs'))
+    stock=load_archive(io.BytesIO(stock_bytes),'rootfs')
+    swconfig_added=add_swconfig(tree,stock)
+    for name in WIFI_PROFILES:
+        if name not in stock or not stock[name][0].isfile():raise ValueError('missing stock Wi-Fi profile: '+name)
+        tree[name]=stock[name]
     for name in list(tree):
         if (name.startswith(('etc/rc.d/','etc/uci-defaults/','etc/board.d/','lib/upgrade/','etc/dropbear/'))
             or 'zmtk_boot_done' in name or (name.startswith('lib/preinit/') and 'failsafe' in name)):
@@ -134,6 +141,9 @@ def integrate(stage,key,stock_path,output):
         link=tarfile.TarInfo(f'etc/rc.d/S{start}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
     put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
+    # The staged boot script runs `wifi config` once when /etc/config/wireless is missing: WPA2 with a random key.
+    put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
+    put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.

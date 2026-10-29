@@ -3,6 +3,8 @@
 # `wifi config` defaults for the MT7915 DBDC: one WPA2 AP per band on lan, with a random per-device key
 # (shown and changed in LuCI under Network > Wireless).
 
+append DRIVERS "mtwifi"
+
 detect_mtwifi() {
 	local band name key
 	[ -d /sys/class/net/ra0 ] || return 0
