@@ -221,6 +221,16 @@ class WaiverTests(unittest.TestCase):
             self.assertIn(k, waived)
 
 
+class SkipProbeTests(unittest.TestCase):
+    def test_skip_probe_drops_only_the_probe_restore_prior_and_only_for_select(self):
+        flags = lambda t, m, s: sorted(w[0] for w in e.wanted_priors(t, m, s))
+        self.assertEqual(flags('misc-blocks', 'select', False), ['prior_probe_restore', 'prior_rootfs_a'])
+        self.assertEqual(flags('misc-blocks', 'select', True), ['prior_rootfs_a'])
+        for t, m in (('misc-blocks', 'probe'), ('misc-blocks', 'probe-restore'), ('misc-blocks', 'select-restore'), ('sig-block', 'identical')):
+            with self.assertRaises(ValueError):
+                e.wanted_priors(t, m, True)
+
+
 class GateTests(unittest.TestCase):
     def run_main(self, *argv):
         with patch.object(sys, 'argv', ['slot_blocks_entry.py', *argv]):

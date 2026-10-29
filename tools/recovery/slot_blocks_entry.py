@@ -38,6 +38,16 @@ PRIOR = {
 KIND_MODE = {'probe': 'write', 'select': 'write', 'probe-restore': 'restore', 'select-restore': 'restore'}
 
 
+def wanted_priors(target, mode, skip_probe):
+    """Prior runs a session consumes; the owner may waive the probe-restore evidence for select only."""
+    wanted = PRIOR[(target, mode)]
+    if skip_probe:
+        if (target, mode) != ('misc-blocks', 'select'):
+            raise ValueError('--skip-probe is for select only')
+        wanted = [w for w in wanted if w[0] != 'prior_probe_restore']
+    return wanted
+
+
 def order_for(mode, last_copy, resumed_order=None):
     if mode.endswith('restore'):
         if not isinstance(resumed_order, (list, tuple)) or sorted(resumed_order) != [1, 2, 3, 4]:
@@ -179,11 +189,12 @@ def main():
     ap.add_argument('--observed-copy', type=int, help='probe-restore: the copy 1..4 whose A priority the UART showed')
     ap.add_argument('--prior-rootfs-a', type=Path)
     ap.add_argument('--resume', type=Path)
+    ap.add_argument('--skip-probe', action='store_true', help='select only: no probe/probe-restore evidence; --last-copy is then a guess')
     ap.add_argument('--waive-sig-tools', action='store_true', help='probe only: accept a sig-block rehearsal made with different tool files')
     args = ap.parse_args()
     if (args.target, args.mode) not in PRIOR:
         raise ValueError(f'{args.mode} is not a {args.target} mode')
-    wanted = PRIOR[(args.target, args.mode)]
+    wanted = wanted_priors(args.target, args.mode, args.skip_probe)
     for flag, *_ in wanted:
         if getattr(args, flag) is None:
             raise ValueError(f'{args.target} {args.mode} requires --{flag.replace("_", "-")}')
@@ -240,7 +251,7 @@ def main():
         identity = {'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': after_sha, 'rootfs_a': rootfs_a_sha or session.ROOTFS_A_SHA, **base_id}
         image_sha = after_sha if not args.mode.endswith('restore') else session.MISC_SHA
         extra = (f' ORDER {"".join(map(str, order))}' + (f' ROOTFS-A {rootfs_a_sha[:12]}' if args.mode == 'select' else '') +
-                 (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ('' if not args.waive_sig_tools else ' TOOLS-WAIVED') + ' BROM-ROUTE-PROVEN')
+                 (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ('' if not args.waive_sig_tools else ' TOOLS-WAIVED') + ('' if not args.skip_probe else ' NO-PROBE') + ' BROM-ROUTE-PROVEN')
     priors = {}
     for flag, kind, verified in wanted:
         run = getattr(args, flag)
