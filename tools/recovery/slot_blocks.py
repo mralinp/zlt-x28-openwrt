@@ -18,6 +18,9 @@ MISC_ADDR, MISC_SIZE = 0x700000, 0x100000
 SIG_ADDR = 0x13500000
 PROBE_A_PRIORITY = (0x0d, 0x0c, 0x0b, 0x0a)  # copies 1..4; B stays 0x0f so every copy still selects B
 PROBE_SHA = '4c449e543dcea4599deea7867352a0d7592efe07536489a800fd600d74bf51af'  # original misc with the probe priorities
+# A selected and marked successful (A retry 0, success 1; B unchanged), what stock's zmtk_boot_done records (#133).
+CONFIRM_SHA = '205a27330bdcca144d31e25302af77374e044c0c0830e06cf76d333982fb1ebc'
+A_RETRY, A_SUCCESS = 9, 10  # record offsets (stock BOOTCTRL_OFFSET_TRY_A / _SUCCESS_A)
 
 
 def digest(data):
@@ -47,6 +50,18 @@ def select_image(original):
     return bytes(out)
 
 
+def confirm_images(original, a_retry):
+    """(before, after) for marking A successful: the A selection after `a_retry` A boots, and the same with A retry 0
+    and success 1. Every mix of the two still selects A (priority 15 > 14)."""
+    if a_retry not in range(3, 8):
+        raise ValueError('A retry must be 3..7 (the selection writes 3; each A boot adds one)')
+    before, after = bytearray(select_image(original)), bytearray(select_image(original))
+    for off in ss.MISC_COPIES:
+        before[off + A_RETRY] = a_retry
+        after[off + A_RETRY], after[off + A_SUCCESS] = 0, 1
+    return bytes(before), bytes(after)
+
+
 def sig_block_spec(sig_a, k):
     """Identical rewrite of one 256 KiB block of rootfs_sig_a (block 0 holds the certificates: refused)."""
     if k not in (1, 2, 3):
@@ -66,20 +81,31 @@ def misc_guards(rootfs_a_ok):
     return (*ss.COMMON, ('rootfs_a', 0x13600000, 0x4000000, rootfs_a_ok))
 
 
-def run_blockwise(da, before, after, after_sha, order, output, *, mode, guards):
+def run_blockwise(da, before, after, after_sha, order, output, *, mode, guards, before_sha=ss.MISC_SHA):
     """mode 'write': before -> after, one erase block per request in `order` (copy numbers 1..4).
     mode 'restore': write the `before` blocks in `order` over any state of the blocks.
 
-    The caller pins `after_sha` (the probe or A-selection image). No retry or reboot; the journal is evidence only.
+    The caller pins `after_sha` (the probe, A-selection or A-success image) and `before_sha` (the original misc, or for
+    the A-success image the A selection with its live retry). No retry or reboot; the journal is evidence only.
     """
     if mode not in ('write', 'restore'):
         raise ValueError('mode must be write or restore')
-    if len(before) != MISC_SIZE or len(after) != MISC_SIZE or digest(before) != ss.MISC_SHA or digest(after) != after_sha:
+    if len(before) != MISC_SIZE or len(after) != MISC_SIZE or digest(before) != before_sha or digest(after) != after_sha:
         raise ValueError('misc images do not match their pinned hashes')
     if sorted(order) != [1, 2, 3, 4]:
         raise ValueError('order must use each copy 1..4 once')
-    if after_sha not in (ss.MISC_A_SHA, PROBE_SHA):
-        raise ValueError('after image is neither the pinned selection nor the pinned probe')
+    if after_sha not in (ss.MISC_A_SHA, PROBE_SHA, CONFIRM_SHA):
+        raise ValueError('after image is neither the pinned selection, probe nor A-success image')
+    if (after_sha == CONFIRM_SHA) != (before_sha != ss.MISC_SHA):
+        raise ValueError('only the A-success image starts from a misc other than the original')
+    if after_sha == CONFIRM_SHA:
+        changed = {i for i in range(MISC_SIZE) if before[i] != after[i]}
+        allowed = {off + k for off in ss.MISC_COPIES for k in (A_RETRY, A_SUCCESS)}
+        retries = {before[off + A_RETRY] for off in ss.MISC_COPIES}
+        if len(retries) != 1 or not retries <= set(range(3, 8)):
+            raise ValueError('A-success write needs one A retry 3..7 in all four copies')
+        if not changed or not changed <= allowed or any(before[off + A_SUCCESS] != 0 for off in ss.MISC_COPIES):
+            raise ValueError('A-success write may change only the A retry and success bytes of an unconfirmed selection')
     old, new = blocks(before), blocks(after)
     out = Path(tempfile.mkdtemp(prefix=f'misc-blocks-{mode}-', dir=Path(output).resolve()))
     with (out / 'journal.jsonl').open('x') as journal:
@@ -123,7 +149,7 @@ def run_blockwise(da, before, after, after_sha, order, output, *, mode, guards):
                 raise ValueError('STOP: write was not acknowledged; no retry or reboot')
 
         try:
-            record(mode=mode, target='misc', order=list(order), before_sha=ss.MISC_SHA, after_sha=after_sha)
+            record(mode=mode, target='misc', order=list(order), before_sha=before_sha, after_sha=after_sha)
             if mode == 'write':
                 for step, copy in enumerate(order):
                     k = copy - 1
@@ -150,7 +176,7 @@ def run_blockwise(da, before, after, after_sha, order, output, *, mode, guards):
                     state[k] = digest(old[k])
                     check('after', k, state[k], {j: {state[j]} for j in range(4)})
             final = read('final', 'misc', MISC_ADDR, MISC_SIZE)
-            if final != (after_sha if mode == 'write' else ss.MISC_SHA):
+            if final != (after_sha if mode == 'write' else before_sha):
                 raise ValueError('STOP: final misc image did not match; no retry or reboot')
             record(status='TARGET_AND_GUARDS_VERIFIED')
         except BaseException:

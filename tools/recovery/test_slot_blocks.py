@@ -167,6 +167,84 @@ class BlockwiseTests(unittest.TestCase):
         self.assertEqual((H(self.select), H(self.probe)), (ss.MISC_A_SHA, b.PROBE_SHA))
 
 
+class ConfirmTests(unittest.TestCase):
+    """Marking A successful (#133): from the A selection after some A boots to A retry 0, success 1."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name)
+        self.before, self.after = b.confirm_images(misc_original(), 4)
+
+    def run_(self, da, mode='write', before=None, after=None):
+        before, after = before or self.before, after or self.after
+        return b.run_blockwise(da, before, after, H(after), (4, 3, 2, 1), self.out, mode=mode, guards=GUARDS, before_sha=H(before))
+
+    def test_images_change_only_retry_and_success_and_are_pinned(self):
+        self.assertEqual(H(self.after), b.CONFIRM_SHA)
+        self.assertEqual(self.before[0x800:0x810].hex(), '00414230ffffffff0f0400000e000100')
+        self.assertEqual(self.after[0x800:0x810].hex(), '00414230ffffffff0f0001000e000100')
+        diff = [i for i, (x, y) in enumerate(zip(self.before, self.after)) if x != y]
+        self.assertEqual(diff, sorted(off + k for off in ss.MISC_COPIES for k in (9, 10)))
+        self.assertEqual(H(b.confirm_images(misc_original(), 3)[0]), ss.MISC_A_SHA)  # retry 3 = straight after the selection
+        for bad in (2, 8):
+            with self.assertRaises(ValueError):
+                b.confirm_images(misc_original(), bad)
+
+    def test_write_goes_copy_1_last_and_every_intermediate_state_selects_a(self):
+        da = FakeDA(self.before)
+        priorities = []
+        real = da.writeflash
+        def spy(addr, length, filename, **kw):
+            m = bytes(da.mem[b.MISC_ADDR])
+            priorities.append({(m[off + 8], m[off + 12]) for off in ss.MISC_COPIES})
+            return real(addr, length, filename, **kw)
+        da.writeflash = spy
+        self.run_(da)
+        self.assertEqual(da.writes, [(b.MISC_ADDR + k * b.BLOCK, b.BLOCK) for k in (3, 2, 1, 0)])
+        self.assertEqual(bytes(da.mem[b.MISC_ADDR]), self.after)
+        self.assertEqual(priorities, [{(0x0f, 0x0e)}] * 4)
+        journal = [json.loads(l) for p in self.out.glob('*/journal.jsonl') for l in p.read_text().splitlines()]
+        self.assertEqual((journal[0]['before_sha'], journal[-1]['status']), (H(self.before), 'TARGET_AND_GUARDS_VERIFIED'))
+
+    def test_wrong_live_retry_stops_before_any_write(self):
+        da = FakeDA(b.confirm_images(misc_original(), 5)[0])
+        with self.assertRaises(ValueError):
+            self.run_(da)
+        self.assertEqual(da.writes, [])
+
+    def test_restore_returns_a_partial_confirm_to_the_unconfirmed_selection(self):
+        da = FakeDA(self.before)
+        da.mem[b.MISC_ADDR][3 * b.BLOCK:4 * b.BLOCK] = b.blocks(self.after)[3]
+        self.run_(da, mode='restore')
+        self.assertEqual(bytes(da.mem[b.MISC_ADDR]), self.before)
+
+    def test_refused_combinations(self):
+        da = FakeDA(self.before)
+        original = misc_original()
+        cases = [
+            (original, self.after),                                    # A-success image straight from the original (B selected)
+            (b.confirm_images(original, 4)[0], b.probe_image(original)),  # probe from a non-original misc
+        ]
+        confirmed = bytearray(self.before)
+        for off in ss.MISC_COPIES:
+            confirmed[off + 10] = 1
+        cases.append((bytes(confirmed), self.after))                  # already marked successful
+        elsewhere = bytearray(self.before)
+        elsewhere[0x900] = 0
+        cases.append((bytes(elsewhere), self.after))                  # differs outside the record
+        mixed = bytearray(self.before)
+        mixed[ss.MISC_COPIES[2] + 9] = 5
+        cases.append((bytes(mixed), self.after))                      # copies disagree on A retry
+        high = bytearray(self.before)
+        for off in ss.MISC_COPIES:
+            high[off + 9] = 9
+        cases.append((bytes(high), self.after))                       # retry outside 3..7
+        for before, after in cases:
+            with self.assertRaises(ValueError):
+                b.run_blockwise(da, before, after, H(after), (4, 3, 2, 1), self.out, mode='write', guards=GUARDS, before_sha=H(before))
+        self.assertEqual((da.writes, da.reads), ([], 0))
+
+
 class SigBlockTests(unittest.TestCase):
     def test_block_spec_guards_the_other_blocks_and_refuses_the_certificate_block(self):
         sig = bytes(range(256)) * 4096

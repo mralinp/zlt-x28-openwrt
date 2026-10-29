@@ -29,6 +29,7 @@ class OrderTests(unittest.TestCase):
         self.assertEqual(e.order_for('select', 2), (4, 3, 1, 2))
         self.assertEqual(e.order_for('select', 1), (4, 3, 2, 1))
         self.assertEqual(e.order_for('select-restore', None, [4, 3, 1, 2]), (4, 3, 1, 2))
+        self.assertEqual(e.order_for('confirm', None), (4, 3, 2, 1))  # copy 1 (the one stock reads) last
         for bad in (None, 0, 5):
             with self.assertRaises(ValueError):
                 e.order_for('select', bad)
@@ -42,6 +43,7 @@ class OrderTests(unittest.TestCase):
         self.assertEqual(flags('misc-blocks', 'probe'), ['prior_sig_block'])
         self.assertEqual(sorted(flags('misc-blocks', 'select')), ['prior_probe_restore', 'prior_rootfs_a'])
         self.assertEqual((flags('misc-blocks', 'probe-restore'), flags('misc-blocks', 'select-restore')), (['resume'], ['resume']))
+        self.assertEqual((flags('misc-blocks', 'confirm'), flags('misc-blocks', 'confirm-restore')), ([], ['resume']))
         self.assertTrue(all(p[2] for k, v in e.PRIOR.items() if not k[1].endswith('restore') for p in v))
         self.assertTrue(all(not p[2] for k, v in e.PRIOR.items() if k[1].endswith('restore') for p in v))
 
@@ -245,7 +247,10 @@ class GateTests(unittest.TestCase):
                      ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--observed-copy', '2'),
                      ('misc-blocks', 'probe-restore', '--resume', '/x', '--observed-copy', '2', '--waive-sig-tools'),
                      ('sig-block', 'identical', '--block', '1', '--waive-sig-tools'),
-                     ('misc-blocks', 'select', '--prior-probe-restore', '/x', '--prior-rootfs-a', '/y', '--last-copy', '1')):
+                     ('misc-blocks', 'select', '--prior-probe-restore', '/x', '--prior-rootfs-a', '/y', '--last-copy', '1'),
+                     ('misc-blocks', 'confirm'), ('misc-blocks', 'confirm', '--a-retry', '4', '--resume', '/x'),
+                     ('misc-blocks', 'confirm-restore'), ('misc-blocks', 'confirm-restore', '--resume', '/x', '--a-retry', '4'),
+                     ('misc-blocks', 'probe', '--prior-sig-block', '/x', '--a-retry', '4')):
             with self.assertRaises(ValueError, msg=argv):
                 self.run_main(*argv)
 
