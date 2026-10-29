@@ -6,6 +6,9 @@ stage=$1
 case_dir=$2
 export TRACE="$case_dir/commands" NOTIFICATIONS="$case_dir/notifications"
 export X28_MIPC_LOCKFILE="$case_dir/modem.lock"
+export X28_MIPC_APN_CMD="cat $case_dir/sim_apns"
+export X28_MIPC_SYSCTL="$case_dir/sysctl"
+mkdir -p "$case_dir/sysctl/ccmni7"
 : > "$TRACE"
 : > "$NOTIFICATIONS"
 . /lib/functions.sh
@@ -17,6 +20,7 @@ mipc_wan_cli() {
   --show_sim_status) cat "$case_dir/sim" ;;
   --data_call_act) cat "$case_dir/reply"; return "$(cat "$case_dir/activate_rc")" ;;
   --data_call_deact) return "$(cat "$case_dir/deactivate_rc")" ;;
+  --data_call_get) [ -s "$case_dir/get" ] && cat "$case_dir/get" ;;
   *) printf 'Unexpected modem command\n' >&2; return 99 ;;
  esac
 }
@@ -34,10 +38,13 @@ ubus() {
  printf 'Unexpected ubus call: %s\n' "$*" >&2; return 99
 }
 ip() {
+ if [ "$*" = '-6 addr show dev ccmni7 scope global' ]; then cat "$case_dir/v6_global"; return 0; fi
+ case "$*" in '-6 addr del '*' dev ccmni7') printf '%s\n' "$4" >> "$case_dir/ip6del"; return 0 ;; esac
  [ "$*" = 'link show dev ccmni7 up' ] || { printf 'Unexpected ip command\n' >&2; return 99; }
  [ "$(cat "$case_dir/link")" = up ] && printf '7: ccmni7: <UP> mtu 1500\n'
  return 0
 }
+sleep() { :; }
 uci() { printf 'FORBIDDEN uci\n' >> "$TRACE"; return 99; }
 killall() { printf 'FORBIDDEN killall\n' >> "$TRACE"; return 99; }
 ifup() { printf 'FORBIDDEN ifup\n' >> "$TRACE"; return 99; }

@@ -60,7 +60,7 @@ class PolicyTests(unittest.TestCase):
         self.archive=self.stage/'rootfs-staging.tar.gz'
         with tarfile.open(self.archive,'w:gz') as t:
             for name,data in {'etc/inittab':b'ttyS0::askfirst:/bin/sh\n','etc/shadow':b'root:::0:99999:7:::\nservice:old:0:0:99999:7:::\n',
-                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq',
+                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd',
                               'sbin/ujail':b'jail', 'usr/lib/opkg/info/procd-ujail.list':b'/sbin/ujail',
                               'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n',
                               'etc/uci-defaults/99-unsafe':b'mtd write', 'etc/rc.local':b'mtd write',
@@ -93,6 +93,11 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("option name 'br-lan'\n option type 'bridge'\n list ports 'eth0.1'\n list ports 'eth0.2'\n list ports 'eth0.3'\n list ports 'eth1'",net)
         self.assertIn("config interface 'lan'\n option device 'br-lan'",net)
         self.assertEqual(tree['etc/rc.d/S19dnsmasq'][0].linkname,'../init.d/dnsmasq')
+        self.assertEqual(tree['etc/rc.d/S35odhcpd'][0].linkname,'../init.d/odhcpd')
+        self.assertIn(" option ip6assign '64'",net)
+        dhcp=tree['etc/config/dhcp'][1].decode()
+        self.assertIn("config dhcp 'lan'\n option interface 'lan'",dhcp)
+        self.assertIn(" option ra 'server'\n option dhcpv6 'server'",dhcp)
         self.assertEqual(tree['usr/lib/opkg/status'][1],b'Package: procd\nStatus: installed\n\nPackage: zlib\n')
         self.assertNotIn('sbin/ujail',tree);self.assertNotIn('usr/lib/opkg/info/procd-ujail.list',tree)
         self.assertEqual(tree['etc/rc.d/S99x28-leds'][0].linkname,'../init.d/x28-leds')

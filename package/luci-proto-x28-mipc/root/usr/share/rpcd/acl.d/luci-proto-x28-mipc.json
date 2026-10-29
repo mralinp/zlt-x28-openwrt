@@ -1,0 +1,10 @@
+{
+	"luci-proto-x28-mipc": {
+		"description": "List the inserted SIM's APNs for the X28 modem protocol",
+		"read": {
+			"file": {
+				"/sbin/x28-apn": [ "exec" ]
+			}
+		}
+	}
+}

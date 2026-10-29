@@ -35,3 +35,6 @@ experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controlle
 
 # Locally supplied vendor SDK; provenance and redistribution rights unverified
 /sdk-fg360/
+
+# mocked lifecycle test output (tests/test_native.py)
+.test-results/

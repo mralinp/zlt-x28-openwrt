@@ -339,6 +339,9 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
 
 - **LAN:** `br-lan` bridges `eth0.1 eth0.2 eth0.3 eth1` (sockets 1, 2, 4, 0), like stock `br0`; the switch table
   above is unchanged, so `x28-switch` still validates it. `lan` is static `192.168.70.1/24` on `br-lan`.
+- **LAN IPv6 (#126):** `lan` has `ip6assign 64` and odhcpd (S35) sends RA and DHCPv6 on `br-lan` from the /64 the
+  cellular WAN hands to netifd (`x28_mipc`, #125); the WAN keeps only a /128 so its on-link /64 does not shadow the LAN.
+  Verified on the unit: a LAN client got SLAAC addresses and reached the IPv6 internet.
 - **DHCP/DNS:** the vendor kernel has `CONFIG_NAMESPACES` off, so procd's `ujail` fails and every jailed service
   (dnsmasq, sysntpd) exits at start. With `procd-ujail` removed procd runs them unjailed and dnsmasq serves DHCP
   and DNS on the LAN. Images for this kernel must not ship `procd-ujail`.
