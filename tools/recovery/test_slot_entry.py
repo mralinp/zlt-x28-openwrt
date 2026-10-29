@@ -130,5 +130,24 @@ class GateTests(unittest.TestCase):
         self.assertNotIn('BROM', e.phrase(a, 'identical', 'a' * 64, False))
 
 
+    def test_base_phrase_names_the_base_and_that_misc_selects_a(self):
+        b = slot_session.rootfs_a_spec('abcdef1234567890' * 4, '0123456789ab' * 5 + '0123')
+        self.assertEqual(e.phrase(b, 'write', b.candidate_sha, False), 'WRITE write rootfs_a abcdef123456 BASE 0123456789ab MISC-SELECTS-A')
+        self.assertEqual(e.phrase(b, 'identical', 'a' * 64, False), 'WRITE identical rootfs_a 0123456789ab BASE 0123456789ab MISC-SELECTS-A')
+        self.assertEqual(e.phrase(b, 'restore', 'a' * 64, False), 'WRITE restore rootfs_a 5f0c997ddbc0')
+
+    def test_prior_identical_of_a_base_run_must_name_the_base(self):
+        base = slot_session.rootfs_a_spec('c' * 64, 'b' * 64)
+        t = PriorTests('test_good_verified_prior_is_accepted')
+        t.setUp()
+        self.addCleanup(t.tmp.cleanup)
+        ident = {**IDENT, 'base': 'b' * 64}
+        e.load_prior(t.make(sha='b' * 64, ident=ident), ident, base, 'identical', True)
+        with self.assertRaises(ValueError):
+            e.load_prior(t.make(sha=base.original_sha, ident=ident), ident, base, 'identical', True)
+        with self.assertRaises(ValueError):
+            e.load_prior(t.make(sha='b' * 64, ident=IDENT), ident, base, 'identical', True)  # receipt without the base
+
+
 if __name__ == '__main__':
     unittest.main()

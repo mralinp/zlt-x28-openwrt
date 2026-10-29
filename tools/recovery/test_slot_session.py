@@ -11,7 +11,7 @@ import slot_session as s
 H = lambda data: hashlib.sha256(data).hexdigest()
 
 
-class SessionTests(unittest.TestCase):
+class FakeDA(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -53,6 +53,8 @@ class SessionTests(unittest.TestCase):
     def journal(self):
         return [json.loads(l) for p in self.out.glob('*/journal.jsonl') for l in p.read_text().splitlines()]
 
+
+class SessionTests(FakeDA):
     def test_identical_writes_original_once_and_verifies(self):
         self.run_('identical')
         self.assertEqual(self.writes, [(0x1000, 64)])
@@ -205,6 +207,70 @@ class SpecTests(unittest.TestCase):
             original[off:off + 16] = s.MISC_AFTER
         # the real dump's other bytes are 0xff, so this reproduces the pinned hash
         self.assertEqual(H(bytes(original)), s.MISC_A_SHA)
+
+
+class BaseModeTests(FakeDA):
+    """#137: identical/write start from a named base image already on the target; misc only has to stay unchanged."""
+    def setUp(self):
+        super().setUp()
+        self.base = b'\x33' * 64
+        guards = self.spec.guards[:2] + (('misc', 0x2200, 16, None),)
+        self.spec = self.spec._replace(guards=guards, restore_guards=guards, base_sha=H(self.base))
+        self.data[0x1000] = self.base
+        self.misc_a = b'A' * 16
+        self.data[0x2200] = self.misc_a
+
+    def run_(self, mode='write', **kw):
+        return s.run_session(self, self.spec, self.original, self.candidate, self.out, mode=mode, base=kw.get('base', self.base))
+
+    def test_write_starts_from_base_and_leaves_misc_alone(self):
+        self.run_('write')
+        self.assertEqual(self.data[0x1000], self.candidate)
+        self.assertEqual(self.data[0x2200], self.misc_a)
+
+    def test_identical_rewrites_the_base_not_the_original(self):
+        self.run_('identical')
+        self.assertEqual(self.data[0x1000], self.base)
+        self.assertEqual(self.writes, [(0x1000, 64)])
+
+    def test_original_on_target_is_not_a_valid_start(self):
+        self.data[0x1000] = self.original
+        with self.assertRaises(ValueError):
+            self.run_('write')
+        self.assertEqual(self.writes, [])
+
+    def test_wrong_or_missing_base_refused_before_any_io(self):
+        for base in (b'\x44' * 64, None):
+            with self.assertRaises(ValueError):
+                self.run_('write', base=base)
+        self.assertEqual((self.writes, self.reads), ([], 0))
+
+    def test_misc_changing_during_the_session_stops(self):
+        orig = self.writeflash
+        def drift(addr, length, filename, **kw):
+            ack = orig(addr, length, filename, **kw)
+            self.data[0x2200] = b'Z' * 16
+            return ack
+        self.writeflash = drift
+        with self.assertRaises(ValueError):
+            self.run_('write')
+
+    def test_restore_returns_the_original_from_any_state(self):
+        self.data[0x1000] = b'\x99' * 64
+        self.run_('restore')
+        self.assertEqual(self.data[0x1000], self.original)
+
+    def test_base_given_without_a_base_spec_is_refused(self):
+        with self.assertRaises(ValueError):
+            s.run_session(self, self.spec._replace(base_sha=''), self.original, self.candidate, self.out, mode='write', base=self.base)
+
+    def test_spec_rules(self):
+        spec = s.rootfs_a_spec('a' * 64, 'b' * 64)
+        self.assertEqual(dict((g[0], g[3]) for g in spec.guards)['misc'], None)
+        self.assertEqual(dict((g[0], g[3]) for g in s.rootfs_a_spec('a' * 64).guards)['misc'], s.MISC_SHA)
+        for cand, base in (('b' * 64, 'b' * 64), ('a' * 64, s.ROOTFS_A_SHA), ('a' * 64, 'short')):
+            with self.assertRaises(ValueError):
+                s.rootfs_a_spec(cand, base)
 
 
 if __name__ == '__main__':

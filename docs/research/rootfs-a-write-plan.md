@@ -48,6 +48,10 @@ needs a verified `identical` run (24 h); `misc identical` needs a verified `root
 **Not done:** hardware identical-write passes, a proven BROM route, and the router-safety-auditor's review of the entry
 command. No device I/O has been run through it.
 
+## Reflash from a named base image (#137, owner-approved relaxation)
+
+After the first native image is on `rootfs_a` and `misc` selects A, `slot_entry.py rootfs_a {identical|write|restore} --base-dir <package_ubi output now on rootfs_a>` starts `identical`/`write` from that pinned base instead of the stock original. Differences from the default flow, only in this mode: `misc` must be **unchanged during the session** (it is never written here) instead of equal to the B-selected record; the live SSH check must confirm **A** instead of B; the phrase and receipt identity name the base (`BASE <12 hex> MISC-SELECTS-A`). `restore` still writes the stock original over any state. Everything else (neighbor guards, receipts, one write, no retry or reboot) is unchanged. The risk accepted: if the write fails, `misc` selects a broken A, so recovery is the DA `restore` route, not a B fallback.
+
 ## Step 1: `rootfs_a` write session (tool to build: #99)
 
 A new bounded session next to `changed_restore.py`, with the same shape: no connect/retry/reboot options,

@@ -45,6 +45,7 @@ class Spec(NamedTuple):
     validate: Callable     # (original, candidate) -> None, raises ValueError
     candidate_sha: str     # the only image `write` may put on the target (pinned by whoever builds the spec)
     restore_guards: tuple  # guards for `restore`: wider, because stock B may have repaired slot A after a fallback
+    base_sha: str = ''     # image already on the target that identical/write start from (#137); '' = the original
 
 
 def validate_rootfs_a(original, candidate):
@@ -74,12 +75,18 @@ COMMON = (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x135000
           ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE, *MODEM_SIDE)
 
 
-def rootfs_a_spec(candidate_sha):
-    """Write rootfs_a. `restore` is refused unless misc still selects B: restore misc first once A is selected."""
-    if len(candidate_sha) != 64 or candidate_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA):
+def rootfs_a_spec(candidate_sha, base_sha=''):
+    """Write rootfs_a. `restore` is refused unless misc still selects B: restore misc first once A is selected.
+
+    With base_sha (#137) the target already holds that earlier native image and misc may select A: misc is then only
+    required to stay unchanged during the session (it is never written here), and the caller checks the live slot is A.
+    """
+    if len(candidate_sha) != 64 or candidate_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA, base_sha):
         raise ValueError('rootfs_a candidate hash must be a new SHA-256')
-    guards = (*COMMON, ('misc', 0x700000, 0x100000, MISC_SHA))
-    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards)
+    if base_sha and (len(base_sha) != 64 or base_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA)):
+        raise ValueError('rootfs_a base hash must be a native image SHA-256')
+    guards = (*COMMON, ('misc', 0x700000, 0x100000, None if base_sha else MISC_SHA))
+    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards, base_sha)
 
 
 def misc_spec(rootfs_a_sha):
@@ -96,8 +103,8 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def run_session(da, spec, original, candidate, output, *, mode):
-    """identical: original over original. write: candidate over original. restore: original over anything.
+def run_session(da, spec, original, candidate, output, *, mode, base=None):
+    """identical: base (default original) over itself. write: candidate over base. restore: original over anything.
 
     The caller owns the session on failure. The journal is evidence, never authority to resume.
     """
@@ -105,6 +112,13 @@ def run_session(da, spec, original, candidate, output, *, mode):
         raise ValueError('mode must be identical, write or restore')
     if not isinstance(original, bytes) or len(original) != spec.size or digest(original) != spec.original_sha:
         raise ValueError('original source identity mismatch')
+    start, start_sha = original, spec.original_sha
+    if spec.base_sha:
+        if not isinstance(base, bytes) or len(base) != spec.size or digest(base) != spec.base_sha:
+            raise ValueError('base source identity mismatch')
+        start, start_sha = base, spec.base_sha
+    elif base is not None:
+        raise ValueError('base image given for a spec without a base')
     if mode == 'write':
         if not isinstance(candidate, bytes) or len(candidate) != spec.size or digest(candidate) != spec.candidate_sha:
             raise ValueError('candidate differs from the hash pinned in the spec')
@@ -126,20 +140,26 @@ def run_session(da, spec, original, candidate, output, *, mode):
                 raise ValueError(f'STOP: {label} {name} read failed; no retry or reboot')
             return actual
 
+        pinned = {}
+
         def check(label, expected_target):
             # restore tolerates any target state (an interrupted write); everything else must match exactly.
             actual = read(label, spec.name, spec.addr, spec.size)
             if expected_target is not None and actual != expected_target:
                 raise ValueError(f'STOP: {label} {spec.name} did not match; no retry or reboot')
             for name, addr, size, sha in (spec.restore_guards if mode == 'restore' else spec.guards):
-                if read(label, name, addr, size) not in ((sha,) if isinstance(sha, str) else sha):
+                got = read(label, name, addr, size)
+                if sha is None:  # unchanged during this session
+                    if pinned.setdefault(name, got) != got:
+                        raise ValueError(f'STOP: {label} guard {name} changed during the session; no retry or reboot')
+                elif got not in ((sha,) if isinstance(sha, str) else sha):
                     raise ValueError(f'STOP: {label} guard {name} did not match; no retry or reboot')
 
         try:
             record(mode=mode, target=spec.name, target_offset=spec.addr, target_length=spec.size,
                    candidate_sha256=spec.candidate_sha if mode == 'write' else None)
-            check('before', None if mode == 'restore' else spec.original_sha)
-            data, want = (candidate, spec.candidate_sha) if mode == 'write' else (original, spec.original_sha)
+            check('before', None if mode == 'restore' else start_sha)
+            data, want = (candidate, spec.candidate_sha) if mode == 'write' else ((original, spec.original_sha) if mode == 'restore' else (start, start_sha))
             source = out / 'source.bin'
             with source.open('xb') as stream:
                 stream.write(data)
