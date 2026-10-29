@@ -363,8 +363,8 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   virtual interface of `ra0` (opens only while `ra0` is up). `package/x28-wifi` is a netifd wireless handler (`mtwifi`):
   it renders `/etc/wireless/mediatek/mt7915.dbdc.b0/b1.dat` from `/etc/config/wireless` on a saved stock copy and
   hands the interface to netifd, which bridges it into `lan`. The image copies `l1profile.dat` and both profiles from
-  the stock rootfs; calibration stays in `/mnt/vendor/nvcfg/e2p`. First boot's `wifi config` creates one WPA2 AP per
-  band with a random per-device key.
+  the stock rootfs; calibration stays in `/mnt/vendor/nvcfg/e2p`. First boot's `wifi config` creates one open AP per
+  band (like root's empty password; set both in LuCI on first login).
   Stock LuCI 23.05 builds Wireless Security choices only for `mac80211`/`broadcom` radios, so the builder inserts an
   `mtwifi` branch (WPA2-PSK, WPA3-SAE, mixed modes) into `wireless.js`; it refuses a LuCI build without the anchor.
 - **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
