@@ -1,0 +1,60 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# After a boot that reached userspace, put slot A's "tries" byte back to 0, as stock's boot-done script does (#145).
+# The preloader adds one try per boot; without this a healthy slot A runs out of tries and stock B repairs
+# (erases) it. Only that byte is written, in the four misc copies the preloader keeps, the copy at 0x800 last.
+# A boot that never gets here keeps counting, so the fall-back to B stays. Success, priorities and every other
+# partition are never touched.
+
+START=96
+
+OFFSET=2057	# record at 2048 in each copy, A tries is byte 9 (as in stock's boot-control helper)
+COPY=262144	# the four copies sit one erase block apart
+# Tests point these at a fake /proc, a file standing in for misc and a fake writer.
+PROC=${X28_BOOTOK_PROC:-/proc}
+DDNAND=${X28_BOOTOK_DDNAND:-dd-nand}
+DEV=${X28_BOOTOK_DEV:-}
+
+log() { logger -t x28-bootok "$*"; echo "x28-bootok: $*" >&2; }
+
+byte() { dd if="$DEV" bs=1 skip=$(($1)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"'; }
+
+# Reaching here only counts as a good boot when SSH is up and the LAN is configured.
+healthy() { pidof dropbear >/dev/null && ifstatus lan 2>/dev/null | grep -q '"up": true'; }
+
+reset_tries() {
+	local slot i off
+	slot=$(sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$PROC/cmdline")
+	case "$slot" in a) ;; b) return 0 ;; *) log "no bootslot on the kernel command line; tries left to count"; return 1 ;; esac
+	if [ -z "$DEV" ]; then
+		DEV=$(sed -n 's/^\(mtd[0-9]*\): [0-9a-f]* [0-9a-f]* "misc"$/\1/p' "$PROC/mtd")
+		[ -n "$DEV" ] || { log "no misc partition"; return 1; }
+		DEV=/dev/$DEV
+	fi
+	# Every copy must be a boot-control record (its magic) before any is written, so a wrong device is never touched.
+	for i in 0 1 2 3; do
+		[ "$(dd if="$DEV" bs=1 skip=$((2048 + COPY * i)) count=4 2>/dev/null | hexdump -v -e '1/1 "%02x"')" = 00414230 ] ||
+			{ log "copy $((i + 1)): not a boot-control record; nothing written"; return 1; }
+	done
+	for i in 3 2 1 0; do
+		off=$((OFFSET + COPY * i))
+		[ "$(byte $off)" = 00 ] && continue
+		printf '\000' | "$DDNAND" of="$DEV" seek=$off bs=1 count=1 >/dev/null 2>&1
+		[ "$(byte $off)" = 00 ] || { log "copy $((i + 1)): tries byte not reset; stopped"; return 1; }
+		log "copy $((i + 1)): tries reset to 0"
+	done
+}
+
+start() {
+	# Runs in the background so a slow flash write never delays the rest of boot.
+	(
+		# netifd and dropbear come up asynchronously; wait up to two minutes. A boot that never gets healthy writes nothing.
+		i=0
+		until healthy; do
+			i=$((i + 1))
+			[ "$i" -gt 60 ] && { log "not healthy; tries left to count"; exit 0; }
+			sleep 2
+		done
+		reset_tries
+	) </dev/null >/dev/null 2>&1 &
+}

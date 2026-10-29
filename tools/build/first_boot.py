@@ -22,7 +22,7 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S96x28-bootok','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -32,6 +32,7 @@ LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
 WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
 MIPC = Path(__file__).resolve().parents[2]/'package/x28-mipc/files'
 LUCI_MIPC = Path(__file__).resolve().parents[2]/'package/luci-proto-x28-mipc'
+BOOTOK = Path(__file__).resolve().parents[2]/'package/x28-bootok/files'
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
@@ -158,6 +159,7 @@ def integrate(stage,key,stock_path,output):
     stock=load_archive(io.BytesIO(stock_bytes),'rootfs')
     swconfig_added=add_swconfig(tree,stock)
     modem_added=add_modem(tree,stock)
+    bootok_added=add_stock(tree,stock,'sbin/dd-nand')  # the vendor writer x28-bootok uses on one misc byte (#145)
     for name in WIFI_PROFILES:
         if name not in stock or not stock[name][0].isfile():raise ValueError('missing stock Wi-Fi profile: '+name)
         tree[name]=stock[name]
@@ -206,6 +208,7 @@ def integrate(stage,key,stock_path,output):
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
+    put('etc/init.d/x28-bootok',(BOOTOK/'x28-bootok.init').read_text(),0o755);enable(96,'x28-bootok')
     enable(95,'done')  # `mount_root done`: without it mount_root discards the overlay at every boot (#143)
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
     put('etc/config/dhcp',"""config dnsmasq
@@ -274,7 +277,7 @@ config interface 'wan'
  option PasswordAuth 'off'
  option RootPasswordAuth 'off'
  option RootLogin 'on'
- option Port '2222'
+ option Port '22'
  option Interface 'lan'
  option GatewayPorts 'off'
  option mdns '0'
@@ -299,7 +302,7 @@ config interface 'wan'
         for name,(info,data) in sorted(tree.items()):
             meta=copy.copy(info);tar.addfile(meta,io.BytesIO(data) if meta.isfile() else None)
     report={'flashable':False,'input_stage_sha256':digest(raw),'archive_sha256':digest(archive.read_bytes()),
-            'lan_device':LAN,'lan_ports':list(LAN_PORTS),'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'modem_added':modem_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
+            'lan_device':LAN,'lan_ports':list(LAN_PORTS),'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'modem_added':modem_added,'bootok_added':bootok_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':22,'public_key_sha256':digest(key.encode()),
             'removed_paths':removed,'enabled_start_links':sorted(n for n in tree if n.startswith('etc/rc.d/S')),
             'limits':['Modem stack from stock, started by x28-modem; reboot persistence unverified (#131)','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No web UI','LEDs show no-service without the modem stack','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
     (output/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');(output/'INCOMPLETE').unlink()

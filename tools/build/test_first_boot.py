@@ -87,7 +87,7 @@ class PolicyTests(unittest.TestCase):
                 binary=service.split('.')[0].lstrip('123')
                 put(t,'rootfs/etc/init.d/'+service,f'procd_set_param command /usr/bin/{binary} 0\n'.encode())
                 put(t,'rootfs/usr/bin/'+binary,elf(['libmodem.so']))
-            put(t,'rootfs/usr/lib/libmodem.so',elf(['libc.so']));put(t,'rootfs/usr/bin/mipc_wan_cli',elf(['libc.so']))
+            put(t,'rootfs/sbin/dd-nand',elf(['libnandapi.so','libc.so']));put(t,'rootfs/usr/lib/libnandapi.so',elf(['libc.so']));put(t,'rootfs/usr/lib/libmodem.so',elf(['libc.so']));put(t,'rootfs/usr/bin/mipc_wan_cli',elf(['libc.so']))
             put(t,'rootfs/etc/quectel-project-version',b'v1\n');put(t,'rootfs/etc/conf/apns-conf_8.xml',b'<apns/>\n');put(t,'rootfs/vendor/etc/md/apncfg/001_01.conf',b'apn\n')
 
     def test_policy_removes_shells_unsafe_services_and_defines_key_only_lan(self):
@@ -136,6 +136,9 @@ class PolicyTests(unittest.TestCase):
         self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/dropbear/authorized_keys'][0].mode,0o600)
         self.assertEqual({row.split(b':')[0]:row.split(b':')[1] for row in tree['etc/shadow'][1].splitlines()},{b'root':b'',b'service':b'!'})  # empty root like stock
+        self.assertEqual(tree['etc/rc.d/S96x28-bootok'][0].linkname,'../init.d/x28-bootok')
+        for name in ('sbin/dd-nand','usr/lib/libnandapi.so','etc/init.d/x28-bootok'):self.assertIn(name,tree)
+        self.assertIn(b"option Port '22'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/rc.d/S95done'][0].linkname,'../init.d/done')
         self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])  # an empty password never works over SSH
         self.assertIn(b"option RootPasswordAuth 'off'",tree['etc/config/dropbear'][1])

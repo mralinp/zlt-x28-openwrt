@@ -2,6 +2,7 @@
 import io
 import tarfile
 import unittest
+from pathlib import Path
 import ab_guard as g
 
 
@@ -45,6 +46,18 @@ class GuardTests(unittest.TestCase):
     def test_hotplug_cron_and_rclocal_are_roots(self):
         for root in ('etc/hotplug.d/iface/10-x','etc/crontabs/root','etc/rc.local','etc/uci-defaults/90-x','lib/preinit/80_x'):
             with self.assertRaises(ValueError,msg=root):g.check(tree({**BASE,root:b'#!/bin/sh\nmtd write a b\n'},LINK))
+
+
+    def test_only_the_reviewed_bootok_script_may_name_dd_nand(self):
+        script=(Path(__file__).resolve().parents[2]/'package/x28-bootok/files/x28-bootok.init').read_bytes()
+        link=[('etc/rc.d/S96x28-bootok','../init.d/x28-bootok')]
+        g.check(tree({**BASE,'etc/init.d/x28-bootok':script},LINK+link))  # as shipped
+        for name,bad in (('second call',script+b'\nprintf x | "$DDNAND" of=/dev/mtd1 seek=0 bs=1 count=1\n'),
+                         ('other of=',script+b'\ndd if=x of=/dev/null\n'),('other writer',script+b'\nnandwrite /dev/mtd1 f\n'),
+                         ('direct call',script+b'\ndd-nand of=/dev/mtd1\n'),('upgrade sync',script+b'\nab_image_sync _a\n')):
+            with self.assertRaises(ValueError,msg=name):g.check(tree({**BASE,'etc/init.d/x28-bootok':bad},LINK+link))
+        other=script.replace(b'x28-bootok',b'x28-other')  # same text, any other name: refused
+        with self.assertRaises(ValueError):g.check(tree({**BASE,'etc/init.d/x28-other':other},LINK+[('etc/rc.d/S96x28-other','../init.d/x28-other')]))
 
 
 if __name__=='__main__':unittest.main()
