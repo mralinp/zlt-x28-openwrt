@@ -149,7 +149,7 @@ password is read/generated/copied. The archive embeds the public key privately a
 bytes must match the stage manifest and its `NOT-FLASHABLE` marker. Existing output is refused.
 
 The profile writes static `192.168.70.1/24` on `eth0.3` (switch profile below; #86 replaced the earlier
-`--lan-device` choice). SSH is port 2222, restricted to LAN, with both password-auth options off and all shadow
+`--lan-device` choice). SSH is port 22 (2222 on images before #145), restricted to LAN, with both password-auth options off and all shadow
 password fields locked. There is no WAN interface, DHCP server, web service or modem/Wi-Fi service
 activation. A laptop would need a compatible static address; no live network was changed here.
 `eth1` in the private draft is **not a verified physical-port mapping**. Read-only observation of the
@@ -421,3 +421,4 @@ records and reading each byte back), with the stock `dd-nand` + `libnandapi.so` 
 success byte, priorities or any other partition; a boot that never reaches it keeps counting, so the fall-back to B stays.
 `ab_guard` allows the `dd-nand` token in that one script only while it keeps the reviewed shape. Dropbear now listens on
 port 22 (LAN only, key-only), like standard OpenWrt; update `~/.ssh/config` and the known_hosts entry when you flash it.
+If one write fails, earlier copies stay at 0 and later ones keep their tries (a mixed record, which the preloader's handling of is unverified); the next boot retries.

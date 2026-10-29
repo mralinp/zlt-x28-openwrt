@@ -44,7 +44,7 @@ are examples, not execution approval; use this unit's own backups only.
 | Cable | **USB-A to USB-C**, into a USB-A port (a hub or adapter is fine) |
 | Does not work | USB-C to USB-C: the Mac never sees an attach, so the preloader finds no cable and skips USB |
 | Host | macOS on Apple Silicon. `usb_watch.py` is macOS-only; the other scripts are portable |
-| Router access | `ssh router` (port 2222, key auth) for step 1 |
+| Router access | `ssh router` (port 22 on the native image, 2222 on older ones; key auth) for step 1 |
 
 Why C-to-C fails (inferred, not measured): the Mac logged no USB-C attach and no accessory
 event in two power cycles, which fits a modem-side port without CC pull-down resistors.

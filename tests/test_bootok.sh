@@ -36,4 +36,29 @@ mkmisc 005; echo 'console=ttyS0 bootslot=b' > "$dir/proc/cmdline"
 echo 'console=ttyS0 bootslot=a' > "$dir/proc/cmdline"; mkmisc 005; : > "$CALLS"
 ! FAIL=1 reset_tries 2>/dev/null; [ "$(wc -l < "$CALLS")" -eq 1 ]               # a failed write stops after the first copy
 [ "$(tries)" = "05 05 05 05 " ]
+# a failure on the third write stops there: copies 4 and 3 stay reset, copies 2 and 1 are left alone
+cat > "$dir/dd-nand2" <<'STUB'
+#!/bin/sh
+echo x >> "$CALLS"
+for a in "$@"; do case "$a" in of=*) f=${a#of=};; seek=*) s=${a#seek=};; esac; done
+[ "$(wc -l < "$CALLS")" -ge 3 ] && exit 1
+dd of="$f" bs=1 seek="$s" count=1 conv=notrunc 2>/dev/null
+STUB
+chmod +x "$dir/dd-nand2"; mkmisc 005; : > "$CALLS"
+! DDNAND=$dir/dd-nand2 reset_tries 2>/dev/null; [ "$(tries)" = "05 05 00 00 " ]
+# a writer that exits 0 without writing is caught by the read-back
+printf '#!/bin/sh\ntrue\n' > "$dir/dd-nand3"; chmod +x "$dir/dd-nand3"; mkmisc 005
+! DDNAND=$dir/dd-nand3 reset_tries 2>/dev/null; [ "$(tries)" = "05 05 05 05 " ]
+# no misc partition, or two of them, with no device given: nothing is written
+DEV_SAVE=$DEV; DEV=; : > "$CALLS"
+printf '%s\n' 'mtd3: 00100000 00040000 "boot_para"' > "$dir/proc/mtd"; ! reset_tries 2>/dev/null
+printf '%s\n' 'mtd3: 00100000 00040000 "misc"' 'mtd9: 00100000 00040000 "misc"' > "$dir/proc/mtd"; ! reset_tries 2>/dev/null
+[ ! -s "$CALLS" ]
+DEV=$DEV_SAVE
+# no bootslot at all: logged, nothing written
+echo 'console=ttyS0' > "$dir/proc/cmdline"; mkmisc 005; : > "$CALLS"; ! reset_tries 2>/dev/null; [ ! -s "$CALLS" ]
+# healthy(): needs both dropbear and lan
+pidof() { return 1; }; ! healthy
+pidof() { return 0; }; ifstatus() { echo '{ "up": true }'; }; healthy
+ifstatus() { echo '{ "up": false }'; }; ! healthy
 echo "PASS: x28-bootok resets the A tries byte in all four copies, only on slot A, only on a boot-control record, and stops on failure"

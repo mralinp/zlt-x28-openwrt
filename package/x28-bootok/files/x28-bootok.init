@@ -25,7 +25,7 @@ healthy() { pidof dropbear >/dev/null && ifstatus lan 2>/dev/null | grep -q '"up
 reset_tries() {
 	local slot i off
 	slot=$(sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$PROC/cmdline")
-	[ "$slot" = a ] || return 0
+	case "$slot" in a) ;; b) return 0 ;; *) log "no bootslot on the kernel command line; tries left to count"; return 1 ;; esac
 	if [ -z "$DEV" ]; then
 		DEV=$(sed -n 's/^\(mtd[0-9]*\): [0-9a-f]* [0-9a-f]* "misc"$/\1/p' "$PROC/mtd")
 		[ -n "$DEV" ] || { log "no misc partition"; return 1; }
@@ -47,5 +47,14 @@ reset_tries() {
 
 start() {
 	# Runs in the background so a slow flash write never delays the rest of boot.
-	( healthy && reset_tries ) </dev/null >/dev/null 2>&1 &
+	(
+		# netifd and dropbear come up asynchronously; wait up to two minutes. A boot that never gets healthy writes nothing.
+		i=0
+		until healthy; do
+			i=$((i + 1))
+			[ "$i" -gt 60 ] && { log "not healthy; tries left to count"; exit 0; }
+			sleep 2
+		done
+		reset_tries
+	) </dev/null >/dev/null 2>&1 &
 }
