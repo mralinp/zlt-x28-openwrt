@@ -12,11 +12,13 @@
 
 MTWIFI_DIR=${MTWIFI_DIR:-/etc/wireless/mediatek}
 
-# Prints the band's main interface and profile, e.g. "rai0 /etc/wireless/mediatek/mt7915.dbdc.b1.dat".
+# mtwifi_band <band> <radio section>: prints the band's main interface and profile, e.g. "rai0 .../mt7915.dbdc.b1.dat".
+# LuCI's frequency widget needs iwinfo, which mt_wifi lacks, so saving a radio there deletes band, channel and htmode
+# (observed); an empty band falls back to the section name `wifi config` gave the radio (radio_2g, radio_5g).
 mtwifi_band() {
-	case "$1" in
-		2g) echo "ra0 $MTWIFI_DIR/mt7915.dbdc.b0.dat" ;;
-		5g) echo "rai0 $MTWIFI_DIR/mt7915.dbdc.b1.dat" ;;
+	case "${1:-$2}" in
+		2g|*_2g) echo "ra0 $MTWIFI_DIR/mt7915.dbdc.b0.dat" ;;
+		5g|*_5g) echo "rai0 $MTWIFI_DIR/mt7915.dbdc.b1.dat" ;;
 		*) return 1 ;;
 	esac
 }
@@ -87,7 +89,7 @@ drv_mtwifi_setup() {
 	json_select config
 	json_get_vars channel htmode country band
 	json_select ..
-	set -- $(mtwifi_band "$band")
+	set -- $(mtwifi_band "$band" "$interface")
 	[ "$#" = 2 ] || { wireless_setup_failed INVALID_BAND; return 1; }
 	ifname="$1" dat="$2"
 	[ -f "$dat" ] || [ -f "$dat.stock" ] || { wireless_setup_failed MISSING_PROFILE; return 1; }
@@ -112,7 +114,7 @@ drv_mtwifi_teardown() {
 	json_select config
 	json_get_vars band
 	json_select ..
-	set -- $(mtwifi_band "$band")
+	set -- $(mtwifi_band "$band" "$interface")
 	[ "$#" = 2 ] && ip link set dev "$1" down 2>/dev/null
 }
 
