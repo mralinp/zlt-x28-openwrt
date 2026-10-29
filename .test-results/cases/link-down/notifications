@@ -1,0 +1,2 @@
+{ "action": 0, "link-up": false, "keep": false, "interface": "wan" }
+{ "action": 3, "error": [ "LINK_NOT_READY" ], "interface": "wan" }

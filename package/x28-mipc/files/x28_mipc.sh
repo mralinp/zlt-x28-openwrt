@@ -158,6 +158,8 @@ x28_mipc_setup() {
     { [ -n "$v4_dns2" ] && ! x28_mipc_ipv4 "$v4_dns2"; }; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
+ # The kernel leaves ccmni DOWN after a data call (observed on hardware); $ifname was validated as ccmniN above.
+ ip link set dev "$ifname" up >/dev/null 2>&1
  if [ -z "$(ip link show dev "$ifname" up 2>/dev/null)" ]; then
   x28_mipc_fail_owned "$interface" "$cid" LINK_NOT_READY; return 1
  fi
