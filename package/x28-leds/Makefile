@@ -17,7 +17,8 @@ endef
 
 define Package/x28-leds/description
   Drives the X28 front LEDs through the vendor tz_gpio_leds driver: power on, Wi-Fi on while a
-  wireless interface is up, 4G/5G from the registered access technology (blinking until wan is up),
+  wireless interface is up, 4G or 5G solid for the connected RAT (both blinking while registering or
+  connecting, off when it cannot register),
   and the RGB signal LED from RSRP (green, orange, red; blue blinking while not registered).
 endef
 

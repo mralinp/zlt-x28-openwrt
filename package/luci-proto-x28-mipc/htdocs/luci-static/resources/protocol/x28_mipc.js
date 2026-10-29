@@ -8,6 +8,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
 [
  ['INVALID_CONFIG', 'Invalid APN, IP type, MTU or routing options'],
  ['NO_SIM_APN', 'No APN is known for this SIM; choose or enter one'],
+ ['NO_IPV6', 'The network sent no IPv6 prefix'],
  ['VENDOR_WAN_ACTIVE', 'The vendor WAN manager is active; native ownership is not established'],
  ['MODEM_BUSY', 'Another modem operation is in progress'],
  ['MISSING_MODEM_CLI', 'The required MIPC modem utility is unavailable'],

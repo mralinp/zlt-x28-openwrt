@@ -75,6 +75,22 @@ x28_mipc_net64() {
  printf '%s:%s:%s:%s::\n' "$1" "$2" "$3" "$4"
 }
 
+x28_mipc_v6_valid() {
+ x28_mipc_ipv6 "$v6_addr" &&
+ { [ -z "$v6_gw" ] || x28_mipc_ipv6 "$v6_gw"; } &&
+ { [ -z "$v6_dns1" ] || x28_mipc_ipv6 "$v6_dns1"; } &&
+ { [ -z "$v6_dns2" ] || x28_mipc_ipv6 "$v6_dns2"; }
+}
+
+# Fills the caller's v6_* from data_call_get when it describes this ccmni.
+x28_mipc_v6_from_get() {
+ local reply iface
+ reply="$(mipc_wan_cli --data_call_get 2>/dev/null)" && json_load "$reply" 2>/dev/null || return 1
+ json_get_vars iface
+ [ "$iface" = "$1" ] || return 1
+ json_get_vars v6_addr v6_gw v6_dns1 v6_dns2
+}
+
 x28_mipc_run_locked() {
  local interface="$1" operation="$2" rc
  shift 2
@@ -108,7 +124,7 @@ x28_mipc_fail_owned() {
 
 x28_mipc_setup() {
  local interface="$1" apn mtu iptype defaultroute peerdns metric sim reply result cid ifname
- local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_prefix v6_gw v6_dns1 v6_dns2 net64
+ local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
  json_get_vars apn mtu iptype defaultroute peerdns metric
  mtu="${mtu:-1500}"; iptype="${iptype:-3}"
  defaultroute="${defaultroute:-1}"; peerdns="${peerdns:-1}"; metric="${metric:-0}"
@@ -162,7 +178,7 @@ x28_mipc_setup() {
   proto_notify_error "$interface" INVALID_REPLY
   proto_block_restart "$interface"; return 1
  fi
- json_get_vars result cid ifname v4_addr v4_mask v4_gw v4_dns1 v4_dns2 v6_addr v6_prefix v6_gw v6_dns1 v6_dns2
+ json_get_vars result cid ifname v4_addr v4_mask v4_gw v4_dns1 v4_dns2 v6_addr v6_gw v6_dns1 v6_dns2
  if ! x28_mipc_uint "$result" 2147483647; then
   proto_notify_error "$interface" INVALID_REPLY
   proto_block_restart "$interface"; return 1
@@ -173,10 +189,10 @@ x28_mipc_setup() {
   proto_block_restart "$interface"; return 1
  fi
  case "$ifname" in ccmni[0-9]|ccmni[0-9][0-9]) ;; *) x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1 ;; esac
- # IPv4v6 may come back with one family only; IPv4 or IPv6 alone needs that family.
+ # IPv4v6 may come back with one family only; IPv4 alone needs it now, IPv6 is checked once the RA had its chance.
  [ "$iptype" = 2 ] && v4_addr=
  [ "$iptype" = 1 ] && v6_addr=
- if [ -z "$v4_addr$v6_addr" ] || { [ "$iptype" = 1 ] && [ -z "$v4_addr" ]; } || { [ "$iptype" = 2 ] && [ -z "$v6_addr" ]; }; then
+ if [ "$iptype" = 1 ] && [ -z "$v4_addr" ]; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
  if [ -n "$v4_addr" ]; then
@@ -188,16 +204,8 @@ x28_mipc_setup() {
    x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
   fi
  fi
- if [ -n "$v6_addr" ]; then
-  v6_prefix="${v6_prefix:-64}"
-  if ! x28_mipc_ipv6 "$v6_addr" || ! x28_mipc_uint "$v6_prefix" 128 ||
-     { [ -n "$v6_gw" ] && ! x28_mipc_ipv6 "$v6_gw"; } ||
-     { [ -n "$v6_dns1" ] && ! x28_mipc_ipv6 "$v6_dns1"; } ||
-     { [ -n "$v6_dns2" ] && ! x28_mipc_ipv6 "$v6_dns2"; }; then
-   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
-  fi
-  # 3GPP hands the UE a whole /64; it goes to netifd as a prefix for the LAN (stock does the same).
-  [ "$v6_prefix" = 64 ] && net64="$(x28_mipc_net64 "$v6_addr")"
+ if [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
+  x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
  # The kernel leaves ccmni DOWN after a data call (observed on hardware); $ifname was validated as ccmniN above.
  ip link set dev "$ifname" up >/dev/null 2>&1
@@ -205,7 +213,40 @@ x28_mipc_setup() {
   x28_mipc_fail_owned "$interface" "$cid" LINK_NOT_READY; return 1
  fi
  [ "$v4_gw" != 0.0.0.0 ] || v4_gw=
- [ "$v6_gw" != :: ] || v6_gw=
+ if [ "$iptype" != 1 ]; then
+  # The modem reports only the interface ID (fe80::...); the global /64 arrives by RA on ccmni and the kernel
+  # configures it (stock's check_global_ipv6_addr waits the same way). 3GPP routes that whole /64 to the UE.
+  # ccmni has no MAC: the kernel needs this link-local to solicit the RA and takes its IID for SLAAC. It goes to
+  # netifd in a first update; netifd flushes addresses it does not own when it takes the device (observed).
+  i=0 ll=
+  while :; do
+   # Reusing the already-active attach bearer, the activation reply omits IPv6 (observed); data_call_get has it.
+   if [ -z "$v6_addr" ] && x28_mipc_v6_from_get "$ifname" && [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
+    x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
+   fi
+   [ "$v6_gw" != :: ] || v6_gw=
+   if [ -z "$ll" ]; then
+    case "$v6_addr" in
+     [fF][eE]8*) ll="$v6_addr"; x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; } ;;
+    esac
+   fi
+   v6_global="$(ip -6 addr show dev "$ifname" scope global 2>/dev/null | sed -n 's/.*inet6 \([0-9a-fA-F:]*\)\/64 .*/\1/p' | head -n 1)"
+   [ -n "$v6_global" ] || [ "$i" -ge 10 ] && break
+   sleep 1; i=$((i + 1))
+  done
+  case "$v6_addr" in [fF][eE]8*) ;; *) v6_global="${v6_global:-$v6_addr}" ;; esac
+  if x28_mipc_ipv6 "$v6_global"; then
+   net64="$(x28_mipc_net64 "$v6_global")"
+  else
+   v6_global=
+   [ -n "$v4_addr" ] || { x28_mipc_fail_owned "$interface" "$cid" NO_IPV6; return 1; }
+  fi
+ fi
+ x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
+}
+
+# Sends the caller's (x28_mipc_setup) current addresses, routes and DNS to netifd.
+x28_mipc_send() {
  proto_init_update "$ifname" 1
  if [ -n "$v4_addr" ]; then
   proto_add_ipv4_address "$v4_addr" "$prefix"
@@ -215,9 +256,10 @@ x28_mipc_setup() {
    [ -z "$v4_dns2" ] || [ "$v4_dns2" = 0.0.0.0 ] || [ "$v4_dns2" = "$v4_dns1" ] || proto_add_dns_server "$v4_dns2"
   fi
  fi
- if [ -n "$v6_addr" ]; then
-  proto_add_ipv6_address "$v6_addr" 128
-  [ -z "$net64" ] || proto_add_ipv6_prefix "${net64}/64"
+ [ -z "$ll" ] || proto_add_ipv6_address "$ll" 64
+ if [ -n "$v6_global" ]; then
+  proto_add_ipv6_address "$v6_global" 128
+  proto_add_ipv6_prefix "${net64}/64"
   [ "$defaultroute" = 0 ] || proto_add_ipv6_route :: 0 "$v6_gw" "$metric"
   if [ "$peerdns" = 1 ]; then
    [ -z "$v6_dns1" ] || proto_add_dns_server "$v6_dns1"
@@ -226,9 +268,9 @@ x28_mipc_setup() {
  fi
  proto_add_data
  json_add_int x28_mipc_cid "$cid"
- json_add_string x28_mipc_owner "$interface"
+ json_add_string x28_mipc_owner "$1"
  proto_close_data
- proto_send_update "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
+ proto_send_update "$1"
 }
 
 x28_mipc_teardown() {

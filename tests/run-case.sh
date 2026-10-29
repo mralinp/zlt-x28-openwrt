@@ -18,6 +18,7 @@ mipc_wan_cli() {
   --show_sim_status) cat "$case_dir/sim" ;;
   --data_call_act) cat "$case_dir/reply"; return "$(cat "$case_dir/activate_rc")" ;;
   --data_call_deact) return "$(cat "$case_dir/deactivate_rc")" ;;
+  --data_call_get) [ -s "$case_dir/get" ] && cat "$case_dir/get" ;;
   *) printf 'Unexpected modem command\n' >&2; return 99 ;;
  esac
 }
@@ -35,10 +36,12 @@ ubus() {
  printf 'Unexpected ubus call: %s\n' "$*" >&2; return 99
 }
 ip() {
+ if [ "$*" = '-6 addr show dev ccmni7 scope global' ]; then cat "$case_dir/v6_global"; return 0; fi
  [ "$*" = 'link show dev ccmni7 up' ] || { printf 'Unexpected ip command\n' >&2; return 99; }
  [ "$(cat "$case_dir/link")" = up ] && printf '7: ccmni7: <UP> mtu 1500\n'
  return 0
 }
+sleep() { :; }
 uci() { printf 'FORBIDDEN uci\n' >> "$TRACE"; return 99; }
 killall() { printf 'FORBIDDEN killall\n' >> "$TRACE"; return 99; }
 ifup() { printf 'FORBIDDEN ifup\n' >> "$TRACE"; return 99; }
