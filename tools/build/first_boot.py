@@ -22,7 +22,7 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -116,6 +116,7 @@ def add_modem(tree,stock):
         if not command:raise ValueError('no command in stock '+script)
         added+=add_stock(tree,stock,command.group(1).lstrip('/'))
     added+=add_stock(tree,stock,'usr/bin/mipc_wan_cli')+add_stock(tree,stock,'etc/quectel-project-version')
+    added+=add_stock(tree,stock,'etc/conf/apns-conf_8.xml')  # the SIM's APN list x28-apn reads; without it wan loops on NO_SIM_APN (#141)
     for name in sorted(stock):
         if (name=='vendor' or name.startswith('vendor/etc')) and name not in tree:tree[name]=stock[name];added.append(name)
     return added
@@ -204,6 +205,7 @@ def integrate(stage,key,stock_path,output):
     put('etc/init.d/x28-modem',(MODEM/'x28-modem.init').read_text(),0o755);enable(19,'x28-modem')
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
+    enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
     put('etc/config/dhcp',"""config dnsmasq
  option domainneeded '1'

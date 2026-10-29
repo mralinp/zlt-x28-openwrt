@@ -63,7 +63,7 @@ class PolicyTests(unittest.TestCase):
         self.archive=self.stage/'rootfs-staging.tar.gz'
         with tarfile.open(self.archive,'w:gz') as t:
             for name,data in {'etc/inittab':b'ttyS0::askfirst:/bin/sh\n','etc/shadow':b'root:::0:99999:7:::\nservice:old:0:0:99999:7:::\n',
-                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd',
+                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd', 'etc/init.d/rpcd':b'rpcd', 'etc/init.d/uhttpd':b'uhttpd', 'etc/init.d/firewall':b'firewall',
                               'www/luci-static/resources/view/network/wireless.js':b"if(hwtype=='mac80211'){x}\nelse if(hwtype=='broadcom'){y}",
                               'sbin/ujail':b'jail', 'usr/lib/opkg/info/procd-ujail.list':b'/sbin/ujail',
                               'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n',
@@ -88,7 +88,7 @@ class PolicyTests(unittest.TestCase):
                 put(t,'rootfs/etc/init.d/'+service,f'procd_set_param command /usr/bin/{binary} 0\n'.encode())
                 put(t,'rootfs/usr/bin/'+binary,elf(['libmodem.so']))
             put(t,'rootfs/usr/lib/libmodem.so',elf(['libc.so']));put(t,'rootfs/usr/bin/mipc_wan_cli',elf(['libc.so']))
-            put(t,'rootfs/etc/quectel-project-version',b'v1\n');put(t,'rootfs/vendor/etc/md/apncfg/001_01.conf',b'apn\n')
+            put(t,'rootfs/etc/quectel-project-version',b'v1\n');put(t,'rootfs/etc/conf/apns-conf_8.xml',b'<apns/>\n');put(t,'rootfs/vendor/etc/md/apncfg/001_01.conf',b'apn\n')
 
     def test_policy_removes_shells_unsafe_services_and_defines_key_only_lan(self):
         r=f.integrate(self.stage,self.key,self.stock,self.output)
@@ -119,6 +119,9 @@ class PolicyTests(unittest.TestCase):
         for name in ('usr/bin/atcid','usr/bin/nvram_daemon','usr/lib/libmodem.so','usr/bin/mipc_wan_cli','etc/quectel-project-version',
                      'vendor/etc/md/apncfg/001_01.conf'):self.assertIn(name,tree)
         self.assertFalse(any(n.startswith('etc/rc.d/') and 'ccci' in n for n in tree))  # x28-modem starts them, not rc.d
+        self.assertEqual(tree['etc/conf/apns-conf_8.xml'][1],b'<apns/>\n')  # x28-apn's database, from stock
+        for link, service in (('S12rpcd','rpcd'),('S19firewall','firewall'),('S50uhttpd','uhttpd')):
+            self.assertEqual(tree['etc/rc.d/'+link][0].linkname,'../init.d/'+service)
         for name in ('lib/netifd/proto/x28_mipc.sh','sbin/x28-apn','www/luci-static/resources/protocol/x28_mipc.js','usr/share/rpcd/acl.d/luci-proto-x28-mipc.json'):self.assertIn(name,tree)
         self.assertEqual(tree['lib/netifd/proto/x28_mipc.sh'][0].mode,0o755)
         self.assertIn("config interface 'wan'\n option proto 'x28_mipc'",net)
