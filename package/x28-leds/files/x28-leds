@@ -21,10 +21,10 @@ decide() {
 	wan=$1 wifi=$2 rsrp=$3 ssrsrp=$4 searching=$5 act=$6
 	echo "$POWER 1 0"
 	echo "$WIFI $wifi 0"
-	# Connected: only the bearer's RAT on (5G NSA, 13, counts as 5G). Registering or connecting: both blink.
-	# Cannot register: both off.
+	# Connected: the RATs carrying the bearer on (5G NSA, 13, is LTE and NR together). Registering or connecting:
+	# both blink. Cannot register: both off.
 	if [ "$wan" = 1 ]; then
-		case "$act" in 7|10) echo "$LTE 1 0" ;; *) echo "$LTE 0 0" ;; esac
+		case "$act" in 7|10|13) echo "$LTE 1 0" ;; *) echo "$LTE 0 0" ;; esac
 		case "$act" in 11|12|13) echo "$NR 1 0" ;; *) echo "$NR 0 0" ;; esac
 	elif [ -n "$act" ] || [ "$searching" = 1 ]; then
 		echo "$LTE 2 500"; echo "$NR 2 500"
@@ -37,8 +37,9 @@ decide() {
 	r=0 g=0 b=0
 	if [ -z "$act" ]; then [ "$searching" = 1 ] && b=2
 	elif [ -z "$dbm" ]; then :
-	elif [ "$dbm" -ge -95 ]; then g=1
-	elif [ "$dbm" -ge -110 ]; then r=1 g=1
+	elif [ "$dbm" -ge -70 ]; then b=1
+	elif [ "$dbm" -ge -90 ]; then g=1
+	elif [ "$dbm" -ge -105 ]; then r=1 g=1
 	else r=1
 	fi
 	echo "$RED $r 500"
@@ -68,9 +69,11 @@ selftest() {
 	got=$(record 11 2 500 | hexdump -ve '1/1 "%02x"')
 	[ "$got" = 020000000b000000f4010000 ] || { echo "record: $got"; return 1; }
 	check() { got=$(decide $1 | tr '\n' ';'); [ "$got" = "$2" ] || { echo "decide $1: $got"; return 1; }; }
-	check '1 0 58 255 0 13' "98 1 0;6 0 0;11 0 0;12 1 0;32 0 500;48 1 500;64 0 500;" &&
+	check '1 0 58 255 0 13' "98 1 0;6 0 0;11 1 0;12 1 0;32 0 500;48 1 500;64 0 500;" &&
 	check '1 0 58 255 0 7' "98 1 0;6 0 0;11 1 0;12 0 0;32 0 500;48 1 500;64 0 500;" &&
-	check '0 1 35 255 0 7' "98 1 0;6 1 0;11 2 500;12 2 500;32 1 500;48 1 500;64 0 500;" &&
+	check '0 1 35 255 0 7' "98 1 0;6 1 0;11 2 500;12 2 500;32 1 500;48 0 500;64 0 500;" &&
+	check '1 0 45 255 0 7' "98 1 0;6 0 0;11 1 0;12 0 0;32 1 500;48 1 500;64 0 500;" &&
+	check '1 0 255 87 0 13' "98 1 0;6 0 0;11 1 0;12 1 0;32 0 500;48 0 500;64 1 500;" &&
 	check '1 0 255 40 0 11' "98 1 0;6 0 0;11 0 0;12 1 0;32 1 500;48 0 500;64 0 500;" &&
 	check '0 0 255 255 1' "98 1 0;6 0 0;11 2 500;12 2 500;32 0 500;48 0 500;64 2 500;" &&
 	check '0 0 255 255 0' "98 1 0;6 0 0;11 0 0;12 0 0;32 0 500;48 0 500;64 0 500;" &&

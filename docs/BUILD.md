@@ -358,7 +358,8 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   writes `{u32 status, u32 type, u32 interval_ms}` records to `/dev/tz_gpio_leds` (format from the stock
   kernel's `tz_gpio_leds_write`; types from the device tree and stock `gpiod`): power `0x62`, Wi-Fi `0x06`,
   4G `0x0b`, 5G `0x0c`, signal red `0x20`, green `0x30`, blue `0x40`. `x28-leds selftest` checks the encoding
-  and the state mapping.
+  and the state mapping. Signal colour (#162), from 5G SS-RSRP or else LTE RSRP: blue >= -70 dBm, green >= -90,
+  yellow >= -105, red below; blinking blue while searching.
 - **Wi-Fi (#127):** MT7915 DBDC on `mt_wifi` (no nl80211): `ra0` 2.4 GHz, `rai0` 5 GHz, which the driver registers as a
   virtual interface of `ra0` (opens only while `ra0` is up). `package/x28-wifi` is a netifd wireless handler (`mtwifi`):
   it renders `/etc/wireless/mediatek/mt7915.dbdc.b0/b1.dat` from `/etc/config/wireless` on a saved stock copy and
