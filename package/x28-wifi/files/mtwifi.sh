@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # netifd wireless handler for the X28's MT7915 DBDC on MediaTek's mt_wifi driver (no nl80211). The driver reads
-# /etc/wireless/l1profile.dat and one .dat profile per band whenever the band's main interface comes up:
+# /etc/wireless/l1profile.dat and one .dat profile per band (merged into DBDC_card0.dat) when the card opens:
 # 2g = ra0 + mt7915.dbdc.b0.dat, 5g = rai0 + mt7915.dbdc.b1.dat. Calibration comes from /mnt/vendor/nvcfg/e2p.
 # The profiles are rendered from the stock files (saved once as *.stock) with only the keys below changed.
 
@@ -85,7 +85,7 @@ mtwifi_setup_vif() {
 }
 
 drv_mtwifi_setup() {
-	local channel htmode country band ifname dat vif_name= vif_auth vif_ssid vif_key vif_hidden vif_isolate
+	local channel htmode country band ifname dat rai0_up vif_name= vif_auth vif_ssid vif_key vif_hidden vif_isolate
 	json_select config
 	json_get_vars channel htmode country band
 	json_select ..
@@ -97,7 +97,11 @@ drv_mtwifi_setup() {
 	[ -n "$vif_name" ] || { wireless_setup_failed NO_AP; return 1; }
 	set -- $vif_auth $(mtwifi_bw "$htmode")
 	[ "$channel" != auto ] || channel=0
-	ip link set dev "$ifname" down 2>/dev/null
+	# The driver merges both profiles into DBDC_card0.dat and reads it only when the card opens, i.e. with ra0 and
+	# rai0 both down (observed: bouncing ra0 alone left 2.4 GHz on its old key). Close both, reopen what was up.
+	rai0_up="$(ip link show dev rai0 up 2>/dev/null)"
+	ip link set dev rai0 down 2>/dev/null
+	ip link set dev ra0 down 2>/dev/null
 	mtwifi_render "$dat" "SSID1=$vif_ssid" "AuthMode=$1" "EncrypType=$2" "WPAPSK1=$vif_key" "HideSSID=$vif_hidden" \
 		"NoForwarding=$vif_isolate" "Channel=${channel:-0}" "CountryCode=${country:-US}" "HT_BW=$3" "VHT_BW=$4" ||
 		{ wireless_setup_failed PROFILE_WRITE; return 1; }
@@ -105,6 +109,7 @@ drv_mtwifi_setup() {
 	# sets up both radios at once. shortcut: with 2g disabled ra0 still comes up and beacons its last profile.
 	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
 	ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
+	[ "$ifname" = rai0 ] || [ -z "$rai0_up" ] || ip link set dev rai0 up 2>/dev/null
 	wireless_add_vif "$vif_name" "$ifname"
 	wireless_set_up
 }
