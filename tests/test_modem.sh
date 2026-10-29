@@ -16,4 +16,10 @@ links  # idempotent
 [ "$(readlink "$dir/dev/block/boot")" = /dev/block/boot_a ]
 echo 'console=ttyS0' > "$dir/proc/cmdline"
 ! links 2>/dev/null
-echo "PASS: x28-modem partition name links and active-slot aliases"
+# Wi-Fi: no radio, nothing to do; radio and no config: create it, then reload; config present: only reload.
+calls=$dir/calls; wifi() { echo "$*" >> "$calls"; }
+SYS=$dir/sys; CFG=$dir/cfg; mkdir -p "$CFG" "$SYS/class/net"; : > "$calls"
+wireless; [ ! -s "$calls" ]
+mkdir "$SYS/class/net/ra0"; wireless; [ "$(tr '\n' ' ' < "$calls")" = "config reload " ]
+: > "$calls"; : > "$CFG/wireless"; wireless; [ "$(tr '\n' ' ' < "$calls")" = "reload " ]
+echo "PASS: x28-modem partition name links, active-slot aliases and Wi-Fi bring-up"
