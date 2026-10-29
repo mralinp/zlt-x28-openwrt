@@ -1,13 +1,16 @@
-# X28 native OpenWrt cellular prototype
+# X28 native OpenWrt cellular: the `x28_mipc` protocol
 
-Version 0.1.0 — source only; not a flashable image or a hardware-validated WAN replacement.
+Shipped in the native image since `v0.20.0` and validated on a real X28 (slot A, 2026-10-29): IPv4, IPv6 and IPv4v6, the
+APN read from the SIM when none is set, started at boot by `x28-modem`. The protocol appears in LuCI under
+Network > Interfaces like any other. Hardware validation notes are at the end; open items are listed under Limits.
 
 This is the first native cellular integration slice for the ZLT X28. Stock LuCI uses a normal protocol extension, UCI supplies configuration, and netifd receives the bearer device, IPv4 address, default route, DNS and lifecycle notifications. There is no OEM CGI bridge or replacement of the core Interfaces page.
 
 ## Contents
 
-- `package/x28-mipc`: native netifd protocol `x28_mipc`.
+- `package/x28-mipc`: native netifd protocol `x28_mipc` and the `x28-apn` helper (APN from the SIM, using the stock `/etc/conf/apns-conf_8.xml` database).
 - `package/luci-proto-x28-mipc`: ordinary LuCI protocol extension.
+- `package/x28-modem`: boot script that starts the vendor modem stack, the USB gadget `atcid` needs, the radio and `ifup wan`.
 - `tests`: mocked lifecycle tests and local LuCI registration/validation checks.
 - `examples/network.disabled`: deliberately disabled configuration example.
 
@@ -36,9 +39,13 @@ Run mock helper tests with `python3 tests/test_native.py --router router`. This 
 
 ## Limits and next work
 
-IPv4 only, one native cellular WAN, no PAP/CHAP, SIM PIN submission, modem cold-start, IPv6 or proven reconnect behavior. The external CLI has no explicit timeout in this prototype; hangs and netifd cancellation still need hardware validation. No kernel, image, boot, real routing, MTU application, firewall, Wi-Fi or throughput tests have passed for this prototype.
+One native cellular WAN, no PAP/CHAP, no SIM PIN submission. The external CLI has no explicit timeout; hangs and netifd
+cancellation need a long-run test. Reconnect after a modem reset or link loss has been seen to re-bind the firewall NAT
+but has not been soak-tested on the final image. `mtk_netagent` is deliberately not started: it forces the radio off
+(`CFUN 0/4`); IPv6 is handled by the protocol instead (it keeps the modem's link-local address and lets the kernel autoconfigure from the router advertisement).
+Existing OEM LuCI wrappers are excluded from this port.
 
-Next: trace minimal modem boot dependencies, establish recovery, measure switch topology, build a clean wired rootfs, then validate modem lifecycle and native wireless integration. Existing OEM LuCI wrappers are excluded from this port.
+Next: more SIMs and operators, PIN and PAP/CHAP, and a long reconnect soak ([TASKS](TASKS.md) section D).
 
 ## Hardware validation, 2026-10-29 (slot A, first run on the X28)
 
@@ -56,6 +63,14 @@ The protocol ran on a real X28 booted from slot A with the native 23.05.5 userla
   on the `ccmni` devices, modem-reset handling) and the correct start order are still open.
 - **Not verified:** IPv6, reconnect after modem reset or link loss, LAN clients (NAT/firewall), reboot persistence of
   the whole stack, and throughput.
+
+### Final image, 2026-10-29 (`v0.22.0`)
+
+The same protocol started by `x28-modem` at boot, with no manual step: after each boot `wan` came up on `ccmni1` with an
+IPv4 address and a default route, pings and DNS worked, NAT was bound to `ccmni1`, and this survived reboots. The first
+boot of the previous image looped on `NO_SIM_APN` because the APN database `/etc/conf/apns-conf_8.xml` was missing from
+the image; it is now copied from the stock rootfs (`v0.21.2`). Still unverified: a long reconnect soak, throughput, and
+other operators or SIMs.
 
 ## License
 

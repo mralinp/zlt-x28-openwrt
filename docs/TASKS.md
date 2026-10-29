@@ -1,67 +1,64 @@
-# Native OpenWrt port tasks — ZLT X28
+# Tasks — native OpenWrt on the ZLT X28
 
-This replaces the earlier OEM-enhancement-first task ordering. The controlling objective and ownership rules are in `PROJECT-PLAN.md`.
+Status as of 2026-10-29 (release `v0.22.0`). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
+stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list is the overview.
 
-## A. Establish the hardware boundary
+## A. Hardware boundary
 
-- [x] Confirm installed standard network binaries and native MIPC protocol hooks.
-- [x] Identify active vendor LAN/WAN managers and missing netifd wireless integration.
-- [x] Audit the installed MIPC helpers as text, without executing setup/teardown.
-- [ ] Trace the minimal modem boot/CCCI/MIPC service dependency graph.
-- [ ] Measure the MT7531 physical port/CPU/VLAN map; preserve board calibration.
-- [ ] Inventory exact kernel config, module ABI, source availability and required blobs.
-- [ ] Choose a buildable OpenWrt/kernel baseline; do not assume current upstream modules fit 4.19.
+- [x] Confirm installed network binaries and the native MIPC protocol hooks.
+- [x] Identify the vendor LAN/WAN managers and the missing netifd wireless integration.
+- [x] Trace the minimal modem start order (nvram, ccci, ril, netd, atci) and what it needs (yaffs2 mounts, USB gadget).
+- [x] Measure the MT7531 port/CPU/VLAN map; keep the board calibration.
+- [x] Inventory the kernel config, module ABI and required blobs ([FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md)).
+- [x] Choose a buildable baseline: OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel.
+- [ ] Obtain the vendor's GPL source (kernel and OpenWrt tree) in writing.
 
-Acceptance: every retained vendor component has a hardware reason; LAN, routing, DHCP and firewall policy have standard OpenWrt owners in the target design.
+## B. Clean build
 
-## B. Prepare the clean build
+- [x] Build the open userspace in CI (ImageBuilder, fw3, LuCI) and boot-test it in QEMU on every build.
+- [x] Stage the private rootfs from the owner's backup, add the first-boot profile, package the UBI.
+- [x] Exclude the OEM CGI, credential proxy and competing policy managers; refuse boot paths that can write flash.
+- [x] Verify ELF ABI and runtime libraries of the vendor stack.
+- [ ] Publish a reproducible build manifest and a how-to for other owners.
 
-- [ ] Pin upstream source and create a Linux build environment matched to the required toolchains.
-- [ ] Obtain or replace the missing board/kernel build inputs.
-- [ ] Build a minimal rootfs using upstream netifd, procd, dnsmasq/odhcpd, firewall and LuCI.
-- [ ] Exclude OEM CGI, credential proxy, UI wrapper bundles and competing LAN/WAN policy managers.
-- [ ] Verify ELF ABI, runtime libraries, kernel requirements, image format and licensing.
+## C. Wired routing
 
-Acceptance: reproducible rootfs/build manifest; unresolved kernel or signing inputs explicitly prevent calling it a bootable firmware image.
+- [x] UART and USB restore working before any boot trial.
+- [x] LAN bridge, DHCP/DNS, IPv6 on the LAN, firewall and NAT owned by stock OpenWrt services.
+- [x] Settings, host keys and the root password survive reboots (`S95done`).
+- [ ] NAT and throughput measured with real LAN clients.
 
-## C. Prove standard wired routing on a recoverable test device
+## D. Cellular
 
-- [ ] Establish UART/USB restore and fallback internet before boot/network ownership trials.
-- [ ] Create verified UCI LAN/WAN/bridge configuration from the measured board topology.
-- [ ] Verify `network.interface.lan` status, native DHCP/DNS, firewall policy and ordinary LuCI Save/Apply.
-- [ ] Verify reboot, rollback and absence of competing vendor policy writers.
+- [x] Native netifd protocol with its own LuCI page; IPv4, IPv6, IPv4v6, APN from the SIM.
+- [x] Cold start at boot, link-up handling, reconnect re-binding of NAT.
+- [ ] SIM PIN, PAP/CHAP, and other operators or SIMs.
+- [ ] Long-run reconnect behaviour after modem resets or link loss.
 
-Acceptance: stock OpenWrt services own the wired router. A renamed menu or a status-only shim does not pass.
+## E. Wireless
 
-## D. Implement the native cellular boundary
+- [x] Native netifd handler for the vendor `mt_wifi` driver; both radios up with WPA2, default config at first boot.
+- [ ] Client tests, throughput, regulatory settings, bridge membership and reload.
+- [ ] Evaluate upstream `mt76` against this board and kernel (the vendor driver is what runs today).
 
-- [ ] Capture/document read-only modem capability and bearer response formats.
-- [x] Write a source-only IPv4 netifd handler (mock-tested) to remove global `killall`, implicit APN teardown, UCI firewall/DHCP edits and process-wide policy effects.
-- [x] Validate UCI input (mock-tested) and bearer responses; track only the interface's own bearer.
-- [x] Report dynamic device (mock-tested), addresses, routes, DNS and failure state via native netifd notifications.
-- [ ] Test with mocked modem responses, then validate cold boot, reconnect, IPv4/IPv6 and ifup/ifdown on recoverable hardware.
+## F. Stable release (roadmap)
 
-Acceptance: the standard Interfaces page and netifd API operate the cellular link without OEM CGI or a custom core LuCI page. Setup/teardown does not rewrite DHCP/firewall policy.
-
-## E. Implement native wireless integration
-
-- [ ] Evaluate upstream mt76 against the actual board/kernel/calibration requirements.
-- [ ] If retaining the hardware driver for bring-up, implement its native netifd wireless lifecycle with UCI as the source of truth.
-- [ ] Verify status, SSIDs/security/channel/regulatory settings, bridge membership and reload/teardown.
-- [ ] Validate standard LuCI Wireless with no separate vendor controller.
-
-Acceptance: netifd owns radio/interface lifecycle; stock LuCI changes reach the driver and survive reboot.
-
-## F. Finish, profile and release
-
-- [ ] Ship the standard LuCI network pages with proven native service backends.
-- [ ] Build matching WireGuard/OpenVPN/proxy dependencies and verify selective routing/DNS.
-- [ ] Measure idle/load RAM, CPU, thermals and throughput after removing unneeded vendor services.
+- [ ] 48 h soak with no unexplained reboots; idle CPU and RAM baseline; explain the load average of ~3 on an idle CPU.
+- [ ] **Recovery slot** on B: small kernel and rescue path that installs OpenWrt on A and can restore stock; frees the
+      flash that holds a second full firmware. Prove it, then retire the stock copy.
+- [ ] `sysupgrade` for the new layout.
+- [ ] Stable tagged release; OpenWrt wiki device page; build documentation.
 - [ ] Prove restore and independent installation on another unit.
-- [ ] Release original source/recipes with provenance and measured limitations.
 
-No full-image build or native ownership migration has yet passed. The prior LuCI customization work is historical OEM UI work, not completed port tasks.
+## G. Later
 
-## Native prototype checkpoint — 2026-10-21
+- [ ] Fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)).
+- [ ] Local SMS and voice on the native image (worked on the stock overlay; voice blocked by the SIM).
+- [ ] Own 4.19 kernel and kmod feed from a sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)); not tried yet.
+- [ ] WireGuard/OpenVPN/proxy dependencies matching the kernel, and selective routing.
 
-Original source is in `../package/`. All 31 mocked lifecycle cases and local LuCI checks passed. No IPK/image build, hardware lifecycle test or live ownership migration has passed. IPv4 only; recovery, cold-start, IPv6 and wireless remain open.
+## Known open questions
+
+- Slot A is unconfirmed (success 0) on purpose; whether the preloader treats success 1 differently is unknown
+  ([BOOT-FLOW](BOOT-FLOW.md)).
+- The download-agent block write to `misc` was never acknowledged; there is no proven off-device `misc` rewrite.

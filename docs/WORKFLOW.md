@@ -57,3 +57,9 @@ safety note if the label is `risk/*` (rollback path), and what is NOT verified. 
 - Deploy tested with the documented command; reboot-persistence checked when relevant.
 - Rollback documented for risky changes; no secrets, vendor blobs, or dumps committed.
 - Docs updated (README status table, plan, or notes).
+
+## Changelog
+
+`CHANGELOG.md` has hand-written milestones at the top and the full per-release list at the bottom. After releases land, run
+`python3 scripts/changelog.py` (needs `gh`) to refresh the list, add a milestone entry by hand when a stretch of work
+completes, and include the file in the next docs PR. `python3 scripts/changelog.py --check` fails if the list is stale.

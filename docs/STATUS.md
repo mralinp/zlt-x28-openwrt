@@ -1,43 +1,50 @@
-# Project status — 2026-10-21
+# Project status — 2026-10-29
+
+The older status snapshot (stock-firmware overlay era, 2026-10-21) is kept in
+[archive/2026-10-21-STATUS.md](archive/2026-10-21-STATUS.md). Evidence for everything below is in
+[TESTING.md](TESTING.md); what changed and when is in [../CHANGELOG.md](../CHANGELOG.md).
 
 ## Objective
 
-A real OpenWrt port: stock LuCI/UCI, netifd, standard DHCP/DNS and a kernel-compatible firewall own networking. OEM CGI wrappers and a UCI-to-vendor sync adapter do not satisfy this objective. Preserve the working modem, board calibration and SIM-unlocked operation.
+A real OpenWrt on the ZLT X28: stock LuCI and UCI, netifd, standard DHCP/DNS and a kernel-compatible firewall own
+networking; the vendor modem stack runs only as the hardware backend. No copy of the vendor web UI, no UCI-to-vendor
+adapter. Preserve the working modem, board calibration and recoverability.
 
-## Completed evidence
+## Where it stands
 
-- Root SSH and LuCI access existed before this migration.
-- A private backup of all 51 NAND partitions was previously captured and hash-verified. This does not establish a tested restore.
-- One device was identified as MT6890/T750, ARM64, OEM 1.5.13, Linux 4.19.205, OpenWrt 19.07-derived userspace. Hardware revision is not established.
-- Read-only audit found vendor network owners, stale UCI values and missing native wireless integration.
-- Original IPv4 `x28_mipc` netifd protocol source and normal LuCI protocol addon exist under `package/`. 31 mocked lifecycle cases passed with the device's real OpenWrt shell/JSON helpers. All modem and network notification calls were mocked. Local JS and shell checks passed. No IPK/image build or real activation passed.
-- Historical resource display changes and OEM UI integrations are preserved under `experiments/oem-ui/`.
+Release `v0.22.0`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
-## Current live-device state at last observation
+**Working on that unit**
+- 5G data through the `x28_mipc` netifd protocol (IPv4, IPv6, IPv4v6, APN from the SIM) and its LuCI page.
+- LuCI, a four-socket LAN bridge, `dnsmasq` DHCP and DNS, IPv6 on the LAN, firewall and NAT.
+- Wi-Fi on the MT7915 dual band through the vendor `mt_wifi` driver (both radios up, WPA2).
+- Front panel LEDs from radio, signal and WAN state.
+- The modem stack, services and Wi-Fi defaults start at boot; settings, host keys and the root password survive reboots.
+- SSH is key-only on port 22 (LAN only); root has an empty password until the owner sets one, like stock OpenWrt.
+- The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
+- About 40 °C idle on the SoC; the CPU is almost fully idle.
 
-- Existing LuCI: port 4153. The custom read-only mock preview is `/admin/status/x28_native`. The user rejected that presentation as unlike genuine stock LuCI.
-- The separate port 4154 stock-view experiment is broken; see its README. Its temporary procd service was stopped during migration. It must not be described as completed.
-- Vendor WAN manager and the default cellular route remained active in the last network check. No native protocol handler was installed. This is a timestamped observation, not a live health claim.
-- No flash, reboot, network ownership takeover or modem activation was performed for these prototypes.
+**Open or unproven**
+- Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.
+  Stock marks success together with copying A over B, which this image never does ([BOOT-FLOW](BOOT-FLOW.md)).
+- The download-agent block write to `misc` was never acknowledged (twice). `misc` is changed live with the stock
+  `dd-nand` method instead; there is no proven off-device way to rewrite `misc`.
+- Wi-Fi client and throughput tests, more LED states, and a long soak are pending. The load average sits around 3 with
+  an idle CPU (probably vendor driver threads in uninterruptible sleep); not yet explained.
+- SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
+- One unit, one SIM, one carrier. Hardware revision differences are unknown.
 
-## Known blockers
+## Known limits of the base
 
-No vendor SDK/external kernel source, proven UART/USB recovery or validated clean image build. Physical switch map, modem startup dependencies, proprietary redistribution rights, IPv6, wireless lifecycle, reconnect, thermal/throughput improvements and matching VPN dependencies remain unresolved.
+- The vendor modem userspace is closed and not redistributable, so no ready-to-flash image can be published; the build
+  copies it from the owner's own backup.
+- The vendor 4.19.205 kernel has no `nf_tables` (so fw3), no namespaces (so no `ujail`), and `CONFIG_MODVERSIONS`: the
+  official feeds' kernel modules do not load, userspace packages do.
 
-## Next work on the laptop
+## Next
 
-1. Repair/validate the isolated genuine LuCI preview; do not deploy mock pages as proof of a port.
-2. Keep private firmware dumps outside Git. Inventory partition/source provenance and hashes; extract copies offline.
-3. Audit minimal modem boot/CCCI/MIPC dependencies and measure switch topology through safe reads.
-4. Select a buildable userspace/kernel baseline and a Linux build environment. Apple Silicon macOS can host editing and tests; a Linux environment is planned for OpenWrt cross-building, not yet provisioned or validated.
-5. Build clean rootfs packages, then prove restore before boot or network ownership tests on recoverable hardware.
-
-The missing SDK is not replaced by copying a running filesystem. A firmware dump and an extracted rootfs are research inputs; they are not a rebuildable source tree.
-
-## Offline extraction checkpoint — 2026-10-21
-
-Boot B and rootfs B hashes were verified; rootfs system files extracted into a case-sensitive Linux volume. See `FIRMWARE-EXTRACTION.md`. This supersedes earlier notes that no extraction had occurred. No modem changes or firmware execution occurred.
-
-## Complete partition preparation — 2026-10-21
-
-All51 original main-data partition captures were decompressed and SHA-256/size verified (1,072,168,960 bytes); a backup-container archive was checked. See `RECOVERY-BACKUP.md`. This is not a proven flashable recovery image: OOB/YAFFS layout, live consistency and actual restore remain unresolved.
+See the roadmap in [PROJECT-PLAN.md](PROJECT-PLAN.md): soak and test slot A, then a recovery slot on B (a small kernel
+and rescue path that installs OpenWrt on A and can restore stock), `sysupgrade` for that layout, a stable release and
+the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
+sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

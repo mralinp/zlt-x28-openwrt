@@ -83,6 +83,8 @@ jobs:
           cat > notes.md <<'EOF'
           **Beta pre-release.** The attached rootfs is the open OpenWrt 23.05.5 userspace only. It does not boot
           the X28 by itself: the stock kernel, modules and vendor binaries are added locally from your own
-          unit's backup, and flashing stays blocked until UART recovery is proven. See docs/BUILD.md and docs/RECOVERY.md.
+          unit's backup. The native image has been flashed to slot A and boots on one tested unit; flashing it
+          is a guarded, owner-approved procedure that needs UART and a verified backup. See docs/BUILD.md,
+          docs/RECOVERY.md and CHANGELOG.md.
           EOF
           gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag $PRE

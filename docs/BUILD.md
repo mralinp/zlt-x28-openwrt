@@ -7,6 +7,15 @@ The X28 image has two halves, built in different places because of licensing:
 | **Open userspace** | OpenWrt 23.05.5 for `armsr/armv8` (aarch64, runs on the Cortex-A55): base system, netifd, **fw3 + iptables-legacy** instead of firewall4, dnsmasq, dropbear, LuCI | GitHub Actions (`.github/workflows/userspace.yml`) or locally, with [`tools/build/userspace.sh`](../tools/build/userspace.sh) |
 | **Vendor half** | stock 4.19 kernel and its 146 modules, the modem/cellular/Wi-Fi binaries, and four 19.07 compatibility libraries | **locally only**, from the unit's own backup (assembly pending; see [#74 input audit](research/native-image-readiness.md)) |
 
+> **Current state, 2026-10-29 (`v0.22.0`):** the assembly is no longer pending. The pipeline is `userspace.sh` (CI) →
+> `stage_native.py` → `first_boot.py` → `package_ubi.py` (offline container) → a guarded `slot_entry.py` flash to slot A
+> ([RECOVERY](RECOVERY.md)). The sections below are in the order the pieces were built and keep their dated notes;
+> older statements such as "no WAN interface, DHCP server or web service" describe that day's profile, not today's. The
+> image now ships: the `x28-*` packages, LuCI, `dnsmasq`, the firewall, Wi-Fi, LEDs, the modem stack at boot,
+> `S95done` (overlay persistence), an empty root password (SSH key-only on port 22) and `x28-bootok`. Sections
+> [#122](#live-lan-dhcp-and-front-leds-on-slot-a-122), [#143](#root-password-and-overlay-persistence-143) and
+> [#145](#boot-tries-reset-and-ssh-on-port-22-145) are the most recent.
+
 **Vendor files never go into the repo, CI, caches, artifacts or secrets.** The repository is public, the files
 are proprietary, and they only match this unit's firmware build ([FIRMWARE-INVENTORY.md](FIRMWARE-INVENTORY.md)).
 

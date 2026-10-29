@@ -2,7 +2,9 @@
 
 Scope update, 2026-10-21: the primary deliverable is now the native OpenWrt port in [PROJECT-PLAN.md](PROJECT-PLAN.md). OEM UI wrappers are historical tools and are excluded from that firmware image.
 
-**Status:** Research and planning. No public custom firmware image or verified installation procedure yet. Tested device: ZLT X28, OEM firmware 1.5.13, MT6890/T750 target `evb6890v1_64_cpe_nand`, Linux 4.19.205, OpenWrt 19.07-derived userspace. These observations describe one unit and may differ across revisions.
+**Status (2026-10-29):** a native OpenWrt 23.05.5 image boots from slot A of one test unit with 5G data, LuCI, LAN/DHCP, Wi-Fi and LEDs ([STATUS](STATUS.md)). There is **no public flashable image or installation guide yet**: the vendor modem stack is not redistributable, so the repository publishes build tooling and packages, and the image is assembled from the owner's own backup. Tested device: ZLT X28, MT6890/T750, Linux 4.19.205 (vendor kernel). These observations describe one unit and may differ across revisions.
+
+**Direction:** stable OpenWrt on slot A and a recovery slot on B (a small kernel and rescue path that installs OpenWrt on A and can restore stock), then `sysupgrade`, a stable release and a wiki device page ([PROJECT-PLAN](PROJECT-PLAN.md)). The milestones list below is the original draft and is kept for context.
 
 ## Goal
 
