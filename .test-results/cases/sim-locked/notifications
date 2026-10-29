@@ -1,2 +1,0 @@
-{ "action": 3, "error": [ "SIM_PIN_LOCKED" ], "interface": "wan" }
-{ "action": 4, "interface": "wan" }

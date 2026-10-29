@@ -8,7 +8,9 @@ const errors = {}, options = {};
 let name;
 const protocol = vm.runInNewContext('(function(){' + script + '\n})()', {
  _: value => value,
- form: {Value:'value', Flag:'flag', DynamicList:'list'},
+ form: {Value:'value', ListValue:'listvalue', Flag:'flag', DynamicList:'list'},
+ fs: {},
+ L: {},
  network: {
   registerPatternVirtual: pattern => assert(pattern.test('ccmni7') && !pattern.test('eth0')),
   registerErrorCode: (key, value) => errors[key] = value,
@@ -25,14 +27,16 @@ protocol._ubus = () => 'ccmni7';
 assert.equal(protocol.getIfname(), 'ccmni7');
 assert.equal(protocol.containsDevice('ccmni7'), true);
 assert.equal(protocol.containsDevice('ccmni1'), false);
-protocol.renderFormOptions({taboption: (_tab, _type, key) => options[key] = {depends(){}}});
+protocol.renderFormOptions({taboption: (_tab, _type, key) => options[key] = {depends(){}, choices: {}, value(k, v){this.choices[k] = v;}}});
 assert.equal(options.apn.validate(null, 'example.invalid'), true);
 assert.equal(typeof options.apn.validate(null, 'x;bad'), 'string');
-assert.equal(typeof options.apn.validate(null, ''), 'string');
+assert.equal(options.apn.validate(null, ''), true);
+assert.deepEqual(Object.keys(options.iptype.choices).sort(), ['1', '2', '3']);
+assert.equal(options.iptype.default, '3');
 assert.equal(options.mtu.datatype, 'range(576,1500)');
 assert.equal(options.metric.datatype, 'range(0,65535)');
 assert.equal(options.defaultroute.default, '1');
 assert.equal(options.peerdns.default, '1');
-assert(errors.VENDOR_WAN_ACTIVE && errors.OWNERSHIP_MISMATCH && errors.CLEANUP_FAILED);
+assert(errors.VENDOR_WAN_ACTIVE && errors.OWNERSHIP_MISMATCH && errors.CLEANUP_FAILED && errors.NO_SIM_APN && !errors.IPV4_ONLY);
 assert(!script.includes('vendorbridge') && !script.includes('http.cgi') && !script.includes('fetch('));
-console.log('PASS: native LuCI protocol registration, dynamic device, APN validation, routing/DNS fields and error messages');
+console.log('PASS: native LuCI protocol registration, dynamic device, APN (auto/list/manual) and IP type, routing/DNS fields and error messages');

@@ -1,0 +1,45 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# The SIM's APNs from the AOSP-format database stock ships, one "carrier<TAB>apn<TAB>ipVersion" per line, in
+# database order (the vendor UI's list). The vendor CLI's --apn_provision_by_sim only reads default_apn.json,
+# which lacks many operators (e.g. 432/11).
+# Usage: x28-apn [imsi]
+
+DB=${X28_APN_DB:-/etc/conf/apns-conf_8.xml}
+
+list() {
+	imsi=$1
+	case "$imsi" in [0-9][0-9][0-9][0-9][0-9][0-9]*) ;; *) return 1 ;; esac
+	[ -r "$DB" ] || return 1
+	# MNC is 2 or 3 digits and the IMSI does not say which; the database does.
+	awk -v mcc="$(echo "$imsi" | cut -c1-3)" -v m2="$(echo "$imsi" | cut -c4-5)" -v m3="$(echo "$imsi" | cut -c4-6)" '
+		function attr(k) { return match(e, "[ \t]" k "=\"[^\"]*\"") ? substr(e, RSTART + length(k) + 3, RLENGTH - length(k) - 4) : "" }
+		/<apn[ \t]/ { e = "" }
+		{ e = e " " $0 }
+		/\/>/ {
+			if (e ~ /<apn[ \t]/ && attr("mcc") == mcc && (attr("mnc") == m2 || attr("mnc") == m3)) {
+				a = attr("apn")
+				if (a != "" && !seen[a]++) print attr("carrier") "\t" a "\t" attr("ipVersion")
+			}
+			e = ""
+		}' "$DB"
+}
+
+selftest() {
+	db=$(mktemp)
+	printf '%s\n' '<apns version="8">' '<apn carrier="Other" mcc="432" mnc="35" apn="mtnirancell"/>' \
+		'<apn carrier="MCI Wap"' 'mcc="432"' 'mnc="11"' 'apn="mcinet"' '/>' \
+		'<apn carrier="MCI-GPRS" mcc="432" mnc="11" apn="mcinet" ipVersion="IPV4V6"/>' \
+		'<apn carrier="Three" mcc="310" mnc="112" mmsapn="x" apn="three"/>' '</apns>' > "$db"
+	got=$(DB=$db list 432112345678901 | tr '\t\n' '|;')
+	want=$(DB=$db list 310112345678901 | tr '\t\n' '|;')
+	rm -f "$db"
+	[ "$got" = "MCI Wap|mcinet|;" ] || { echo "432/11: $got"; return 1; }
+	[ "$want" = "Three|three|;" ] || { echo "310/112: $want"; return 1; }
+	echo "selftest ok"
+}
+
+case "$1" in
+	selftest) selftest ;;
+	*) list "${1:-$(mipc_wan_cli --at_cmd AT+CIMI 2>/dev/null | grep -oE '^[0-9]{6,}')}" ;;
+esac

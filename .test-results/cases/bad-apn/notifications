@@ -1,2 +1,0 @@
-{ "action": 3, "error": [ "INVALID_CONFIG" ], "interface": "wan" }
-{ "action": 4, "interface": "wan" }

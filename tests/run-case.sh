@@ -6,6 +6,7 @@ stage=$1
 case_dir=$2
 export TRACE="$case_dir/commands" NOTIFICATIONS="$case_dir/notifications"
 export X28_MIPC_LOCKFILE="$case_dir/modem.lock"
+export X28_MIPC_APN_CMD="cat $case_dir/sim_apns"
 : > "$TRACE"
 : > "$NOTIFICATIONS"
 . /lib/functions.sh

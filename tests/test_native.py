@@ -15,13 +15,14 @@ CONFIG = {"apn": "example.invalid", "mtu": 1500, "iptype": 1}
 REPLY = {"result": 0, "cid": 4, "ifname": "ccmni7", "v4_addr": "198.51.100.7",
          "v4_mask": "255.255.255.255", "v4_gw": "0.0.0.0",
          "v4_dns1": "192.0.2.53", "v4_dns2": "192.0.2.53"}
+V6 = {"v6_addr": "2001:db8:1:2::1011", "v6_prefix": 64, "v6_gw": "", "v6_dns1": "2001:db8::53", "v6_dns2": "2001:db8::53"}
 
 def case(name, *, config=None, reply=None, error=None, cleanup=False, **extra):
     return {"name": name, "config": {**CONFIG, **(config or {})},
             "reply": {**REPLY, **(reply or {})}, "error": error, "cleanup": cleanup,
             "sim": "MIPC_SIM_STATUS_COMPLETE_READY", "activate_rc": 0,
             "deactivate_rc": 0, "notify_rc": 0, "link": "up", "operation": "setup",
-            "vendor_active": 0, "status_rc": 0, "status": {}, **extra}
+            "vendor_active": 0, "status_rc": 0, "status": {}, "sim_apns": "MCI\tmcinet\tIPV4V6\n", **extra}
 
 def cases():
     own = {"data": {"x28_mipc_cid": 4, "x28_mipc_owner": "wan"}}
@@ -31,7 +32,14 @@ def cases():
         case("no-route-dns", config={"defaultroute": False, "peerdns": False}),
         case("bad-apn", config={"apn": "x;touch /tmp/should-not-exist"}, error="INVALID_CONFIG", no_cli=True),
         case("bad-mtu", config={"mtu": 575}, error="INVALID_CONFIG", no_cli=True),
-        case("ipv6-config", config={"iptype": 3}, error="IPV4_ONLY", no_cli=True),
+        case("ipv4v6", config={"iptype": 3}, reply=V6),
+        case("ipv4v6-v4-only", config={"iptype": 3}),
+        case("ipv6-only", config={"iptype": 2}, reply={**V6, "v4_addr": "", "v4_mask": ""}),
+        case("ipv6-missing", config={"iptype": 2}, error="INVALID_REPLY", cleanup=True),
+        case("bad-ipv6", config={"iptype": 3}, reply={**V6, "v6_addr": "2001:db8::zz"}, error="INVALID_REPLY", cleanup=True),
+        case("bad-iptype", config={"iptype": 4}, error="INVALID_CONFIG", no_cli=True),
+        case("auto-apn", config={"apn": ""}, expect_apn="mcinet"),
+        case("no-sim-apn", config={"apn": ""}, sim_apns="", error="NO_SIM_APN", no_activate=True),
         case("vendor-active", vendor_active=1, error="VENDOR_WAN_ACTIVE", no_cli=True),
         case("sim-locked", sim="MIPC_SIM_STATUS_SIM_PIN", error="SIM_PIN_LOCKED", no_activate=True),
         case("sim-pending", sim="MIPC_SIM_STATUS_NOT_READY", error="SIM_NOT_READY", no_activate=True),
@@ -81,7 +89,7 @@ def verify(item, directory):
     assert len(activations) <= 1, commands
     if activations:
         activation = json.loads(activations[0].split(" ", 1)[1])
-        assert activation == {"apn": item["config"]["apn"], "ip_type": 1, "roaming_type": 3,
+        assert activation == {"apn": item.get("expect_apn", item["config"]["apn"]), "ip_type": item["config"]["iptype"], "roaming_type": 3,
                               "auth_type": 0, "username": "", "password": "",
                               "bearer_bitmask": "0xfffdffff", "mtu": item["config"]["mtu"], "mode": 1}, activation
     deactivations = [c for c in commands if c.startswith("--data_call_deact ")]
@@ -98,12 +106,23 @@ def verify(item, directory):
         assert rc == 0 and not errors, (rc, events)
         if item["operation"] == "setup":
             assert len(up) == 1 and up[0]["interface"] == "wan" and up[0]["ifname"] == "ccmni7", events
+            v6 = item["name"] in ("ipv4v6", "ipv6-only")
+            if v6:
+                assert up[0]["ip6addr"] == [{"ipaddr": "2001:db8:1:2::1011", "mask": "128"}], events
+                assert up[0]["ip6prefix"] == ["2001:db8:1:2::/64"], events
+                assert any(r["target"] == "::" and r["netmask"] == "0" for r in up[0]["routes6"]), events
+            if item["name"] == "ipv6-only":
+                assert not up[0].get("ipaddr") and not up[0].get("routes"), events
+                assert up[0]["dns"] == ["2001:db8::53"], events
+                return
+            if not v6:
+                assert not up[0].get("ip6addr"), events
             assert up[0]["ipaddr"] == [{"ipaddr": "198.51.100.7", "mask": "24" if item["name"] == "gateway" else "32"}], events
             assert up[0]["data"] == {"x28_mipc_cid": 4, "x28_mipc_owner": "wan"}, events
             if item["name"] == "no-route-dns":
                 assert not up[0].get("routes") and not up[0].get("dns"), events
             else:
-                assert up[0]["dns"] == ["192.0.2.53"], events
+                assert up[0]["dns"] == ["192.0.2.53"] + (["2001:db8::53"] if v6 else []), events
                 route = up[0]["routes"][0]
                 assert route["target"] == "0.0.0.0" and route["netmask"] == "0", events
                 assert route.get("gateway") == ("198.51.100.1" if item["name"] == "gateway" else None), events
@@ -127,6 +146,7 @@ def main():
             for field in ["config", "status"]:
                 (d / field).write_text(json.dumps(item[field]))
             (d / "reply").write_text(item.get("raw_reply", json.dumps(item["reply"])))
+            (d / "sim_apns").write_text(item["sim_apns"])
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:
                 (d / field).write_text(str(item[field]))
         archive = tmp / "inputs.tgz"

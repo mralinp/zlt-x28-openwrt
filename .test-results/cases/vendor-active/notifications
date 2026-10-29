@@ -1,2 +1,0 @@
-{ "action": 3, "error": [ "VENDOR_WAN_ACTIVE" ], "interface": "wan" }
-{ "action": 4, "interface": "wan" }
