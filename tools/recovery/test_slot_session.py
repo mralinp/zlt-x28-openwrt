@@ -233,6 +233,16 @@ class BaseModeTests(FakeDA):
         self.assertEqual(self.data[0x1000], self.base)
         self.assertEqual(self.writes, [(0x1000, 64)])
 
+    def test_only_the_static_head_of_the_base_is_compared_before_the_write(self):
+        self.spec = self.spec._replace(base_head=32)
+        self.data[0x1000] = self.base[:32] + b'\xee' * 32  # a booted slot rewrote its overlay tail
+        self.run_('write')
+        self.assertEqual(self.data[0x1000], self.candidate)  # the write still replaces all of it
+        self.data[0x1000] = b'\xee' * 32 + self.base[32:]  # the head differs: not the base
+        with self.assertRaises(ValueError):
+            self.run_('write')
+        self.assertEqual(len(self.writes), 1)
+
     def test_original_on_target_is_not_a_valid_start(self):
         self.data[0x1000] = self.original
         with self.assertRaises(ValueError):
@@ -265,12 +275,15 @@ class BaseModeTests(FakeDA):
             s.run_session(self, self.spec._replace(base_sha=''), self.original, self.candidate, self.out, mode='write', base=self.base)
 
     def test_spec_rules(self):
-        spec = s.rootfs_a_spec('a' * 64, 'b' * 64)
+        spec = s.rootfs_a_spec('a' * 64, 'b' * 64, 0x40000)
         self.assertEqual(dict((g[0], g[3]) for g in spec.guards)['misc'], None)
         self.assertEqual(dict((g[0], g[3]) for g in s.rootfs_a_spec('a' * 64).guards)['misc'], s.MISC_SHA)
         for cand, base in (('b' * 64, 'b' * 64), ('a' * 64, s.ROOTFS_A_SHA), ('a' * 64, 'short')):
             with self.assertRaises(ValueError):
-                s.rootfs_a_spec(cand, base)
+                s.rootfs_a_spec(cand, base, 0x40000)
+        for base, head in (('b' * 64, 0), ('b' * 64, 0x40001), ('b' * 64, 0x4000000), ('', 0x40000)):
+            with self.assertRaises(ValueError):
+                s.rootfs_a_spec('a' * 64, base, head)
 
 
 if __name__ == '__main__':

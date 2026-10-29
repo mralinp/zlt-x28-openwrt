@@ -46,6 +46,7 @@ class Spec(NamedTuple):
     candidate_sha: str     # the only image `write` may put on the target (pinned by whoever builds the spec)
     restore_guards: tuple  # guards for `restore`: wider, because stock B may have repaired slot A after a fallback
     base_sha: str = ''     # image already on the target that identical/write start from (#137); '' = the original
+    base_head: int = 0     # bytes of that base that must match before a write: a booted slot A rewrites its overlay tail (#139)
 
 
 def validate_rootfs_a(original, candidate):
@@ -75,7 +76,7 @@ COMMON = (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x135000
           ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE, *MODEM_SIDE)
 
 
-def rootfs_a_spec(candidate_sha, base_sha=''):
+def rootfs_a_spec(candidate_sha, base_sha='', base_head=0):
     """Write rootfs_a. `restore` is refused unless misc still selects B: restore misc first once A is selected.
 
     With base_sha (#137) the target already holds that earlier native image and misc may select A: misc is then only
@@ -85,8 +86,10 @@ def rootfs_a_spec(candidate_sha, base_sha=''):
         raise ValueError('rootfs_a candidate hash must be a new SHA-256')
     if base_sha and (len(base_sha) != 64 or base_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA)):
         raise ValueError('rootfs_a base hash must be a native image SHA-256')
+    if bool(base_sha) != bool(base_head) or not 0 <= base_head < 0x4000000 or base_head % 0x40000:
+        raise ValueError('base head must be a whole number of erase blocks inside rootfs_a, with a base')
     guards = (*COMMON, ('misc', 0x700000, 0x100000, None if base_sha else MISC_SHA))
-    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards, base_sha)
+    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards, base_sha, base_head)
 
 
 def misc_spec(rootfs_a_sha):
@@ -145,8 +148,14 @@ def run_session(da, spec, original, candidate, output, *, mode, base=None):
         def check(label, expected_target):
             # restore tolerates any target state (an interrupted write); everything else must match exactly.
             actual = read(label, spec.name, spec.addr, spec.size)
-            if expected_target is not None and actual != expected_target:
-                raise ValueError(f'STOP: {label} {spec.name} did not match; no retry or reboot')
+            if expected_target is not None:
+                if spec.base_head and label == 'before':  # static head only; the overlay tail of a booted slot is volatile
+                    with (out / f'before-{spec.name}.bin').open('rb') as f:
+                        same = f.read(spec.base_head) == start[:spec.base_head]
+                else:
+                    same = actual == expected_target
+                if not same:
+                    raise ValueError(f'STOP: {label} {spec.name} did not match; no retry or reboot')
             for name, addr, size, sha in (spec.restore_guards if mode == 'restore' else spec.guards):
                 got = read(label, name, addr, size)
                 if sha is None:  # unchanged during this session

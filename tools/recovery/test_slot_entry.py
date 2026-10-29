@@ -131,13 +131,13 @@ class GateTests(unittest.TestCase):
 
 
     def test_base_phrase_names_the_base_and_that_misc_selects_a(self):
-        b = slot_session.rootfs_a_spec('abcdef1234567890' * 4, '0123456789ab' * 5 + '0123')
+        b = slot_session.rootfs_a_spec('abcdef1234567890' * 4, '0123456789ab' * 5 + '0123', 0x40000)
         self.assertEqual(e.phrase(b, 'write', b.candidate_sha, False), 'WRITE write rootfs_a abcdef123456 BASE 0123456789ab MISC-SELECTS-A')
         self.assertEqual(e.phrase(b, 'identical', 'a' * 64, False), 'WRITE identical rootfs_a 0123456789ab BASE 0123456789ab MISC-SELECTS-A')
         self.assertEqual(e.phrase(b, 'restore', 'a' * 64, False), 'WRITE restore rootfs_a 5f0c997ddbc0')
 
     def test_prior_identical_of_a_base_run_must_name_the_base(self):
-        base = slot_session.rootfs_a_spec('c' * 64, 'b' * 64)
+        base = slot_session.rootfs_a_spec('c' * 64, 'b' * 64, 0x40000)
         t = PriorTests('test_good_verified_prior_is_accepted')
         t.setUp()
         self.addCleanup(t.tmp.cleanup)
@@ -155,6 +155,30 @@ class GateTests(unittest.TestCase):
         main = next(n for n in ast.parse(Path(e.__file__).read_text()).body if isinstance(n, ast.FunctionDef) and n.name == 'main')
         stores = [n for n in ast.walk(main) if isinstance(n, ast.Name) and n.id == 'base' and isinstance(n.ctx, ast.Store)]
         self.assertEqual(len(stores), 1)
+
+
+    def test_base_head_is_layout_plus_rootfs_lebs_and_refuses_overlay_blocks(self):
+        peb = 0x40000
+        manifest = {'peb_bytes': peb, 'layout_copies': 2, 'populated_lebs': [3, 1], 'volumes': ['rootfs', 'rootfs_data']}
+        def vid(vol):
+            return b'UBI!' + b'\0' * 4 + vol.to_bytes(4, 'big')
+        image = bytearray(b'\xff' * (8 * peb))
+        for n, vol in enumerate((0x7fffefff, 0x7fffefff, 0, 0, 0, 1, 1, 1)):
+            image[n * peb + 4096:n * peb + 4108] = vid(vol)
+        self.assertEqual(e.base_head(bytes(image), manifest), 5 * peb)
+        image[4 * peb + 4096:4 * peb + 4108] = vid(1)  # overlay block inside the claimed head
+        with self.assertRaises(ValueError):
+            e.base_head(bytes(image), manifest)
+        for bad in ({**manifest, 'volumes': ['rootfs_data', 'rootfs']}, {**manifest, 'populated_lebs': [30, 1]}, {**manifest, 'peb_bytes': 4096}):
+            with self.assertRaises(ValueError):
+                e.base_head(bytes(8 * peb), bad)
+
+    def test_base_head_of_the_real_first_native_image(self):
+        base = Path(e.__file__).resolve().parents[2] / 'private/build/native-ubi-104'
+        if not base.is_dir():
+            self.skipTest('private build output not present')
+        head = e.base_head((base / 'rootfs-a-experimental.bin').read_bytes(), json.loads((base / 'manifest.json').read_text()))
+        self.assertEqual(head, 33 * 0x40000)
 
 
 if __name__ == '__main__':
