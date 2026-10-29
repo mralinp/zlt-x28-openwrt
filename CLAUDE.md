@@ -24,7 +24,7 @@ with working stock LuCI, cooler operation, and local SMS/voice for AI projects. 
   `cd router && COPYFILE_DISABLE=1 tar --uid 0 --gid 0 -cf - usr etc | ssh router 'cd / && tar xf -'`
 - After Lua/LuCI changes: `ssh router 'rm -rf /tmp/luci-modulecache /tmp/luci-indexcache'` (module cache otherwise serves old code).
 - Router shell is busybox ash: no `diff`, `paste`, `setsid`, `nohup`, `scp` (no sftp). Use `ssh router 'cat > f' < local`.
-- Access: SSH key auth, `ssh router` (port 2222, `~/.ssh/config`); LuCI `http://192.168.70.1:4153/cgi-bin/luci` (no trailing slash); vendor UI on ports 80/443.
+- Access: SSH key auth, `ssh router` (port 22 on the native image, 2222 on older ones; `~/.ssh/config`); LuCI `http://192.168.70.1/cgi-bin/luci` (empty root password until you set one); the native image has no vendor UI.
 
 ## Architecture in one paragraph
 Vendor daemons (`ql_netd`, `firewalltools`, `lan_mgr`, `sms_mgr`, `ql_ril_service`) own the real state. `router/usr/lib/lua/vendorbridge.lua`

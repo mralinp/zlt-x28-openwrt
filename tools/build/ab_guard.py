@@ -15,6 +15,17 @@ from stage_native import load_archive, resolve
 
 FORBIDDEN = re.compile(rb'ab_image_sync|zmtk_boot_done|bootctrl|platform_do_upgrade|nandwrite|flash_erase|ubiupdatevol|'
                        rb'ubiformat|\bmtd\s[^\n]*\bwrite\b|(?:^|[\s;&|`(])(?:/sbin/)?sysupgrade\s|of=/dev/(?:mtd|ubi|block)|dd-nand|fw_setenv|ubi(?:rmvol|mkvol|rsvol|attach|detach)|flash_eraseall|flash_unlock|\bmtd\s[^\n]*\b(?:erase|unlock)\b')
+# The one reviewed flash write the image may do (#145): x28-bootok clears slot A's boot "tries" byte in misc. The
+# exemption covers only the dd-nand token, only in that script, and only while the script keeps the exact shape that
+# was reviewed: one writer variable, one call, one of=.
+BOOTOK = 'etc/init.d/x28-bootok'
+
+
+def bootok_exempt(real, data):
+    return (real == BOOTOK and data.count(b'dd-nand') == 1 and b'DDNAND=${X28_BOOTOK_DDNAND:-dd-nand}' in data
+            and data.count(b'"$DDNAND" ') == 1 and data.count(b'of=') == 1)
+
+
 PATHS = re.compile(rb'(?<![\w.-])/((?:etc|lib|usr|sbin|bin)/[A-Za-z0-9_./-]*[A-Za-z0-9_])')
 ROOT_PREFIXES = ('etc/rc.d/','etc/hotplug.d/','etc/crontabs/','etc/uci-defaults/','lib/preinit/')
 ROOT_FILES = ('etc/inittab','etc/rc.local','etc/preinit','etc/rc.common','etc/init.d/rcS')
@@ -30,7 +41,9 @@ def violations(tree):
         if real in seen:continue
         seen.add(real)
         if data[:2]!=b'#!' and not name.endswith('.sh') and not name.startswith(ROOT_PREFIXES):continue  # data, ELF, JSON
-        for hit in sorted({m.decode() for m in FORBIDDEN.findall(data)}):found.append((real,hit))
+        for hit in sorted({m.decode() for m in FORBIDDEN.findall(data)}):
+            if hit=='dd-nand' and bootok_exempt(real,data):continue
+            found.append((real,hit))
         for ref in PATHS.findall(data):
             ref=posixpath.normpath(ref.decode())
             todo.extend(n for n in tree if n==ref or n.startswith(ref+'/'))

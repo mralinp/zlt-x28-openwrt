@@ -35,7 +35,7 @@ def main():
             return subprocess.run(['chroot',str(root),*args],input='',capture_output=True,text=True,timeout=20)
         config=run(['/sbin/uci','-c','/etc/config','show','dropbear'])
         check(config.returncode==0,'cannot parse Dropbear config')
-        for setting in ("PasswordAuth='off'","RootPasswordAuth='off'","RootLogin='on'","Port='2222'","Interface='lan'"):
+        for setting in ("PasswordAuth='off'","RootPasswordAuth='off'","RootLogin='on'","Port='22'","Interface='lan'"):
             check(setting in config.stdout,'unexpected authentication policy: '+setting)
         root_account=next(row for row in (root/'etc/shadow').read_text().splitlines() if row.startswith('root:'))
         check(root_account.split(':')[1]=='','expected an empty root password (stock OpenWrt; SSH stays key-only)')
