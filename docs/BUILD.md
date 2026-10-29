@@ -332,7 +332,10 @@ measured). Nothing was run on the router.
 
 ## Live LAN, DHCP and front LEDs on slot A (#122)
 
-Applied by hand on the running slot-A unit (2026-10-29); not yet in `first_boot.py`.
+Applied by hand on the running slot-A unit (2026-10-29), then built into `first_boot.py`: the `br-lan` bridge,
+an `S19dnsmasq` link (the staged default `dhcp` config already serves `lan`), `sbin/ujail` and its opkg files
+removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link. A real build against
+`native-stage-76-final` passed `ab_guard`; without the modem stack the LEDs show power plus blue (no service).
 
 - **LAN:** `br-lan` bridges `eth0.1 eth0.2 eth0.3 eth1` (sockets 1, 2, 4, 0), like stock `br0`; the switch table
   above is unchanged, so `x28-switch` still validates it. `lan` is static `192.168.70.1/24` on `br-lan`.

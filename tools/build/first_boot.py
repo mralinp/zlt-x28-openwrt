@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Apply a private, NOT-FLASHABLE first-boot management profile to #76 staging.
 
-Stock swconfig, observed MT7531AE VLAN table, static LAN on eth0.3, key-only SSH. No vendor activation or device I/O.
+Stock swconfig, observed MT7531AE VLAN table, static LAN on br-lan (all four sockets) with DHCP, front LEDs, key-only SSH.
+No vendor activation or device I/O.
 """
 import argparse
 import base64
@@ -20,10 +21,13 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S20network'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S19dnsmasq','S20network','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
-LAN = 'eth0.3'  # socket 4 = MT7531AE port 4, untagged VLAN 3 (#84)
+LAN = 'br-lan'
+# Sockets 1, 2, 4 (#84: port 4, untagged VLAN 3) and 0, one VLAN each; stock bridges them all into br0 (#122).
+LAN_PORTS = ('eth0.1','eth0.2','eth0.3','eth1')
+LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
 # vlan: (ports, untagged port whose PVID is that vlan). Copied from the observed stock table.
 SWITCH = {1:('1 5t',1),2:('2 5t',2),3:('4 5t',4),4:('0 6t',0)}
 SWITCH_UCI = "\nconfig switch\n option name 'switch0'\n option reset '1'\n option enable_vlan '1'\n" + ''.join(
@@ -125,8 +129,19 @@ def integrate(stage,key,stock_path,output):
     if 'lib/preinit/00_preinit.conf' in tree:
         config=tree['lib/preinit/00_preinit.conf'][1].decode()
         put('lib/preinit/00_preinit.conf',config+'\npi_preinit_no_failsafe="y"\n')
-    put('etc/init.d/x28-switch',SWITCH_INIT,0o755)
-    link=tarfile.TarInfo('etc/rc.d/S18x28-switch');link.type=tarfile.SYMTYPE;link.linkname='../init.d/x28-switch';tree[link.name]=(link,b'')
+    def enable(start,service):
+        if 'etc/init.d/'+service not in tree:raise ValueError('missing service: '+service)
+        link=tarfile.TarInfo(f'etc/rc.d/S{start}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
+    put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
+    put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
+    put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
+    enable(19,'dnsmasq')  # the staged default dhcp config already serves lan
+    # CONFIG_NAMESPACES is off in the vendor kernel: with ujail present procd jails dnsmasq/sysntpd and they exit (#122).
+    for name in [n for n in tree if n=='sbin/ujail' or n.startswith('usr/lib/opkg/info/procd-ujail.')]:
+        removed.append(name);del tree[name]
+    if 'usr/lib/opkg/status' in tree:  # or opkg would still list it and could reinstall it
+        stanzas=tree['usr/lib/opkg/status'][1].decode().split('\n\n')
+        put('usr/lib/opkg/status','\n\n'.join(x for x in stanzas if not x.startswith('Package: procd-ujail\n')))
     # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. Root's password
     # stays locked; this is the single way in if switch/network init fails, since failsafe is removed.
     if 'bin/ash' not in tree:raise ValueError('missing /bin/ash for the console shell')
@@ -137,6 +152,10 @@ def integrate(stage,key,stock_path,output):
  option ipaddr '127.0.0.1'
  option netmask '255.0.0.0'
 
+config device
+ option name '{LAN}'
+ option type 'bridge'
+"""+''.join(f" list ports '{p}'\n" for p in LAN_PORTS)+f"""
 config interface 'lan'
  option device '{LAN}'
  option proto 'static'
@@ -171,9 +190,9 @@ config interface 'lan'
         for name,(info,data) in sorted(tree.items()):
             meta=copy.copy(info);tar.addfile(meta,io.BytesIO(data) if meta.isfile() else None)
     report={'flashable':False,'input_stage_sha256':digest(raw),'archive_sha256':digest(archive.read_bytes()),
-            'lan_device':LAN,'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
+            'lan_device':LAN,'lan_ports':list(LAN_PORTS),'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
             'removed_paths':removed,'enabled_start_links':sorted(n for n in tree if n.startswith('etc/rc.d/S')),
-            'limits':['No modem/Wi-Fi/shared mounts','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No DHCP/web UI','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
+            'limits':['No modem/Wi-Fi/shared mounts','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No web UI','LEDs show no-service without the modem stack','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
     (output/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');(output/'INCOMPLETE').unlink()
     return report
 
