@@ -4,20 +4,25 @@ The repository is the source of truth for original packages, tests, plans and ev
 
 ## Layout
 
-- `package/`: original native netifd protocol and standard LuCI addon.
-- `tests/`, `examples/`: mocked lifecycle tests and disabled configuration.
-- `docs/PROJECT-PLAN.md`, `TASKS.md`, `DEVICE-AUDIT.md`, `STATUS.md`: native port plan and measured progress.
+- `package/`: the OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol) and its LuCI page, `x28-modem`, `x28-wifi`, `x28-leds`, `x28-bootok`.
+- `tools/build/`, `tools/recovery/`, `tools/firmware/`: image assembly, guarded flash sessions and firmware analysis, each with host tests.
+- `tests/`, `examples/`: shell tests of the init scripts, mocked protocol tests and a disabled configuration.
+- `docs/PROJECT-PLAN.md`, `TASKS.md`, `STATUS.md`, `TESTING.md`, `../CHANGELOG.md`: plan, progress, evidence and history.
 - `experiments/`: historical OEM UI work and unfinished genuine stock-LuCI preview.
-- `router/`: earlier OEM overlay; do not treat it as the native image rootfs.
+- `router/`: the earlier overlay for the stock firmware; not part of the native image.
 - ignored `private/`, `firmware/`, `external/`, `build/`: future private inputs, upstream checkouts and generated artifacts.
 
 ## Local checks
 
 ```sh
+for t in tests/test_modem.sh tests/test_bootok.sh tests/test_wifi.sh; do sh $t; done
+python3 -m unittest discover -s tools/build -p 'test_*.py'
+for t in tools/recovery/test_*.py; do python3 $t; done
 node tests/test_luci.cjs
 sh -n package/x28-mipc/files/x28_mipc.sh tests/run-case.sh
-python3 experiments/oem-ui/x28-native-preview/test_readonly.py
 ```
+
+CI runs the same checks (`.github/workflows/ci.yml`).
 
 `python3 tests/test_native.py --router router` executes mock-only tests with installed OpenWrt helpers through SSH. It stages files in /tmp, mocks modem and ubus operations, and cleans up. It still contacts the active router; read its harness first.
 

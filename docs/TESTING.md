@@ -5,7 +5,7 @@ Written for whoever picks this up later with no memory of the sessions: start he
 anywhere else in the repo.
 
 Conventions:
-- **Device**: one ZLT X28, OEM firmware 1.5.13, OpenWrt 19.07-derived, kernel 4.19.205, active slot **B**.
+- **Device**: one ZLT X28, kernel 4.19.205. Tests 1–22 ran on the stock firmware (OEM 1.5.13, OpenWrt 19.07-derived, active slot **B**); tests 23–30 ran on the native image on slot **A**.
 - **Host**: Apple Silicon Mac (macOS), Docker Desktop (arm64 Linux, plus x86_64 emulation).
 - Private outputs (dumps, probe logs, chip IDs, vendor files) live in git-ignored `private/` and are never
   committed. Paths below under `private/` are on the maintainer's machine.
@@ -37,8 +37,16 @@ Conventions:
 | 20 | Read-only USB target and first-write guards (#57) | 2026-10-28 | ✅ 6/6 exact-size, acknowledged reads match backup; 101 MiB; no flash write | [Read rehearsal](research/first-write-plan.md#completed-read-only-rehearsal-2026-10-28) |
 | 21 | Patched identical-byte USB rewrite (#70) | 2026-10-28 | ✅ one acknowledged write; 12/12 same-session target/guard reads match; verified stock-B return | [Result and limits](research/patched-identical-write-result.md) |
 | 22 | Changed-page USB restore (#72) | 2026-10-29 | ✅ candidate then original; 18/18 exact reads match; verified stock-B return | [Result and limits](research/changed-page-restore-result.md) |
+| 23 | Native image written to slot A with the guarded sessions (identical rewrite, then write; base mode from #137) | 2026-10-29 | ✅ five images written; each read-back hash equals the candidate and all neighbour guards match before and after | this page |
+| 24 | First boot of slot A, management path | 2026-10-29 | ✅ boots; key-only SSH, LAN, LuCI login | this page |
+| 25 | 5G data on slot A | 2026-10-29 | ✅ `wan` up on `ccmni1` with internet; started at boot by `x28-modem` | [NATIVE-CELLULAR](NATIVE-CELLULAR.md) |
+| 26 | Services at boot and persistence across reboot | 2026-10-29 | ✅ LuCI, DHCP/DNS, NAT, both Wi-Fi radios; host key, Wi-Fi key and root password unchanged after a reboot | this page |
+| 27 | A/B boot counter | 2026-10-29 | ✅ the preloader adds one try per boot (0 → 1 seen); `x28-bootok` writes the byte back to 0 in all four `misc` copies | [BOOT-FLOW](BOOT-FLOW.md) |
+| 28 | Download-agent block write to `misc` | 2026-10-29 | ❌ the first block write was not acknowledged, twice; `misc` stayed intact and was verified | this page |
+| 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
+| 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
 
-Inactive `rootfs_sig_a` has passed an exact changed-page-and-restore test. A native custom-image boot remains untested.
+Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
 ## Lab setup
 
@@ -264,3 +272,33 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
   the script; `iptables-save` output changes every second (timestamp comment, counters), so strip both to compare.
 - **Not proven**: netifd, fw3 *applying* rules, dnsmasq and procd as init on 4.19 (they need the device's network
   to themselves: a flashed inactive slot); Wi-Fi, modem, switch; long-running stability and heat.
+
+## 23–30. The native image on the X28 (slot A, 2026-10-29)
+
+- **Question**: does the image built by `tools/build/` boot from slot A and do the job of a router, and can we keep it
+  there safely?
+- **Flash** (23): `slot_entry.py rootfs_a identical` then `write` (with `--base-dir` once an earlier image is on slot
+  A), each a typed-phrase session with a second backup copy and a live UART capture. Pass criteria the tool enforces:
+  the read-back hash of `rootfs_a` equals the candidate, every neighbour partition (boot, lk, tee, signature, `misc`,
+  the whole B side and the modem-side partitions) is unchanged before and after, one write, no retry, no reboot.
+  Dry runs: `python3 tools/recovery/slot_entry.py rootfs_a identical --candidate-dir <ubi dir> [--base-dir <ubi dir>]`.
+- **Boot and router checks** (24–26, 30), read over `ssh router` and from the Mac:
+  `grep bootslot /proc/cmdline`, `ifstatus wan`, `ping 1.1.1.1`, `iptables -t nat -S POSTROUTING`, `wifi status`,
+  `curl -d luci_username=root -d luci_password= http://192.168.70.1/cgi-bin/luci` (302 = logged in),
+  `/sys/class/thermal/thermal_zone*/temp`, `top`. The reboot test: record the SSH host key and Wi-Fi key hash, `reboot`,
+  compare after.
+- **Boot counter** (27): read the four copies with `dd if=/dev/mtd3 bs=16 skip=$((128+n*16384)) count=1 | hexdump -C`
+  (A priority, tries, success, up-type are bytes 8–11). One try is added per boot; with `x28-bootok` they read 0 again
+  once the system is up.
+- **Download-agent write to `misc`** (28): `slot_blocks_entry.py misc-blocks confirm --a-retry N --write ...` stopped at
+  the first block, twice (`write_result acknowledged: false`). The restore session showed all four copies unchanged. Not
+  used again; the `confirm` mode remains in the tree but is unproven on hardware.
+- **Live `misc` writes** (29): the stock helper is used exactly as its own boot script uses it,
+  `printf '\000' | dd-nand of=/dev/mtd3 seek=<2057 + 262144 × copy> bs=1 count=1`, with the vendor binary copied to `/tmp`.
+  An identical-value write came first; after every write all four copies were re-read and the whole 1 MiB compared with a
+  dump. Review: router-safety-auditor.
+- **Gotchas found**: the preloader counts every boot; a `reboot` without the reset service left the byte at 1; stock B
+  repairs (erases) slot A if it ever boots with A's tries above 3; `misc` cannot be rewritten over USB (28); the log
+  buffer is flooded by vendor RIL messages, so early boot lines scroll out of `logread`.
+- **Not proven**: Wi-Fi client and throughput behaviour, a multi-day soak, other SIMs, reconnect after a modem reset on
+  the final image, the preloader's fall-back to B (inferred), and the load average of about 3 with an idle CPU.

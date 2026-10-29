@@ -8,6 +8,14 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 > all eighteen target/guard reads and stock-B return passed. This is a tested narrow recovery path,
 > not universal rollback or approval to flash experimental firmware.
 
+> **Update, 2026-10-29:** the guarded `slot_entry.py` sessions have since written five native images to `rootfs_a`
+> (identical rewrite first, then write, each verified by read-back and neighbour guards) and the unit boots them. The
+> download-agent route is the proven way to replace slot A. It is **not** proven for `misc`: block writes there were
+> never acknowledged (twice), so `misc` is only changed live with the stock `dd-nand` method, byte by byte, with the
+> full partition compared after each write ([TESTING](TESTING.md) 28 and 29). The planned recovery slot
+> ([PROJECT-PLAN](PROJECT-PLAN.md)) is meant to make this everyday path independent of the download agent; the
+> agent stays the last resort.
+
 See the [#72 changed-page result](research/changed-page-restore-result.md),
 [#70 identical-write result](research/patched-identical-write-result.md),
 [first-write history](research/first-write-plan.md) and
