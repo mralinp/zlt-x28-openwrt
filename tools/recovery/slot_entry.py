@@ -71,7 +71,12 @@ def load_inputs(backup, loader, target, mode, candidate_dir, base_dir=None):
         if json.loads((base_dir / 'manifest.json').read_text()).get('padded_sha256') != digest(base):
             raise ValueError('base does not match its build manifest')
     if target == 'rootfs_a':
-        spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else ''), rootfs_a_image
+        head = 0
+        if base:  # 2 layout copies + the SquashFS LEBs: the static part of a base that has since booted
+            m = json.loads((base_dir / 'manifest.json').read_text())
+            squash = (base_dir / 'rootfs.squashfs').stat().st_size
+            head = (m['layout_copies'] + -(-squash // m['leb_bytes'])) * m['peb_bytes']
+        spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else '', head), rootfs_a_image
     else:
         spec = session.misc_spec(rootfs_a_sha)
         candidate = bytearray(original)
@@ -99,7 +104,7 @@ def load_inputs(backup, loader, target, mode, candidate_dir, base_dir=None):
                                                       'changed_restore.py', 'read_verify.py'))
     tools += b''.join((here.parent / 'build' / n).read_bytes() for n in ('package_ubi.py', 'stage_native.py'))
     identity = {'target': target, 'original': spec.original_sha, 'candidate': spec.candidate_sha, 'rootfs_a': rootfs_a_sha,
-                'base': spec.base_sha, 'da': DA_HASH, 'host': host, 'tools': digest(tools), 'unit': by_name['proinfo']['sha256']}
+                'base': spec.base_sha, 'base_head': spec.base_head, 'da': DA_HASH, 'host': host, 'tools': digest(tools), 'unit': by_name['proinfo']['sha256']}
     return by_name, table, original, candidate, spec, identity, base
 
 
@@ -178,7 +183,7 @@ def main():
         backup, loader, args.target, args.mode, args.candidate_dir.resolve(strict=True),
         args.base_dir.resolve(strict=True) if args.base_dir else None)
     rootfs_a_sha = identity['rootfs_a']
-    specs = {'rootfs_a': session.rootfs_a_spec(rootfs_a_sha, identity['base'] if args.target == 'rootfs_a' else ''), 'misc': session.misc_spec(rootfs_a_sha)}
+    specs = {'rootfs_a': session.rootfs_a_spec(rootfs_a_sha, identity['base'], identity['base_head']), 'misc': session.misc_spec(rootfs_a_sha)}
     priors = {}
     for flag, target, mode, verified in wanted:
         # Every prior is bound to this unit, host, tools and the same approved rootfs_a image (from the manifest, not a receipt).

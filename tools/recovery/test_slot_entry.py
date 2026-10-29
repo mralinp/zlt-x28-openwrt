@@ -131,13 +131,13 @@ class GateTests(unittest.TestCase):
 
 
     def test_base_phrase_names_the_base_and_that_misc_selects_a(self):
-        b = slot_session.rootfs_a_spec('abcdef1234567890' * 4, '0123456789ab' * 5 + '0123')
+        b = slot_session.rootfs_a_spec('abcdef1234567890' * 4, '0123456789ab' * 5 + '0123', 0x40000)
         self.assertEqual(e.phrase(b, 'write', b.candidate_sha, False), 'WRITE write rootfs_a abcdef123456 BASE 0123456789ab MISC-SELECTS-A')
         self.assertEqual(e.phrase(b, 'identical', 'a' * 64, False), 'WRITE identical rootfs_a 0123456789ab BASE 0123456789ab MISC-SELECTS-A')
         self.assertEqual(e.phrase(b, 'restore', 'a' * 64, False), 'WRITE restore rootfs_a 5f0c997ddbc0')
 
     def test_prior_identical_of_a_base_run_must_name_the_base(self):
-        base = slot_session.rootfs_a_spec('c' * 64, 'b' * 64)
+        base = slot_session.rootfs_a_spec('c' * 64, 'b' * 64, 0x40000)
         t = PriorTests('test_good_verified_prior_is_accepted')
         t.setUp()
         self.addCleanup(t.tmp.cleanup)
