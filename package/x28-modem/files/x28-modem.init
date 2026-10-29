@@ -1,0 +1,108 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Brings the X28 modem stack up natively, in the order verified on hardware (#131), without the vendor 0mount_all:
+# partition name links, vendor yaffs2 mounts, the vendor daemons (their own procd scripts), the one-ACM USB gadget
+# atcid needs (/dev/ttyGS0), then radio on and wan up. mtk_netagent stays off: it forces CFUN 0/4.
+
+START=19
+STOP=89
+
+SERVICES="1nvram_daemon 2ccci_fsd 3ccci_mdinit ql_ril_service ql_netd.init mipc_submonitor.init atci_service atcid"
+MOUNTS="nvcfg:/mnt/vendor/nvcfg nvdata:/mnt/vendor/nvdata nvram:/mnt/vendor/nvram protect1:/mnt/vendor/protect_f
+	protect2:/mnt/vendor/protect_s user_config:/mnt/data productinfo:/productinfo"
+AB="mcf1 mcf2 md1img md1dsp spmfw pi_img dpm medmcu sspm mcupm lk tee boot rootfs_sig rootfs loader_ext"
+GADGET=/config/usb_gadget/g1
+# Tests point these at a staging directory.
+PROC=${X28_MODEM_PROC:-/proc}
+DEV=${X28_MODEM_DEV:-/dev}
+
+log() { logger -t x28-modem "$*"; echo "x28-modem: $*" >&2; }
+
+links() {
+	local dev size erase name slot b
+	mkdir -p "$DEV/mtd" "$DEV/block"
+	# /proc/mtd: mtdN: size erasesize "name"; vendor daemons open /dev/block/<name> and /dev/mtd/<name>.
+	while read -r dev size erase name; do
+		case "$dev" in mtd[0-9]*:) ;; *) continue ;; esac
+		dev=${dev%:} name=${name#\"} name=${name%\"}
+		ln -sfn "/dev/$dev" "$DEV/mtd/$name"
+		ln -sfn "/dev/mtdblock${dev#mtd}" "$DEV/block/$name"
+	done < "$PROC/mtd"
+	slot=$(sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$PROC/cmdline")
+	[ -n "$slot" ] || { log "no bootslot on the kernel command line"; return 1; }
+	for b in $AB; do
+		ln -sfn "/dev/mtd/${b}_$slot" "$DEV/mtd/$b"
+		ln -sfn "/dev/block/${b}_$slot" "$DEV/block/$b"
+	done
+}
+
+mounts() {
+	local m part dir rc=0
+	for m in $MOUNTS; do
+		part=${m%%:*} dir=${m#*:}
+		grep -q " $dir " /proc/mounts && continue
+		mkdir -p "$dir"
+		mount -t yaffs2 -o nosuid,nodev,noatime,nodiratime "/dev/block/$part" "$dir" || { log "mount $part failed"; rc=1; }
+	done
+	return $rc
+}
+
+gadget() {
+	local udc
+	grep -q ' /config configfs ' /proc/mounts || { mkdir -p /config; mount -t configfs none /config; } || return 1
+	[ -s "$GADGET/UDC" ] && return 0
+	udc=$(ls /sys/class/udc 2>/dev/null | head -n 1)
+	[ -n "$udc" ] || { log "no USB device controller"; return 1; }
+	mkdir -p "$GADGET/strings/0x409" "$GADGET/configs/b.1/strings/0x409" "$GADGET/functions/acm.gs0" || return 1
+	echo 0x2c7c > "$GADGET/idVendor"
+	echo 0x7003 > "$GADGET/idProduct"
+	echo 0x0419 > "$GADGET/bcdDevice"
+	echo Quectel > "$GADGET/strings/0x409/manufacturer"
+	echo "X28 OpenWrt" > "$GADGET/strings/0x409/product"
+	echo acm > "$GADGET/configs/b.1/strings/0x409/configuration"
+	echo 250 > "$GADGET/configs/b.1/MaxPower"
+	[ -e "$GADGET/configs/b.1/f1" ] || ln -s "$GADGET/functions/acm.gs0" "$GADGET/configs/b.1/f1"
+	echo "$udc" > "$GADGET/UDC"
+}
+
+radio_on() {
+	local i=0
+	# The modem answers AT only once ccci, the RIL and atcid are up; that takes a while after a cold start.
+	while [ "$i" -lt 60 ]; do
+		mipc_wan_cli --at_cmd 'AT+CFUN=1' 2>/dev/null | grep -q '^OK' && { log "radio on"; return 0; }
+		sleep 2; i=$((i + 1))
+	done
+	log "radio did not answer AT+CFUN=1"
+	return 1
+}
+
+bringup() {
+	local s i
+	links && mounts || return 1
+	for s in $SERVICES; do
+		if [ "$s" = 1nvram_daemon ]; then
+			# One-shot that must finish before ccci reads the NV partitions; once per boot.
+			[ -e /tmp/.x28-modem-nvram ] && continue
+			/etc/init.d/$s start
+			i=0; while pidof nvram_daemon >/dev/null && [ "$i" -lt 30 ]; do sleep 1; i=$((i + 1)); done
+			touch /tmp/.x28-modem-nvram
+			continue
+		fi
+		# procd leaves an already running instance alone, so a second run only fills gaps.
+		/etc/init.d/$s start || log "$s did not start"
+		[ "$s" = atci_service ] && { gadget || log "USB gadget failed; atcid has no serial port"; }
+	done
+	radio_on && ifup wan
+}
+
+start() {
+	# Runs in the background so the rest of boot (network, dropbear) does not wait for the modem.
+	( bringup ) </dev/null >/dev/null 2>&1 &
+}
+
+stop() {
+	local s
+	for s in atcid atci_service mipc_submonitor.init ql_netd.init ql_ril_service 3ccci_mdinit 2ccci_fsd; do
+		/etc/init.d/$s stop
+	done
+}

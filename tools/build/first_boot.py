@@ -10,6 +10,7 @@ import copy
 import io
 import json
 import posixpath
+import re
 from pathlib import Path
 import struct
 import sys
@@ -21,7 +22,7 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -29,6 +30,7 @@ LAN = 'br-lan'
 LAN_PORTS = ('eth0.1','eth0.2','eth0.3','eth1')
 LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
 WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
+MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
 LUCI_WIRELESS = 'www/luci-static/resources/view/network/wireless.js'
@@ -70,9 +72,10 @@ start() {
 """
 
 
-def add_swconfig(tree,stock):
-    """Copy stock /sbin/swconfig plus any ELF dependency the tree lacks; every NEEDED must resolve."""
-    todo=['sbin/swconfig'];seen=set();added=[]
+def add_stock(tree,stock,root,exclusive=False):
+    """Copy a stock file plus any ELF dependency the tree lacks; every NEEDED must resolve. A root the tree already
+    holds must be identical (exclusive: must be absent)."""
+    todo=[root];seen=set();added=[];label=posixpath.basename(root)
     while todo:
         name=todo.pop()
         if name in seen:continue
@@ -80,16 +83,39 @@ def add_swconfig(tree,stock):
         real,data=resolve(stock,name,chain)
         for item in chain:
             if item not in tree:tree[item]=stock[item];added.append(item)
-            elif name=='sbin/swconfig':raise ValueError('swconfig path already occupied: '+item)
-        if data[:4]!=b'\x7fELF':raise ValueError('not ELF: '+name)
+            elif name==root and (exclusive or tree[item][1]!=stock[item][1]):raise ValueError(label+' path already occupied: '+item)
+        if data[:4]!=b'\x7fELF':
+            if exclusive:raise ValueError('not ELF: '+name)
+            continue
         for need in elf_dynamic(data)[1]:
             options=[d+'/'+need for d in ('lib','usr/lib')]
             have=next((p for p in options if p in tree),None)
             if have:resolve(tree,have)
             else:
                 old=next((p for p in options if p in stock),None)
-                if old is None:raise ValueError('unresolved swconfig library: '+need)
+                if old is None:raise ValueError('unresolved '+label+' library: '+need)
                 todo.append(old)
+    return added
+
+
+def add_swconfig(tree,stock):
+    return add_stock(tree,stock,'sbin/swconfig',exclusive=True)
+
+
+def add_modem(tree,stock):
+    """The vendor modem stack x28-modem starts (#131): its stock init scripts, the binaries they run, the modem
+    configuration under vendor/etc."""
+    services=re.search(r'^SERVICES="([^"]*)"',(MODEM/'x28-modem.init').read_text(),re.M).group(1).split()
+    added=[]
+    for service in services:
+        script='etc/init.d/'+service
+        added+=add_stock(tree,stock,script)
+        command=re.search(r'procd_set_param command (/\S+)',stock[script][1].decode())
+        if not command:raise ValueError('no command in stock '+script)
+        added+=add_stock(tree,stock,command.group(1).lstrip('/'))
+    added+=add_stock(tree,stock,'usr/bin/mipc_wan_cli')+add_stock(tree,stock,'etc/quectel-project-version')
+    for name in sorted(stock):
+        if (name=='vendor' or name.startswith('vendor/etc')) and name not in tree:tree[name]=stock[name];added.append(name)
     return added
 
 
@@ -128,6 +154,7 @@ def integrate(stage,key,stock_path,output):
     tree=load_archive(io.BytesIO(raw));removed=[]
     stock=load_archive(io.BytesIO(stock_bytes),'rootfs')
     swconfig_added=add_swconfig(tree,stock)
+    modem_added=add_modem(tree,stock)
     for name in WIFI_PROFILES:
         if name not in stock or not stock[name][0].isfile():raise ValueError('missing stock Wi-Fi profile: '+name)
         tree[name]=stock[name]
@@ -160,6 +187,7 @@ def integrate(stage,key,stock_path,output):
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
     if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
+    put('etc/init.d/x28-modem',(MODEM/'x28-modem.init').read_text(),0o755);enable(19,'x28-modem')
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
@@ -250,9 +278,9 @@ config interface 'lan'
         for name,(info,data) in sorted(tree.items()):
             meta=copy.copy(info);tar.addfile(meta,io.BytesIO(data) if meta.isfile() else None)
     report={'flashable':False,'input_stage_sha256':digest(raw),'archive_sha256':digest(archive.read_bytes()),
-            'lan_device':LAN,'lan_ports':list(LAN_PORTS),'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
+            'lan_device':LAN,'lan_ports':list(LAN_PORTS),'switch_table':{str(v):x[0] for v,x in SWITCH.items()},'swconfig_sha256':digest(tree['sbin/swconfig'][1]),'swconfig_added':swconfig_added,'modem_added':modem_added,'stock_sha256':digest(stock_bytes),'lan_address':'192.168.70.1/24','ssh_port':2222,'public_key_sha256':digest(key.encode()),
             'removed_paths':removed,'enabled_start_links':sorted(n for n in tree if n.startswith('etc/rc.d/S')),
-            'limits':['No modem/Wi-Fi/shared mounts','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No web UI','LEDs show no-service without the modem stack','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
+            'limits':['Modem stack from stock, started by x28-modem; reboot persistence unverified (#131)','UART console shell (ttyS0, no password) is physical-access root','Switch table is stock-observed, never applied on hardware; physical socket-4 mapping is operator-confirmed only','No web UI','LEDs show no-service without the modem stack','Root/key login still needs runtime test','No overlay/UBI/slot/signature readiness']}
     (output/'manifest.json').write_text(json.dumps(report,indent=2)+'\n');(output/'INCOMPLETE').unlink()
     return report
 
