@@ -218,6 +218,9 @@ x28_mipc_setup() {
   # configures it (stock's check_global_ipv6_addr waits the same way). 3GPP routes that whole /64 to the UE.
   # ccmni has no MAC: the kernel needs this link-local to solicit the RA and takes its IID for SLAAC. It goes to
   # netifd in a first update; netifd flushes addresses it does not own when it takes the device (observed).
+  # Tests redirect this to their private staging directory.
+  local pinfo="${X28_MIPC_SYSCTL:-/proc/sys/net/ipv6/conf}/$ifname/accept_ra_pinfo"
+  echo 1 > "$pinfo" 2>/dev/null
   i=0 ll=
   while :; do
    # Reusing the already-active attach bearer, the activation reply omits IPv6 (observed); data_call_get has it.
@@ -237,6 +240,10 @@ x28_mipc_setup() {
   case "$v6_addr" in [fF][eE]8*) ;; *) v6_global="${v6_global:-$v6_addr}" ;; esac
   if x28_mipc_ipv6 "$v6_global"; then
    net64="$(x28_mipc_net64 "$v6_global")"
+   # The /64 belongs to the LAN now: keep the WAN to a /128 so the kernel's on-link /64 route on ccmni does not
+   # beat the LAN's (observed: replies to LAN clients left through ccmni). Bearer prefixes do not change.
+   echo 0 > "$pinfo" 2>/dev/null
+   ip -6 addr del "$v6_global/64" dev "$ifname" >/dev/null 2>&1
   else
    v6_global=
    [ -n "$v4_addr" ] || { x28_mipc_fail_owned "$interface" "$cid" NO_IPV6; return 1; }

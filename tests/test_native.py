@@ -122,6 +122,11 @@ def verify(item, directory):
             last = up[-1]
             v6 = item["name"] in ("ipv4v6", "ipv6-only", "ipv4v6-late-v6")
             if v6:
+                assert (directory / "ip6del").read_text() == "2001:db8:1:2:1:0:73a4:e064/64\n", "kernel /64 not removed"
+                assert (directory / "pinfo").read_text() == "0\n", "RA prefix info still accepted"
+            elif ll:
+                assert (directory / "pinfo").read_text() == "1\n" and not (directory / "ip6del").exists()
+            if v6:
                 assert last["ip6addr"] == [LL, {"ipaddr": "2001:db8:1:2:1:0:73a4:e064", "mask": "128"}], events
                 assert last["ip6prefix"] == ["2001:db8:1:2::/64"], events
                 assert any(r["target"] == "::" and r["netmask"] == "0" for r in last["routes6"]), events
@@ -190,6 +195,10 @@ def main():
                         data = tar.extractfile("cases/" + item["name"] + "/" + name)
                         assert data is not None, "Missing test result"
                         (directory / name).write_bytes(data.read())
+                    for name, src in [("ip6del", "ip6del"), ("pinfo", "sysctl/ccmni7/accept_ra_pinfo")]:
+                        (directory / name).unlink(missing_ok=True)
+                        if "cases/" + item["name"] + "/" + src in tar.getnames():
+                            (directory / name).write_bytes(tar.extractfile("cases/" + item["name"] + "/" + src).read())
             for item in items:
                 verify(item, result_path / "cases" / item["name"])
                 print("PASS", item["name"])

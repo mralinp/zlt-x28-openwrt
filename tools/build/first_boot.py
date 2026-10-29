@@ -21,7 +21,7 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S19dnsmasq','S20network','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -135,7 +135,40 @@ def integrate(stage,key,stock_path,output):
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
     put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
-    enable(19,'dnsmasq')  # the staged default dhcp config already serves lan
+    enable(19,'dnsmasq');enable(35,'odhcpd')
+    # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
+    put('etc/config/dhcp',"""config dnsmasq
+ option domainneeded '1'
+ option boguspriv '1'
+ option localise_queries '1'
+ option rebind_protection '1'
+ option rebind_localhost '1'
+ option local '/lan/'
+ option domain 'lan'
+ option expandhosts '1'
+ option cachesize '1000'
+ option authoritative '1'
+ option readethers '1'
+ option leasefile '/tmp/dhcp.leases'
+ option resolvfile '/tmp/resolv.conf.d/resolv.conf.auto'
+ option nonwildcard '1'
+ option localservice '1'
+ option ednspacket_max '1232'
+
+config dhcp 'lan'
+ option interface 'lan'
+ option start '100'
+ option limit '150'
+ option leasetime '12h'
+ option ra 'server'
+ option dhcpv6 'server'
+ list ra_flags 'managed-config'
+ list ra_flags 'other-config'
+
+config dhcp 'wan'
+ option interface 'wan'
+ option ignore '1'
+""")
     # CONFIG_NAMESPACES is off in the vendor kernel: with ujail present procd jails dnsmasq/sysntpd and they exit (#122).
     for name in [n for n in tree if n=='sbin/ujail' or n.startswith('usr/lib/opkg/info/procd-ujail.')]:
         removed.append(name);del tree[name]
@@ -161,6 +194,7 @@ config interface 'lan'
  option proto 'static'
  option ipaddr '192.168.70.1'
  option netmask '255.255.255.0'
+ option ip6assign '64'
 """+SWITCH_UCI)
     put('etc/config/dropbear',"""config dropbear
  option PasswordAuth 'off'
