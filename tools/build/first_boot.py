@@ -30,6 +30,21 @@ LAN_PORTS = ('eth0.1','eth0.2','eth0.3','eth1')
 LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
 WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
+# Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
+LUCI_WIRELESS = 'www/luci-static/resources/view/network/wireless.js'
+LUCI_ANCHOR = "else if(hwtype=='broadcom'){"
+LUCI_MTWIFI = ("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2','WPA2-PSK',35]);"
+               "crypto_modes.push(['sae','WPA3-SAE',31]);crypto_modes.push(['sae-mixed','WPA2-PSK/WPA3-SAE Mixed Mode',30]);"
+               "crypto_modes.push(['psk-mixed','WPA-PSK/WPA2-PSK Mixed Mode',22]);}\n")
+
+
+def luci_mtwifi(js):
+    """Stock wireless.js with the mtwifi encryption modes; refuses an unknown LuCI build."""
+    if LUCI_MTWIFI in js:return js
+    if js.count(LUCI_ANCHOR)!=1:raise ValueError('unexpected LuCI wireless.js: mtwifi patch anchor not found')
+    return js.replace(LUCI_ANCHOR,LUCI_MTWIFI+LUCI_ANCHOR)
+
+
 WIFI_PROFILES = ('etc/wireless/l1profile.dat','etc/wireless/mediatek/mt7915.dbdc.b0.dat','etc/wireless/mediatek/mt7915.dbdc.b1.dat')
 # vlan: (ports, untagged port whose PVID is that vlan). Copied from the observed stock table.
 SWITCH = {1:('1 5t',1),2:('2 5t',2),3:('4 5t',4),4:('0 6t',0)}
@@ -144,6 +159,7 @@ def integrate(stage,key,stock_path,output):
     # The staged boot script runs `wifi config` once when /etc/config/wireless is missing: WPA2 with a random key.
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
+    if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
