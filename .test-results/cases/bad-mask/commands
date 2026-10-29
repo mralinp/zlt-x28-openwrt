@@ -1,0 +1,3 @@
+--show_sim_status
+--data_call_act { "apn": "example.invalid", "ip_type": 1, "roaming_type": 3, "auth_type": 0, "username": "", "password": "", "bearer_bitmask": "0xfffdffff", "mtu": 1500, "mode": 1 }
+--data_call_deact 4

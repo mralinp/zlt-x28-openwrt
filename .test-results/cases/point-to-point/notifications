@@ -1,0 +1,1 @@
+{ "action": 0, "ifname": "ccmni7", "link-up": true, "data": { "x28_mipc_cid": 4, "x28_mipc_owner": "wan" }, "keep": false, "ipaddr": [ { "ipaddr": "198.51.100.7", "mask": "32" } ], "routes": [ { "target": "0.0.0.0", "netmask": "0", "metric": 0, "source": "198.51.100.7" } ], "dns": [ "192.0.2.53" ], "interface": "wan" }

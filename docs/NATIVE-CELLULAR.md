@@ -40,6 +40,23 @@ IPv4 only, one native cellular WAN, no PAP/CHAP, SIM PIN submission, modem cold-
 
 Next: trace minimal modem boot dependencies, establish recovery, measure switch topology, build a clean wired rootfs, then validate modem lifecycle and native wireless integration. Existing OEM LuCI wrappers are excluded from this port.
 
+## Hardware validation, 2026-10-29 (slot A, first run on the X28)
+
+The protocol ran on a real X28 booted from slot A with the native 23.05.5 userland, the modem stack started by hand
+(`nvram_daemon`, `ccci_fsd 0 2 0`, `ccci_mdinit 0`, `ql_ril_service`, `ql_netd`, `mipc_submonitor`, `atci_service`,
+`atcid` with a one-serial-port USB gadget), the radio on (`AT+CFUN=1`) and the SIM ready. `network.wan` was
+`proto x28_mipc`, `apn internet`, `iptype 1`.
+
+- **Bug found and fixed:** the kernel leaves `ccmniN` DOWN after `--data_call_act`, so the `LINK_NOT_READY` check always
+  failed and the protocol looped (activate, fail, deactivate, retry). The protocol now brings the validated `ccmniN`
+  device up first. The 31 mocked lifecycle cases still pass.
+- **Result:** `wan` came up in about 3 seconds on `ccmni1` with an IPv4 address, a default route and the operator's DNS;
+  pings to `1.1.1.1` and `8.8.8.8` had 0% loss and DNS plus an HTTP fetch worked from the router.
+- **Not started:** `mtk_netagent` forces `AT+CFUN=0`/`4` when started in this order and was left stopped; its role (IPv6 RA
+  on the `ccmni` devices, modem-reset handling) and the correct start order are still open.
+- **Not verified:** IPv6, reconnect after modem reset or link loss, LAN clients (NAT/firewall), reboot persistence of
+  the whole stack, and throughput.
+
 ## License
 
 Original package sources and tests: GPL-2.0-only. See https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt . No vendor executables, firmware, credentials, calibration or private backups are included.

@@ -1,0 +1,2 @@
+{ "action": 0, "link-up": false, "keep": false, "interface": "wan" }
+{ "action": 3, "error": [ "INVALID_REPLY" ], "interface": "wan" }
