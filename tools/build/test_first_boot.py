@@ -119,6 +119,10 @@ class PolicyTests(unittest.TestCase):
         for name in ('usr/bin/atcid','usr/bin/nvram_daemon','usr/lib/libmodem.so','usr/bin/mipc_wan_cli','etc/quectel-project-version',
                      'vendor/etc/md/apncfg/001_01.conf'):self.assertIn(name,tree)
         self.assertFalse(any(n.startswith('etc/rc.d/') and 'ccci' in n for n in tree))  # x28-modem starts them, not rc.d
+        for name in ('lib/netifd/proto/x28_mipc.sh','sbin/x28-apn','www/luci-static/resources/protocol/x28_mipc.js','usr/share/rpcd/acl.d/luci-proto-x28-mipc.json'):self.assertIn(name,tree)
+        self.assertEqual(tree['lib/netifd/proto/x28_mipc.sh'][0].mode,0o755)
+        self.assertIn("config interface 'wan'\n option proto 'x28_mipc'",net)
+        self.assertIn(" option hostname 'x28'",tree['etc/config/system'][1].decode())
         for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
         js=tree[f.LUCI_WIRELESS][1].decode()
         self.assertIn("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2'",js)

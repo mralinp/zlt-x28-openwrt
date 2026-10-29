@@ -30,6 +30,8 @@ LAN = 'br-lan'
 LAN_PORTS = ('eth0.1','eth0.2','eth0.3','eth1')
 LEDS = Path(__file__).resolve().parents[2]/'package/x28-leds/files'
 WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
+MIPC = Path(__file__).resolve().parents[2]/'package/x28-mipc/files'
+LUCI_MIPC = Path(__file__).resolve().parents[2]/'package/luci-proto-x28-mipc'
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
@@ -187,6 +189,18 @@ def integrate(stage,key,stock_path,output):
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
     if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
+    # Cellular WAN as a stock-looking netifd protocol (#135): the proto handler, its APN helper and the LuCI form.
+    put('lib/netifd/proto/x28_mipc.sh',(MIPC/'x28_mipc.sh').read_text(),0o755)
+    put('sbin/x28-apn',(MIPC/'x28-apn').read_text(),0o755)
+    put('www/luci-static/resources/protocol/x28_mipc.js',(LUCI_MIPC/'htdocs/luci-static/resources/protocol/x28_mipc.js').read_text())
+    put('usr/share/rpcd/acl.d/luci-proto-x28-mipc.json',(LUCI_MIPC/'root/usr/share/rpcd/acl.d/luci-proto-x28-mipc.json').read_text())
+    put('etc/config/system',"""config system
+ option hostname 'x28'
+ option timezone 'UTC'
+ option ttylogin '0'
+ option log_size '64'
+ option urandom_seed '0'
+""")
     put('etc/init.d/x28-modem',(MODEM/'x28-modem.init').read_text(),0o755);enable(19,'x28-modem')
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
@@ -249,6 +263,9 @@ config interface 'lan'
  option ipaddr '192.168.70.1'
  option netmask '255.255.255.0'
  option ip6assign '64'
+
+config interface 'wan'
+ option proto 'x28_mipc'
 """+SWITCH_UCI)
     put('etc/config/dropbear',"""config dropbear
  option PasswordAuth 'off'
