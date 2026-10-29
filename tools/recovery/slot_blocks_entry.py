@@ -6,6 +6,8 @@
   misc-blocks probe-restore --resume R --observed-copy K   restore the original misc, blockwise; K = the copy the UART showed
   misc-blocks select --last-copy K   the real A selection, blockwise, copy K written last (K must equal the observed copy)
   misc-blocks select-restore --resume
+  misc-blocks confirm --a-retry R    mark the running slot A successful (A retry 0, success 1); R = the live A retry (#133)
+  misc-blocks confirm-restore --resume R   put back the unconfirmed A selection of a confirm run
 
 Plan: docs/research/misc-probe-plan.md. Use the private mtkclient venv Python for --write. No automatic reboot or
 retry. Merging this file approves nothing; the typed phrase attests the owner's approval of this exact session.
@@ -34,8 +36,12 @@ PRIOR = {
     ('misc-blocks', 'probe-restore'): [('resume', 'probe', False)],
     ('misc-blocks', 'select'): [('prior_probe_restore', 'probe-restore', True), ('prior_rootfs_a', 'rootfs_a', True)],
     ('misc-blocks', 'select-restore'): [('resume', 'select', False)],
+    # The A selection was made outside these tools (no receipt): confirm checks the live record instead.
+    ('misc-blocks', 'confirm'): [],
+    ('misc-blocks', 'confirm-restore'): [('resume', 'confirm', False)],
 }
-KIND_MODE = {'probe': 'write', 'select': 'write', 'probe-restore': 'restore', 'select-restore': 'restore'}
+KIND_MODE = {'probe': 'write', 'select': 'write', 'confirm': 'write', 'probe-restore': 'restore', 'select-restore': 'restore',
+             'confirm-restore': 'restore'}
 
 
 def wanted_priors(target, mode, skip_probe):
@@ -53,8 +59,8 @@ def order_for(mode, last_copy, resumed_order=None):
         if not isinstance(resumed_order, (list, tuple)) or sorted(resumed_order) != [1, 2, 3, 4]:
             raise ValueError('resumed receipt has an invalid copy order')
         return tuple(resumed_order)
-    if mode == 'probe':
-        return (4, 3, 2, 1)
+    if mode in ('probe', 'confirm'):
+        return (4, 3, 2, 1)  # confirm: every mix still selects A; copy 1 (0x800, the one stock reads) goes last
     if last_copy not in (1, 2, 3, 4):
         raise ValueError('select needs --last-copy 1..4 (the copy the probe showed the preloader trusts)')
     return tuple([c for c in (4, 3, 2, 1) if c != last_copy] + [last_copy])
@@ -175,7 +181,8 @@ def phrase(target, mode, image_sha, extra, same_disk):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('target', choices=('sig-block', 'misc-blocks'))
-    ap.add_argument('mode', choices=('identical', 'probe', 'probe-restore', 'select', 'select-restore'))
+    ap.add_argument('mode', choices=('identical', 'probe', 'probe-restore', 'select', 'select-restore', 'confirm', 'confirm-restore'))
+    ap.add_argument('--a-retry', type=int, help='confirm only: the live A retry byte (3..7), read over SSH just before')
     ap.add_argument('--write', action='store_true')
     ap.add_argument('--block', type=int)
     ap.add_argument('--last-copy', type=int)
@@ -205,6 +212,8 @@ def main():
         raise ValueError('--waive-sig-tools is for probe only')
     if (args.mode == 'probe-restore') != (args.observed_copy is not None) or (args.observed_copy not in (None, 1, 2, 3, 4)):
         raise ValueError('--observed-copy 1..4 is required for probe-restore only')
+    if (args.mode == 'confirm') != (args.a_retry is not None):
+        raise ValueError('--a-retry is required for confirm only')
     if (args.target == 'sig-block') != (args.block is not None):
         raise ValueError('--block is for sig-block only, and required there')
     if args.mode in ('select', 'select-restore') and args.candidate_dir is None:
@@ -232,25 +241,32 @@ def main():
         identity = {'target': spec.name, 'original': spec.original_sha, 'candidate': spec.candidate_sha, 'rootfs_a': session.ROOTFS_A_SHA, **base_id}
         image_sha, extra = spec.original_sha, ''
     else:
-        before = Path(parts['misc']['image']).read_bytes()
-        after = blocks.probe_image(before) if args.mode.startswith('probe') else blocks.select_image(before)
-        after_sha = digest(after)
-        if after_sha != (blocks.PROBE_SHA if args.mode.startswith('probe') else session.MISC_A_SHA):
-            raise ValueError('misc image differs from its pinned hash')
+        original = before = Path(parts['misc']['image']).read_bytes()
         resumed = None
         if args.resume is not None:
-            resumed = json.loads((args.resume / 'receipt.json').read_text()).get('order')
+            resumed_receipt = json.loads((args.resume / 'receipt.json').read_text())
+            resumed = resumed_receipt.get('order')
             if not isinstance(resumed, list):
                 raise ValueError('resumed receipt has no order')
+        a_retry = args.a_retry if args.mode == 'confirm' else resumed_receipt.get('a_retry') if args.mode == 'confirm-restore' else None
+        if args.mode.startswith('confirm'):
+            before, after = blocks.confirm_images(original, a_retry)
+        else:
+            after = blocks.probe_image(before) if args.mode.startswith('probe') else blocks.select_image(before)
+        after_sha, before_sha = digest(after), digest(before)
+        if after_sha != {'probe': blocks.PROBE_SHA, 'select': session.MISC_A_SHA, 'confirm': blocks.CONFIRM_SHA}[args.mode.split('-')[0]]:
+            raise ValueError('misc image differs from its pinned hash')
         order = order_for(args.mode, args.last_copy, resumed)
         # select: exactly the written candidate. select-restore: also stock B's repair copy. probe: stock A or the candidate.
         rootfs_a_ok = {'select': (rootfs_a_sha,), 'select-restore': (rootfs_a_sha, session.ROOTFS_A_SHA, session.ROOTFS_B_SHA)}.get(
             args.mode, tuple(x for x in (session.ROOTFS_A_SHA, rootfs_a_sha) if x))
-        guards = blocks.misc_guards(rootfs_a_ok)
+        # confirm: rootfs_a carries the running system's live overlay, so it has no stable hash to guard.
+        guards = session.COMMON if args.mode.startswith('confirm') else blocks.misc_guards(rootfs_a_ok)
         check_guards(parts, guards)
-        identity = {'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': after_sha, 'rootfs_a': rootfs_a_sha or session.ROOTFS_A_SHA, **base_id}
-        image_sha = after_sha if not args.mode.endswith('restore') else session.MISC_SHA
+        identity = {'target': 'misc-blocks', 'original': before_sha, 'candidate': after_sha, 'rootfs_a': rootfs_a_sha or session.ROOTFS_A_SHA, **base_id}
+        image_sha = after_sha if not args.mode.endswith('restore') else before_sha
         extra = (f' ORDER {"".join(map(str, order))}' + (f' ROOTFS-A {rootfs_a_sha[:12]}' if args.mode == 'select' else '') +
+                 (f' A-RETRY {a_retry} SLOT-A-RUNNING' if args.mode.startswith('confirm') else '') +
                  (f' OBSERVED-COPY {args.observed_copy}' if args.mode == 'probe-restore' else '') + ('' if not args.waive_sig_tools else ' TOOLS-WAIVED') + ('' if not args.skip_probe else ' NO-PROBE') + ' BROM-ROUTE-PROVEN')
     priors = {}
     for flag, kind, verified in wanted:
@@ -273,10 +289,11 @@ def main():
             receipt_order = tuple((json.loads((Path(run) / 'receipt.json').read_text()).get('order')) or ())
             if kind == 'probe' and receipt_order != (4, 3, 2, 1):
                 raise ValueError('probe runs use the fixed order 4,3,2,1')
-            prior_after = blocks.probe_image(before) if kind == 'probe' else blocks.select_image(before)
+            prior_before = before if kind == 'confirm' else original
+            prior_after = {'probe': blocks.probe_image, 'select': blocks.select_image}[kind](original) if kind != 'confirm' else after
             prior_sha, new_blocks = digest(prior_after), blocks.blocks(prior_after)
-            header = {'mode': 'write', 'target': 'misc', 'order': list(receipt_order), 'before_sha': session.MISC_SHA, 'after_sha': prior_sha}
-            expect = {**base_id, 'target': 'misc-blocks', 'original': session.MISC_SHA, 'candidate': prior_sha}
+            header = {'mode': 'write', 'target': 'misc', 'order': list(receipt_order), 'before_sha': digest(prior_before), 'after_sha': prior_sha}
+            expect = {**base_id, 'target': 'misc-blocks', 'original': digest(prior_before), 'candidate': prior_sha}
             priors[flag] = load_blocks_prior(run, expect, header, kind, receipt_order, lambda c, nb=new_blocks: digest(nb[c - 1]), verified)
     if args.target == 'sig-block':
         print(f'identical: rootfs_sig_a block {args.block} at {spec.addr:#x}, {spec.size:#x} bytes; no reboot or retry')
@@ -297,7 +314,10 @@ def main():
         raise ValueError('second archive copy is missing, same file, or invalid')
     same_disk = copy.stat().st_dev == archive.stat().st_dev
     check_uart(uart)
-    if not args.mode.endswith('restore') and active_slot(table) != 'b':
+    if args.mode == 'confirm':
+        if active_slot(table) != 'a':
+            raise ValueError('live SSH must show the running slot A and the exact full layout')
+    elif not args.mode.endswith('restore') and active_slot(table) != 'b':
         raise ValueError('live SSH must confirm B and exact full layout')
     base = PRIVATE / 'usb-probe'
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -315,7 +335,7 @@ def main():
     receipt = {'schema': 3 if args.target == 'misc-blocks' else 2, 'run': str(run), 'target': 'misc-blocks' if args.target == 'misc-blocks' else spec.name,
                'mode': 'identical' if args.target == 'sig-block' else args.mode, 'status': 'STARTED', 'identity': identity, 'created': time.time(),
                'uart': str(uart), 'same_disk_backup': same_disk, 'order': list(order) if order else None,
-               'block': args.block, 'observed_copy': args.observed_copy, 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
+               'block': args.block, 'observed_copy': args.observed_copy, 'a_retry': a_retry if args.target == 'misc-blocks' else None, 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
     save(run, receipt)
     mtk = None
     previous_cwd = Path.cwd()
@@ -336,7 +356,7 @@ def main():
             session.run_session(mtk.daloader, spec, block, block, run, mode='identical')
         else:
             blocks.run_blockwise(mtk.daloader, before, after, after_sha, order, run,
-                                 mode='restore' if args.mode.endswith('restore') else 'write', guards=guards)
+                                 mode='restore' if args.mode.endswith('restore') else 'write', guards=guards, before_sha=before_sha)
         receipt['status'] = 'VERIFIED'
         print('Verified. No reboot issued; review UART before approving the next step.')
     except BaseException:
