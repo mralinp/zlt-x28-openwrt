@@ -220,6 +220,8 @@ x28_mipc_setup() {
   # netifd in a first update; netifd flushes addresses it does not own when it takes the device (observed).
   # Tests redirect this to their private staging directory.
   local pinfo="${X28_MIPC_SYSCTL:-/proc/sys/net/ipv6/conf}/$ifname/accept_ra_pinfo"
+  # The sysctl init zeroes accept_ra everywhere, and with forwarding on the kernel solicits only at 2 (observed: no RS).
+  echo 2 > "${pinfo%_pinfo}" 2>/dev/null
   echo 1 > "$pinfo" 2>/dev/null
   i=0 ll=
   while :; do

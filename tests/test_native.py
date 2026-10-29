@@ -121,6 +121,8 @@ def verify(item, directory):
                 assert up[0]["ip6addr"] == [LL] and not up[0].get("ip6prefix"), events
             last = up[-1]
             v6 = item["name"] in ("ipv4v6", "ipv6-only", "ipv4v6-late-v6")
+            if ll:
+                assert (directory / "accept_ra").read_text() == "2\n", "router solicitation not enabled"
             if v6:
                 assert (directory / "ip6del").read_text() == "2001:db8:1:2:1:0:73a4:e064/64\n", "kernel /64 not removed"
                 assert (directory / "pinfo").read_text() == "0\n", "RA prefix info still accepted"
@@ -195,7 +197,8 @@ def main():
                         data = tar.extractfile("cases/" + item["name"] + "/" + name)
                         assert data is not None, "Missing test result"
                         (directory / name).write_bytes(data.read())
-                    for name, src in [("ip6del", "ip6del"), ("pinfo", "sysctl/ccmni7/accept_ra_pinfo")]:
+                    for name, src in [("ip6del", "ip6del"), ("pinfo", "sysctl/ccmni7/accept_ra_pinfo"),
+                                      ("accept_ra", "sysctl/ccmni7/accept_ra")]:
                         (directory / name).unlink(missing_ok=True)
                         if "cases/" + item["name"] + "/" + src in tar.getnames():
                             (directory / name).write_bytes(tar.extractfile("cases/" + item["name"] + "/" + src).read())
