@@ -1,0 +1,297 @@
+diff --git a/Makefile b/Makefile
+index adb9e73..f9858a1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -17,11 +17,16 @@ IWINFO_CLI_LDFLAGS = $(LDFLAGS) -L. -liwinfo
+ IWINFO_CLI_OBJ     = iwinfo_cli.o
+ 
+ 
+-ifneq ($(filter wl wext madwifi,$(IWINFO_BACKENDS)),)
++ifneq ($(filter wl wext madwifi mtwifi,$(IWINFO_BACKENDS)),)
+ 	IWINFO_CFLAGS  += -DUSE_WEXT
+ 	IWINFO_LIB_OBJ += iwinfo_wext.o iwinfo_wext_scan.o
+ endif
+ 
++ifneq ($(filter mtwifi,$(IWINFO_BACKENDS)),)
++	IWINFO_CFLAGS  += -DUSE_MTWIFI
++	IWINFO_LIB_OBJ += iwinfo_mtwifi.o
++endif
++
+ ifneq ($(filter wl,$(IWINFO_BACKENDS)),)
+ 	IWINFO_CFLAGS  += -DUSE_WL
+ 	IWINFO_LIB_OBJ += iwinfo_wl.o
+diff --git a/include/iwinfo.h b/include/iwinfo.h
+index b50de69..65b2014 100644
+--- a/include/iwinfo.h
++++ b/include/iwinfo.h
+@@ -409,6 +409,7 @@ const struct iwinfo_ops * iwinfo_backend_by_name(const char *name);
+ void iwinfo_finish(void);
+ 
+ extern const struct iwinfo_ops wext_ops;
++extern const struct iwinfo_ops mtwifi_ops;
+ extern const struct iwinfo_ops madwifi_ops;
+ extern const struct iwinfo_ops nl80211_ops;
+ extern const struct iwinfo_ops wl_ops;
+diff --git a/iwinfo_lib.c b/iwinfo_lib.c
+index 579efc4..e8f3f60 100644
+--- a/iwinfo_lib.c
++++ b/iwinfo_lib.c
+@@ -391,6 +391,9 @@ static const struct iwinfo_ops *backends[] = {
+ #ifdef USE_WL
+ 	&wl_ops,
+ #endif
++#ifdef USE_MTWIFI
++	&mtwifi_ops,
++#endif
+ #ifdef USE_WEXT
+ 	&wext_ops,
+ #endif
+diff --git a/iwinfo_mtwifi.c b/iwinfo_mtwifi.c
+new file mode 100644
+index 0000000..8230ae4
+--- /dev/null
++++ b/iwinfo_mtwifi.c
+@@ -0,0 +1,243 @@
++/*
++ * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
++ *
++ * mt_wifi has no nl80211. Its wireless extensions answer ESSID, BSSID, channel, mode and bit rate, but report
++ * no frequency range, tx power list or stations. Those come from fixed per-band tables and from the driver's
++ * station table (RTPRIV_IOCTL_GET_MAC_TABLE_STRUCT), with the layout the stock firmware's ioctl_helper.so reads.
++ * ra0 is the 2.4 GHz band and rai0 the 5 GHz band; radio sections named *_2g / *_5g map to them.
++ *
++ * Licensed under GPL-2.0 like the rest of iwinfo.
++ */
++
++#include "iwinfo.h"
++#include "iwinfo/utils.h"
++#include "api/wext.h"
++
++#define MTWIFI_GET_MAC_TABLE	(SIOCIWFIRSTPRIV + 0x1F)
++#define MTWIFI_TABLE_SIZE	0x7938	/* buffer size the stock firmware passes */
++#define MTWIFI_ENTRY_SIZE	56
++
++/* Wi-Fi channel to MHz; 2.4 GHz (channel 14 is the odd one) or 5 GHz. */
++static int mtwifi_ch2mhz(int ch, int five)
++{
++	return five ? 5000 + ch * 5 : (ch == 14 ? 2484 : 2407 + ch * 5);
++}
++
++static const char *mtwifi_ifname(const char *name)
++{
++	size_t len = strlen(name);
++
++	if (!strcmp(name, "ra0") || !strcmp(name, "rai0"))
++		return name;
++	if (len > 3 && !strcmp(name + len - 3, "_2g"))
++		return "ra0";
++	if (len > 3 && !strcmp(name + len - 3, "_5g"))
++		return "rai0";
++	return NULL;
++}
++
++#define IFN(name) const char *ifn = mtwifi_ifname(name); if (!ifn) return -1
++
++static int mtwifi_probe(const char *name)
++{
++	struct iwreq wrq = {};
++	const char *ifn = mtwifi_ifname(name);
++
++	if (!ifn)
++		return 0;
++	strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
++	return iwinfo_ioctl(SIOCGIWNAME, &wrq) >= 0 && !strncmp(wrq.u.name, "RTWIFI", 6);
++}
++
++static int mtwifi_is_5g(const char *ifn)
++{
++	return !strcmp(ifn, "rai0");
++}
++
++static int mtwifi_mode(const char *n, int *b)    { IFN(n); return wext_ops.mode(ifn, b); }
++static int mtwifi_channel(const char *n, int *b) { IFN(n); return wext_ops.channel(ifn, b); }
++static int mtwifi_bitrate(const char *n, int *b) { IFN(n); return wext_ops.bitrate(ifn, b); }
++static int mtwifi_ssid(const char *n, char *b)   { IFN(n); return wext_ops.ssid(ifn, b); }
++static int mtwifi_bssid(const char *n, char *b)  { IFN(n); return wext_ops.bssid(ifn, b); }
++
++static int mtwifi_frequency(const char *n, int *b)
++{
++	int ch;
++
++	IFN(n);
++	if (wext_ops.channel(ifn, &ch) || ch <= 0)
++		return -1;
++	*b = mtwifi_ch2mhz(ch, mtwifi_is_5g(ifn));
++	return 0;
++}
++
++static int mtwifi_zero(const char *n, int *b)  { *b = 0; return 0; }
++static int mtwifi_none(const char *n, int *b)  { return -1; }
++static int mtwifi_nostr(const char *n, char *b) { return -1; }
++static int mtwifi_nolist(const char *n, char *b, int *l) { return -1; }
++
++static int mtwifi_hwmodelist(const char *n, int *b)
++{
++	IFN(n);
++	*b = mtwifi_is_5g(ifn) ? (IWINFO_80211_A | IWINFO_80211_N | IWINFO_80211_AC | IWINFO_80211_AX)
++	                       : (IWINFO_80211_B | IWINFO_80211_G | IWINFO_80211_N | IWINFO_80211_AX);
++	return 0;
++}
++
++static int mtwifi_htmodelist(const char *n, int *b)
++{
++	IFN(n);
++	*b = IWINFO_HTMODE_HT20 | IWINFO_HTMODE_HT40 | IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40;
++	if (mtwifi_is_5g(ifn))
++		*b |= IWINFO_HTMODE_VHT20 | IWINFO_HTMODE_VHT40 | IWINFO_HTMODE_VHT80 | IWINFO_HTMODE_VHT160 |
++		      IWINFO_HTMODE_HE80 | IWINFO_HTMODE_HE160;
++	return 0;
++}
++
++static int mtwifi_hardware_name(const char *n, char *b)
++{
++	strcpy(b, "MediaTek MT7915 (mt_wifi)");
++	return 0;
++}
++
++static int mtwifi_phyname(const char *n, char *b)
++{
++	IFN(n);
++	strcpy(b, ifn);
++	return 0;
++}
++
++/* ponytail: fixed ETSI-style channel set per band, no per-country or DFS flags; read the driver's
++ * channel list (SIOCGIWRANGE stays empty) if a private ioctl for it turns up. */
++static int mtwifi_freqlist(const char *n, char *buf, int *len)
++{
++	static const uint8_t ch2[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
++	static const uint8_t ch5[] = { 36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128,
++	                               132, 136, 140, 144, 149, 153, 157, 161, 165 };
++	struct iwinfo_freqlist_entry *e = (struct iwinfo_freqlist_entry *)buf;
++	const uint8_t *ch;
++	int i, cnt, five;
++
++	IFN(n);
++	five = mtwifi_is_5g(ifn);
++	ch = five ? ch5 : ch2;
++	cnt = five ? sizeof(ch5) : sizeof(ch2);
++	for (i = 0; i < cnt; i++, e++) {
++		memset(e, 0, sizeof(*e));
++		e->band = five ? IWINFO_BAND_5 : IWINFO_BAND_24;
++		e->channel = ch[i];
++		e->mhz = mtwifi_ch2mhz(ch[i], five);
++	}
++	*len = cnt * sizeof(*e);
++	return 0;
++}
++
++/* Rate word at +0x14: MCS bits 0-5 (VHT/HE: MCS 0-3, NSS-1 4-5), BW bits 7-8, short GI bit 9, mode bits 13-15. */
++static void mtwifi_rate(uint16_t w, struct iwinfo_rate_entry *r)
++{
++	unsigned mode = w >> 13, mcs = w & 0x3f;
++
++	r->mhz = 20 << ((w >> 7) & 3);
++	r->is_40mhz = r->mhz == 40;
++	r->is_short_gi = (w >> 9) & 1;
++	r->is_ht = mode == 2 || mode == 3;
++	r->is_vht = mode == 4;
++	r->is_he = mode >= 5;
++	if (r->is_vht || r->is_he) {
++		r->mcs = mcs & 0xf;
++		r->nss = ((mcs >> 4) & 3) + 1;
++	} else {
++		r->mcs = (r->is_ht) ? mcs : -1;
++	}
++}
++
++static int mtwifi_assoclist(const char *n, char *buf, int *len)
++{
++	struct iwinfo_assoclist_entry *out = (struct iwinfo_assoclist_entry *)buf;
++	struct iwreq wrq = {};
++	unsigned char *tab, *e;
++	uint64_t num;
++	int i, j, cnt = 0;
++
++	IFN(n);
++	tab = calloc(1, MTWIFI_TABLE_SIZE);
++	if (!tab)
++		return -1;
++	strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
++	wrq.u.data.pointer = tab;
++	wrq.u.data.length = MTWIFI_TABLE_SIZE;
++	if (iwinfo_ioctl(MTWIFI_GET_MAC_TABLE, &wrq) < 0) {
++		free(tab);
++		return -1;
++	}
++	memcpy(&num, tab, sizeof(num));
++	if (num > (MTWIFI_TABLE_SIZE - 8) / MTWIFI_ENTRY_SIZE)
++		num = 0;
++	for (i = 0; i < (int)num && (cnt + 1) * (int)sizeof(*out) <= IWINFO_BUFSIZE; i++) {
++		int8_t best = -127;
++		uint16_t rate;
++		uint32_t ct;
++
++		e = tab + 8 + i * MTWIFI_ENTRY_SIZE;
++		memset(out, 0, sizeof(*out));
++		memcpy(out->mac, e + 1, 6);
++		for (j = 0; j < 4; j++)
++			if ((int8_t)e[0xc + j] < 0 && (int8_t)e[0xc + j] > best)
++				best = (int8_t)e[0xc + j];
++		out->signal = out->signal_avg = best;
++		out->noise = -95;
++		memcpy(&ct, e + 0x10, sizeof(ct));
++		out->connected_time = ct;
++		memcpy(&rate, e + 0x14, sizeof(rate));
++		mtwifi_rate(rate, &out->tx_rate);
++		out->rx_rate = out->tx_rate;
++		out->is_authorized = out->is_authenticated = out->is_wme = 1;
++		out++;
++		cnt++;
++	}
++	free(tab);
++	*len = cnt * sizeof(*out);
++	return 0;
++}
++
++static int mtwifi_encryption(const char *n, char *b) { return -1; }
++
++/* iwinfo_finish() calls every backend's close() unchecked. */
++static void mtwifi_close(void) { }
++
++const struct iwinfo_ops mtwifi_ops = {
++	.name             = "mtwifi",
++	.probe            = mtwifi_probe,
++	.mode             = mtwifi_mode,
++	.channel          = mtwifi_channel,
++	.center_chan1     = mtwifi_none,
++	.center_chan2     = mtwifi_none,
++	.frequency        = mtwifi_frequency,
++	.frequency_offset = mtwifi_zero,
++	.txpower          = mtwifi_none,
++	.txpower_offset   = mtwifi_zero,
++	.bitrate          = mtwifi_bitrate,
++	.signal           = mtwifi_none,
++	.noise            = mtwifi_none,
++	.quality          = mtwifi_none,
++	.quality_max      = mtwifi_none,
++	.mbssid_support   = mtwifi_zero,
++	.hwmodelist       = mtwifi_hwmodelist,
++	.htmodelist       = mtwifi_htmodelist,
++	.htmode           = mtwifi_none,
++	.ssid             = mtwifi_ssid,
++	.bssid            = mtwifi_bssid,
++	.country          = mtwifi_nostr,
++	.hardware_id      = mtwifi_nostr,
++	.hardware_name    = mtwifi_hardware_name,
++	.encryption       = mtwifi_encryption,
++	.phyname          = mtwifi_phyname,
++	.assoclist        = mtwifi_assoclist,
++	.txpwrlist        = mtwifi_nolist,
++	.scanlist         = mtwifi_nolist,
++	.freqlist         = mtwifi_freqlist,
++	.countrylist      = mtwifi_nolist,
++	.survey           = mtwifi_nolist,
++	.lookup_phy       = mtwifi_nostr,
++	.close            = mtwifi_close,
++};

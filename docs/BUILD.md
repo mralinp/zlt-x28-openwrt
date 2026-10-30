@@ -369,6 +369,12 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   band (like root's empty password; set both in LuCI on first login).
   Stock LuCI 23.05 builds Wireless Security choices only for `mac80211`/`broadcom` radios, so the builder inserts an
   `mtwifi` branch (WPA2-PSK, WPA3-SAE, mixed modes) into `wireless.js`; it refuses a LuCI build without the anchor.
+- **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/iwinfo_mtwifi.sh`
+  builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
+  ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, fixed per-band channel and mode lists (2.4 GHz
+  1-13; 5 GHz 36-165; no per-country or DFS flags), and associated stations from the driver's station table
+  (`SIOCIWFIRSTPRIV + 0x1F`, 56-byte entries, the layout stock's `ioctl_helper.so` reads). Tx power, radio signal/noise and
+  station data rates stay unknown. On a unit: `iwinfo rai0 info` shows `Type: mtwifi`; `iwinfo rai0 assoclist` lists clients.
 - **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
   `/dev/block/<name>` links from `/proc/mtd` plus active-slot aliases, mounts the vendor yaffs2 partitions, starts the
   vendor daemons through their own stock init scripts (`nvram_daemon` once, `ccci_fsd`, `ccci_mdinit`, `ql_ril_service`,

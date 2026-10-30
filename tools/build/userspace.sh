@@ -17,6 +17,7 @@ PACKAGES="-firewall4 -nftables -kmod-nft-offload
   firewall iptables-legacy ip6tables-legacy
   luci-base luci-mod-admin-full luci-theme-bootstrap luci-app-opkg
   luci-app-firewall luci-proto-ipv6 luci-proto-ppp
+  iwinfo rpcd-mod-iwinfo
   uhttpd uhttpd-mod-ubus rpcd-mod-luci"
 
 OUT=$(mkdir -p "${1:-out}" && cd "${1:-out}" && pwd)
@@ -26,10 +27,17 @@ mkdir -p "$WORK"
 echo "$IB_SHA256  $WORK/$IB.tar.xz" | sha256sum -c -
 [ -d "$WORK/$IB" ] || tar -C "$WORK" -xJf "$WORK/$IB.tar.xz"
 
+# libiwinfo with the mtwifi backend (#165): ImageBuilder installs local packages/ and prefers their release 2.
+"$(dirname "$0")/iwinfo_mtwifi.sh" "$WORK/iwinfo"
+mkdir -p "$WORK/$IB/packages"
+cp "$WORK"/iwinfo/*.ipk "$WORK/$IB/packages/"
+
 make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" BIN_DIR="$OUT"
 
 # The rootfs carries armsr's 5.15 kernel modules from dependencies; the X28 assembly replaces them.
 ls -l "$OUT"
+grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-2$' "$OUT"/*.manifest ||
+  { echo "the image did not take the mtwifi libiwinfo" >&2; exit 1; }
 if grep -qE '^(firewall4|nftables[a-z-]*) ' "$OUT"/*.manifest; then
   echo "firewall4/nftables ended up in the image" >&2
   exit 1
