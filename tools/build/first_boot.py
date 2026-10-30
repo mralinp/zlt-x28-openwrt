@@ -203,12 +203,21 @@ def integrate(stage,key,stock_path,output):
  option ttylogin '0'
  option log_size '64'
  option urandom_seed '0'
+
+config timeserver 'ntp'
+ option enabled '1'
+ option enable_server '0'
+ list server '0.openwrt.pool.ntp.org'
+ list server '1.openwrt.pool.ntp.org'
+ list server '2.openwrt.pool.ntp.org'
+ list server '3.openwrt.pool.ntp.org'
 """)
     put('etc/init.d/x28-modem',(MODEM/'x28-modem.init').read_text(),0o755);enable(19,'x28-modem')
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
     put('etc/init.d/x28-bootok',(BOOTOK/'x28-bootok.init').read_text(),0o755);enable(96,'x28-bootok')
+    enable(98,'sysntpd')  # without a set clock HTTPS (opkg) fails: the unit boots at 2010-01-01 (#169)
     enable(95,'done')  # `mount_root done`: without it mount_root discards the overlay at every boot (#143)
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
     put('etc/config/dhcp',"""config dnsmasq

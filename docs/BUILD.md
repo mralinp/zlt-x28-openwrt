@@ -420,6 +420,8 @@ Like stock OpenWrt, root starts with an **empty password**: LuCI accepts it and 
 empty or any password never works over SSH. The image also enables `S95done` (`mount_root done`); without it `mount_root`
 reports 'overlay filesystem has not been fully initialized yet' and discards the overlay at every boot, losing passwords, host
 keys and settings. Set the password in LuCI (System > Administration) or with `passwd` over SSH.
+The image also writes stock OpenWrt's NTP section (`*.openwrt.pool.ntp.org`) and enables `S98sysntpd` (#169): the unit
+boots with its clock at 2010-01-01, and HTTPS (`opkg`, LuCI Software) fails until the clock is set.
 
 ## Boot tries reset and SSH on port 22 (#145)
 
