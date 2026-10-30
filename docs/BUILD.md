@@ -376,6 +376,9 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   only at start, so a new option needs a netifd restart on a running unit. A band whose networks are all disabled can't be
   switched off on its own (`RadioOn=0` turned the whole card's flag off and `ra0` beaconed an open `HT_AP0`): `rai0` goes
   down; `ra0` goes down too unless it has to carry `rai0`, and then it gets a hidden WPA2 network with a random key.
+  The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an
+  `mtwifi` radio count as having them, and drops the Client and Ad-Hoc modes for it until client mode exists (#175).
+  All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/iwinfo_mtwifi.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, fixed per-band channel and mode lists (2.4 GHz
