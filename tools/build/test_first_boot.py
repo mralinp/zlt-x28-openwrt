@@ -127,6 +127,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("config interface 'wan'\n option proto 'x28_mipc'",net)
         self.assertIn(" option hostname 'x28'",tree['etc/config/system'][1].decode())
         for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
+        self.assertEqual(f.two_bss(b'a=1\nBssidNum=1\nb=2\n'),b'a=1\nBssidNum=2\nb=2\n')
         js=tree[f.LUCI_WIRELESS][1].decode()
         self.assertIn("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2'",js)
         self.assertIn("if(hwtype=='mtwifi'){o=ss.taboption('general',form.ListValue,'txpower_pct'",js)

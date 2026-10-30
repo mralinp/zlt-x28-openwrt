@@ -71,6 +71,11 @@ LUCI_FREQ_MTWIFI = ".then(L.bind(function(data){var mtw=data[0]&&data[0].get('ty
 LUCI_MODE_ANCHOR = "o.value('ap',_('Access Point'));o.value('sta',_('Client'));o.value('adhoc',_('Ad-Hoc'));"
 
 
+def two_bss(profile):
+    """Stock profile with BssidNum=2: the driver creates ra1/rai1 only at its first open after loading (#167)."""
+    return profile.replace(b'\nBssidNum=1\n',b'\nBssidNum=2\n')
+
+
 def luci_edits():
     """(anchor, replacement) pairs that make stock wireless.js handle mtwifi radios."""
     acs,auto="L.hasSystemFeature('hostapd','acs')","?['auto','auto',true]:[]"
@@ -206,7 +211,7 @@ def integrate(stage,key,stock_path,output):
     bootok_added=add_stock(tree,stock,'sbin/dd-nand')  # the vendor writer x28-bootok uses on one misc byte (#145)
     for name in WIFI_PROFILES:
         if name not in stock or not stock[name][0].isfile():raise ValueError('missing stock Wi-Fi profile: '+name)
-        tree[name]=stock[name]
+        tree[name]=(stock[name][0],two_bss(stock[name][1]))
     for name in list(tree):
         if (name.startswith(('etc/rc.d/','etc/uci-defaults/','etc/board.d/','lib/upgrade/','etc/dropbear/'))
             or 'zmtk_boot_done' in name or (name.startswith('lib/preinit/') and 'failsafe' in name)):
