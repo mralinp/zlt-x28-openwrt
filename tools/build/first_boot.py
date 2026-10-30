@@ -35,7 +35,7 @@ LUCI_MIPC = Path(__file__).resolve().parents[2]/'package/luci-proto-x28-mipc'
 BOOTOK = Path(__file__).resolve().parents[2]/'package/x28-bootok/files'
 STORAGE = Path(__file__).resolve().parents[2]/'package/x28-storage/files'
 # ubi-utils for attaching user_data (#183); its writers have no business on a router that must not touch other slots.
-UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
+UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubidetach','ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).

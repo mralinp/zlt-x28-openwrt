@@ -32,7 +32,8 @@ USER_DATA = 'lib/preinit/79_x28_user_data'
 
 
 def user_data_exempt(real, data):
-    return real == USER_DATA and data.count(b'ubiattach') == 1 and b'ubiattach /dev/ubi_ctrl -m "$mtd" -d 1 ' in data
+    return (real == USER_DATA and data.count(b'ubiattach') == 1 and b'ubiattach /dev/ubi_ctrl -m "$mtd" -d 1 ' in data
+            and b'"user_data"$/' in data)
 
 
 PATHS = re.compile(rb'(?<![\w.-])/((?:etc|lib|usr|sbin|bin)/[A-Za-z0-9_./-]*[A-Za-z0-9_])')

@@ -3,8 +3,8 @@
 # The user_data preinit hook against fakes: no device, flash or UBI involved.
 set -e
 dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
-export X28_UD_TEST=1 X28_UD_PROC="$dir/proc" X28_UD_SYS="$dir/sys" X28_UD_MNT="$dir/mnt"
-mkdir -p "$dir/proc" "$dir/mnt/etc" "$dir/mnt/upper" "$dir/mnt/work" "$dir/mnt/log"
+export X28_UD_TEST=1 X28_UD_PROC="$dir/proc" X28_UD_SYS="$dir/sys" X28_UD_MNT="$dir/mnt" X28_UD_DEV="$dir/dev"
+mkdir -p "$dir/proc" "$dir/dev" "$dir/mnt/etc" "$dir/mnt/upper" "$dir/mnt/work" "$dir/mnt/log"
 . "$(dirname "$0")/../package/x28-storage/files/x28-user-data.preinit"
 attach_rc=0 mount_rc=0 uuid=NEW
 ubiattach() { echo "attach $*" >> "$dir/calls"; return $attach_rc; }
@@ -13,7 +13,9 @@ block() { echo "/dev/ubiblock0_0: UUID=\"$uuid\" VERSION=\"4.0\" TYPE=\"squashfs
 mount() { echo mount >> "$dir/calls"; return $mount_rc; }
 umount() { echo umount >> "$dir/calls"; }
 reset() { : > "$dir/calls"; mkdir -p "$dir/mnt/upper" "$dir/mnt/work"; }
-printf 'mtd49: 00400000 00040000 "productinfo"\nmtd50: 1ab80000 00040000 "user_data"\n' > "$dir/proc/mtd"
+tries() { head -c 2057 /dev/zero > "$dir/dev/mtd3"; printf "\\00$1" >> "$dir/dev/mtd3"; }
+printf 'mtd3: 00100000 00040000 "misc"\nmtd49: 00400000 00040000 "productinfo"\nmtd50: 1ab80000 00040000 "user_data"\n' > "$dir/proc/mtd"
+tries 1
 
 # Same image: the overlay stays.
 reset; echo NEW > "$dir/mnt/etc/.extroot-uuid"; do_x28_user_data
@@ -33,7 +35,16 @@ reset; mount_rc=1; do_x28_user_data; mount_rc=0
 # Attach fails: stop there.
 reset; attach_rc=1; do_x28_user_data; attach_rc=0
 ! grep -q mount "$dir/calls" || exit 1
+# A wipe that fails keeps the tag, so it repeats next boot.
+reset; echo OLD > "$dir/mnt/etc/.extroot-uuid"; rm() { return 1; }; do_x28_user_data; unset -f rm
+[ "$(cat "$dir/mnt/etc/.extroot-uuid")" = OLD ] || exit 1
+# Tries 2 still attach; from 3 on user_data is left alone, also with an old tag.
+reset; tries 2; do_x28_user_data; grep -q attach "$dir/calls" || exit 1
+reset; tries 3; do_x28_user_data; [ ! -s "$dir/calls" ] && [ -d "$dir/mnt/upper" ] || exit 1
+reset; tries 7; do_x28_user_data; [ ! -s "$dir/calls" ] || exit 1
+# misc unreadable: go on.
+reset; /bin/rm -f "$dir/dev/mtd3"; do_x28_user_data; grep -q attach "$dir/calls" || exit 1
 # No user_data partition: no attach.
 reset; echo 'mtd0: 00400000 00040000 "preloader"' > "$dir/proc/mtd"; do_x28_user_data
 [ ! -s "$dir/calls" ] || exit 1
-echo "PASS: user_data attach, new-image reset and every fall-back"
+echo "PASS: user_data attach, new-image reset, boot-tries bypass and every fall-back"

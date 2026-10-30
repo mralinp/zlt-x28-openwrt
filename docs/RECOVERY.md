@@ -529,3 +529,14 @@ the later [#72 result](research/changed-page-restore-result.md) now establishes 
 The [changed-data plan](research/changed-data-restore-plan.md) was subsequently executed under
 separate approval in #72. Future device operations still require fresh gates, safety review and
 exact-scope approval. The test did not boot changed certificates or a custom rootfs.
+
+## Clearing settings when the overlay is on `user_data` (#183)
+
+The native image keeps its overlay on `user_data`'s `data` volume, so the usual resets don't reach it:
+
+- The reset button and `firstboot` clear only `rootfs_data`. Reflashing identical image bytes keeps the overlay; an image with a
+  different root UUID starts it fresh.
+- Over SSH, let the next boot wipe it (never delete a live `upper`): `echo reset > /overlay/etc/.extroot-uuid && sync && reboot`.
+- No SSH: from slot A's third boot try on, the preinit hook leaves `user_data` alone and `rootfs_data` boots, reachable with the
+  image's SSH key. LuCI's password is empty there, Wi-Fi has a new key and the host key differs, until the next normal boot.
+- Clean up from such a boot: `ubiattach /dev/ubi_ctrl -m <user_data mtd> -d 1; mkdir -p /tmp/ud && mount -t ubifs /dev/ubi1_2 /tmp/ud && rm -rf /tmp/ud/upper /tmp/ud/work /tmp/ud/etc/.extroot-uuid /tmp/ud/.fs_state; umount /tmp/ud`.

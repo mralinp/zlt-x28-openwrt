@@ -391,9 +391,12 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
 - **Install space (#183):** Disk space would be only `rootfs_data` (22.8 MB). `lib/preinit/79_x28_user_data` attaches `user_data`
   (ubi1, stock's volumes `customer` and `data`) before `mount_root`, and `etc/config/fstab` makes `data` (278 MB free) the overlay
   through stock OpenWrt's `block extroot`. Nothing is formatted, so stock slot B keeps its files. If the volume is missing or
-  doesn't mount, `rootfs_data` serves as before. `block` binds the overlay to the image's root UUID, so the hook starts the
-  overlay fresh on a new image, as flashing does to `rootfs_data`. The image ships only `ubiattach`, `ubidetach` and `ubinfo` of
-  `ubi-utils`; `ab_guard` allows `ubiattach` in that one file only. Factory reset (`firstboot`) clears `rootfs_data`, not this overlay.
+  doesn't mount, `rootfs_data` serves as before; so it does from slot A's third boot try on, so a bad overlay can't run the
+  tries up to stock B's repair (a persistent fault cycles bad, bad, good). `block` binds the overlay to the image's root UUID, so
+  the hook starts the overlay fresh on a new image, as flashing does to `rootfs_data`. The image ships only `ubiattach` and
+  `ubinfo` of `ubi-utils`; `ab_guard` allows `ubiattach` in that one file only. Limits, see `docs/RECOVERY.md`: the reset button
+  and `firstboot` don't clear this overlay, reflashing identical bytes keeps it, and a fall-back boot has `rootfs_data`'s own
+  settings (LuCI password empty, new Wi-Fi key and host key). Keep free space on it: stock B's `/data` is the same volume.
 - **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
   `/dev/block/<name>` links from `/proc/mtd` plus active-slot aliases, mounts the vendor yaffs2 partitions, starts the
   vendor daemons through their own stock init scripts (`nvram_daemon` once, `ccci_fsd`, `ccci_mdinit`, `ql_ril_service`,

@@ -38,8 +38,9 @@ make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" BIN_DIR="
 ls -l "$OUT"
 grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-2$' "$OUT"/*.manifest ||
   { echo "the image did not take the mtwifi libiwinfo" >&2; exit 1; }
-grep -qE '^(ubi-utils|block-mount) ' "$OUT"/*.manifest && [ "$(grep -cE '^(ubi-utils|block-mount) ' "$OUT"/*.manifest)" = 2 ] ||
-  { echo "the image lacks ubi-utils or block-mount" >&2; exit 1; }
+# The preinit hook relies on this block's extroot behaviour (#183).
+grep -q '^ubi-utils - ' "$OUT"/*.manifest && grep -q '^block-mount - 2023-02-28-bfe882d5-' "$OUT"/*.manifest ||
+  { echo "the image lacks ubi-utils or the expected block-mount" >&2; exit 1; }
 if grep -qE '^(firewall4|nftables[a-z-]*) ' "$OUT"/*.manifest; then
   echo "firewall4/nftables ended up in the image" >&2
   exit 1
