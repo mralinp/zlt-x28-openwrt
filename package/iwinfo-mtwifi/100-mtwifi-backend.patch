@@ -48,17 +48,18 @@ index 579efc4..e8f3f60 100644
  #endif
 diff --git a/iwinfo_mtwifi.c b/iwinfo_mtwifi.c
 new file mode 100644
-index 0000000..8230ae4
+index 0000000..eed4cb6
 --- /dev/null
 +++ b/iwinfo_mtwifi.c
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,244 @@
 +/*
 + * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
 + *
 + * mt_wifi has no nl80211. Its wireless extensions answer ESSID, BSSID, channel, mode and bit rate, but report
 + * no frequency range, tx power list or stations. Those come from fixed per-band tables and from the driver's
 + * station table (RTPRIV_IOCTL_GET_MAC_TABLE_STRUCT), with the layout the stock firmware's ioctl_helper.so reads.
-+ * ra0 is the 2.4 GHz band and rai0 the 5 GHz band; radio sections named *_2g / *_5g map to them.
++ * ra0/ra1 are the 2.4 GHz band and rai0/rai1 the 5 GHz band; radio sections named *_2g / *_5g map to ra0 / rai0.
++ * The station table of an interface holds only that interface's clients (checked on the unit).
 + *
 + * Licensed under GPL-2.0 like the rest of iwinfo.
 + */
@@ -81,7 +82,7 @@ index 0000000..8230ae4
 +{
 +	size_t len = strlen(name);
 +
-+	if (!strcmp(name, "ra0") || !strcmp(name, "rai0"))
++	if (!strcmp(name, "ra0") || !strcmp(name, "ra1") || !strcmp(name, "rai0") || !strcmp(name, "rai1"))
 +		return name;
 +	if (len > 3 && !strcmp(name + len - 3, "_2g"))
 +		return "ra0";
@@ -105,7 +106,7 @@ index 0000000..8230ae4
 +
 +static int mtwifi_is_5g(const char *ifn)
 +{
-+	return !strcmp(ifn, "rai0");
++	return !strncmp(ifn, "rai", 3);
 +}
 +
 +static int mtwifi_mode(const char *n, int *b)    { IFN(n); return wext_ops.mode(ifn, b); }
