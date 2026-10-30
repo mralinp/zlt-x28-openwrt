@@ -65,14 +65,32 @@ LUCI_MTWIFI_IFACE = ("if(hwtype=='mtwifi'){o=ss.taboption('macfilter',form.ListV
                      "['psk2','psk-mixed','sae','sae-mixed'].forEach(function(e){o.depends('encryption',e);});}")
 
 
+# The frequency widget offers "auto", AC and AX only with hostapd (acs/11ac/11ax); mt_wifi does all three itself (#175).
+LUCI_FREQ_ANCHOR = ".then(L.bind(function(data){this.channels={"
+LUCI_FREQ_MTWIFI = ".then(L.bind(function(data){var mtw=data[0]&&data[0].get('type')=='mtwifi';this.channels={"
+LUCI_MODE_ANCHOR = "o.value('ap',_('Access Point'));o.value('sta',_('Client'));o.value('adhoc',_('Ad-Hoc'));"
+
+
+def luci_edits():
+    """(anchor, replacement) pairs that make stock wireless.js handle mtwifi radios."""
+    acs,auto="L.hasSystemFeature('hostapd','acs')","?['auto','auto',true]:[]"
+    return [(LUCI_ANCHOR,LUCI_MTWIFI+LUCI_ANCHOR),
+            (LUCI_DEV_ANCHOR,LUCI_DEV_ANCHOR.replace("if(hwtype=='mac80211')",LUCI_MTWIFI_DEV+"if(hwtype=='mac80211')")),
+            (LUCI_IFACE_ANCHOR,LUCI_MTWIFI_IFACE+LUCI_IFACE_ANCHOR),
+            (LUCI_FREQ_ANCHOR,LUCI_FREQ_MTWIFI),
+            ("'2g':"+acs+auto+",'5g':"+acs+auto+",","'2g':(mtw||"+acs+")"+auto+",'5g':(mtw||"+acs+")"+auto+","),
+            ("L.hasSystemFeature('hostapd','11ac')&&hwmodelist.ac","(mtw||L.hasSystemFeature('hostapd','11ac'))&&hwmodelist.ac"),
+            ("L.hasSystemFeature('hostapd','11ax')&&hwmodelist.ax","(mtw||L.hasSystemFeature('hostapd','11ax'))&&hwmodelist.ax"),
+            # The handler only sets up access points; client and ad-hoc come with #168.
+            (LUCI_MODE_ANCHOR,"o.value('ap',_('Access Point'));if(hwtype!='mtwifi'){o.value('sta',_('Client'));o.value('adhoc',_('Ad-Hoc'));}")]
+
+
 def luci_mtwifi(js):
-    """Stock wireless.js with the mtwifi encryption modes and options; refuses an unknown LuCI build."""
-    for anchor,block,where in ((LUCI_ANCHOR,LUCI_MTWIFI,'before'),(LUCI_DEV_ANCHOR,LUCI_MTWIFI_DEV,'inside'),
-                               (LUCI_IFACE_ANCHOR,LUCI_MTWIFI_IFACE,'before')):
-        if block in js:continue
+    """Stock wireless.js with mtwifi encryption modes, options and frequency choices; refuses an unknown LuCI build."""
+    for anchor,new in luci_edits():
+        if new in js:continue
         if js.count(anchor)!=1:raise ValueError('unexpected LuCI wireless.js: mtwifi patch anchor not found')
-        if where=='inside':js=js.replace(anchor,anchor.replace("if(hwtype=='mac80211')",block+"if(hwtype=='mac80211')"))
-        else:js=js.replace(anchor,block+anchor)
+        js=js.replace(anchor,new)
     return js
 
 
