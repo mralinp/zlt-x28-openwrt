@@ -76,6 +76,22 @@ def two_bss(profile):
     return profile.replace(b'\nBssidNum=1\n',b'\nBssidNum=2\n')
 
 
+
+# The modem stack's and Wi-Fi calibration's partitions aren't user storage: keep them out of LuCI's Storage list.
+LUCI_STORAGE = 'www/luci-static/resources/view/status/include/25_storage.js'
+LUCI_SKIP_ANCHOR = 'var MountSkipList=["/rom","/tmp","/dev","/overlay","/",]'
+LUCI_SKIP = ('var MountSkipList=["/rom","/tmp","/dev","/overlay","/","/mnt/vendor/nvcfg","/mnt/vendor/nvdata","/mnt/vendor/nvram",'
+             '"/mnt/vendor/protect_f","/mnt/vendor/protect_s","/mnt/data","/productinfo",]')
+
+
+def luci_storage(js):
+    """Stock 25_storage.js without the vendor mounts; refuses an unknown LuCI build."""
+    if LUCI_SKIP in js:return js
+    if js.count(LUCI_SKIP_ANCHOR)!=1:raise ValueError('unexpected LuCI 25_storage.js: mount list anchor not found')
+    return js.replace(LUCI_SKIP_ANCHOR,LUCI_SKIP)
+
+
+
 def luci_edits():
     """(anchor, replacement) pairs that make stock wireless.js handle mtwifi radios."""
     acs,auto="L.hasSystemFeature('hostapd','acs')","?['auto','auto',true]:[]"
@@ -241,6 +257,7 @@ def integrate(stage,key,stock_path,output):
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
     if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
+    if LUCI_STORAGE in tree:put(LUCI_STORAGE,luci_storage(tree[LUCI_STORAGE][1].decode()))
     # Cellular WAN as a stock-looking netifd protocol (#135): the proto handler, its APN helper and the LuCI form.
     put('lib/netifd/proto/x28_mipc.sh',(MIPC/'x28_mipc.sh').read_text(),0o755)
     put('sbin/x28-apn',(MIPC/'x28-apn').read_text(),0o755)
