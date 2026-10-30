@@ -127,6 +127,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("config interface 'wan'\n option proto 'x28_mipc'",net)
         self.assertIn(" option hostname 'x28'",tree['etc/config/system'][1].decode())
         for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
+        self.assertEqual(f.two_bss(b'a=1\nBssidNum=1\nb=2\n'),b'a=1\nBssidNum=2\nb=2\n')
         self.assertIn('"/productinfo"',f.luci_storage(f.LUCI_SKIP_ANCHOR))
         self.assertEqual(f.luci_storage(f.LUCI_SKIP),f.LUCI_SKIP)  # idempotent
         with self.assertRaises(ValueError):f.luci_storage('changed LuCI')

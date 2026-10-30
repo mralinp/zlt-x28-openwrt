@@ -379,6 +379,9 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an
   `mtwifi` radio count as having them, and drops the Client and Ad-Hoc modes for it until client mode exists (#175).
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
+  Two networks per band (#167): the driver creates `ra1`/`rai1` once, at its first open after loading, from `BssidNum` in the
+  profile, so the image ships `BssidNum=2` and the handler always renders it. A second `wifi-iface` on a radio brings the
+  extra interface up; without one it stays down and silent (scanned). The MAC address of `rai0` depends on `BssidNum`.
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/iwinfo_mtwifi.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, fixed per-band channel and mode lists (2.4 GHz
