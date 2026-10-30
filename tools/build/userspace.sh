@@ -12,10 +12,11 @@ IB_SHA256=af89b96dfd1b370197a907774d97be1732a0c8cb7c58f0048b86e477e287c2b4  # fr
 URL=https://downloads.openwrt.org/releases/$VERSION/targets/armsr/armv8/$IB.tar.xz
 
 # The stock X28 kernel (4.19) has no nf_tables: use the iptables firewall (fw3) instead of
-# firewall4, and the LuCI pages that do not depend on firewall4 (docs/FIRMWARE-INVENTORY.md).
+# firewall4. luci-app-firewall only needs uci-firewall, which fw3 provides (#164).
 PACKAGES="-firewall4 -nftables -kmod-nft-offload
   firewall iptables-legacy ip6tables-legacy
   luci-base luci-mod-admin-full luci-theme-bootstrap luci-app-opkg
+  luci-app-firewall luci-proto-ipv6 luci-proto-ppp
   uhttpd uhttpd-mod-ubus rpcd-mod-luci"
 
 OUT=$(mkdir -p "${1:-out}" && cd "${1:-out}" && pwd)

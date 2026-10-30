@@ -27,7 +27,8 @@ a rootfs from prebuilt packages (no compiling; a few minutes). Package choices, 
 - `-firewall4 -nftables -kmod-nft-offload`, `+firewall iptables-legacy ip6tables-legacy`: the stock kernel has
   no `nf_tables`, and fw3 fits its iptables modules (gaps: no `ip6table_raw`, `xt_hashlimit` or flow offload).
 - LuCI from parts (`luci-base`, `luci-mod-admin-full`, `luci-theme-bootstrap`, `luci-app-opkg`, `uhttpd`,
-  `rpcd-mod-luci`), because the `luci` meta-package pulls in `luci-app-firewall`, which expects firewall4.
+  `rpcd-mod-luci`), plus `luci-app-firewall` (it needs only `uci-firewall`, which fw3 provides), `luci-proto-ipv6`
+  and `luci-proto-ppp` (#164). The kernel has PPPoE and `ip6tnl` (DS-Lite) but no `sit`, so 6in4/6rd don't work.
 - The script fails if `firewall4` or `nftables` end up in the manifest.
 
 The result includes armsr's 5.15 kernel modules (pulled in by package dependencies); the local assembly step
@@ -37,7 +38,7 @@ First local build (2026-10-23, emulated x86_64 on an M-series Mac, 5.5 min): **1
 `openwrt-23.05.5-armsr-armv8-rootfs.tar.gz`. Included: `firewall` (fw3), iptables 1.8.8 in legacy mode
 (`iptables-zz-legacy`, `ip6tables-zz-legacy`, `xtables-legacy`), `netifd`, `dnsmasq`, `dropbear`,
 `procd`, musl `libc 1.2.4` and LuCI (`luci-base`, `luci-mod-admin-full`, `luci-theme-bootstrap`,
-`luci-app-opkg`, `uhttpd`, `rpcd`). No `firewall4` or `nftables`. Also present and to be replaced: the armsr
+`luci-app-opkg`, `luci-app-firewall`, `luci-proto-ipv6`, `luci-proto-ppp`, `uhttpd`, `rpcd`). No `firewall4` or `nftables`. Also present and to be replaced: the armsr
 5.15 kernel and 86 `kmod-*` packages. ImageBuilder also writes armsr disk images (`*-combined.img.gz`,
 `*-rootfs.img.gz`) that the X28 does not use.
 
