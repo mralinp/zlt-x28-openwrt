@@ -95,6 +95,10 @@ def main():
             sys.exit("boot did not reach the console prompt")
         print(f"booted to console in {time.time() - t0:.0f} s")
         time.sleep(20)  # let netifd, firewall and uhttpd settle after procd's boot
+        for _ in range(24):  # a slow runner needs longer for netifd: wait for lan, the check below still decides
+            if "true" in con.run("ifstatus lan | jsonfilter -e '@.up'"):
+                break
+            time.sleep(5)
         proc.stdin.write(b"\n")
         proc.stdin.flush()
         con.read_until(PROMPT, 60)
