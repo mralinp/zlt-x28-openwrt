@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Attach user_data so mount_root's `block extroot` can use stock's "data" volume as the overlay (#183, /etc/config/fstab):
+# 278 MB against the 22.8 MB rootfs_data. Stock slot B keeps its files: nothing is formatted, the overlay's upper and
+# work directories just sit next to them. Any failure here leaves the volume unused and rootfs_data serves as before.
+# So does a unit that keeps failing to boot: from slot A's third try on, the hook leaves user_data alone, so a bad overlay
+# or a fault in that partition can't run the tries up to stock B's repair, which erases A. x28-bootok resets the count.
+
+# Tests point these at a fake /proc and /sys, and a directory instead of the mount point.
+X28_UD_PROC=${X28_UD_PROC:-/proc}
+X28_UD_SYS=${X28_UD_SYS:-/sys}
+X28_UD_MNT=${X28_UD_MNT:-/tmp/x28-user-data}
+X28_UD_DEV=${X28_UD_DEV:-/dev}
+
+# preinit's /dev has only what hotplug made so far.
+x28_ud_node() {
+	[ -e "/dev/$1" ] || [ ! -r "$2/dev" ] || mknod "/dev/$1" c "$(cut -d: -f1 "$2/dev")" "$(cut -d: -f2 "$2/dev")"
+}
+
+# block keeps the image's root UUID in etc/.extroot-uuid on the volume and refuses a different one, which would drop a
+# newly flashed image back to rootfs_data for good. So a new image starts this overlay fresh, as flashing does to rootfs_data.
+x28_ud_new_image() {
+	local root
+	root="$(block info 2>/dev/null | sed -n 's|^/dev/ubiblock0_0: UUID="\([^"]*\)".*|\1|p')"
+	[ -n "$root" ] || return 0
+	mkdir -p "$X28_UD_MNT"
+	mount -t ubifs /dev/ubi1_2 "$X28_UD_MNT" 2>/dev/null || return 0
+	if [ -f "$X28_UD_MNT/etc/.extroot-uuid" ] && [ "$(cat "$X28_UD_MNT/etc/.extroot-uuid")" != "$root" ]; then
+		# The tag goes last and only after the rest: a half-done wipe repeats next boot, old settings never meet a new image.
+		rm -rf "$X28_UD_MNT/upper" "$X28_UD_MNT/work" && rm -f "$X28_UD_MNT/etc/.extroot-uuid"
+	fi
+	umount "$X28_UD_MNT"
+}
+
+# Slot A's tries in misc, this boot's included (record at 2048, tries at byte 9, as in x28-bootok). Read only; empty if unreadable.
+x28_ud_tries() {
+	local misc
+	misc="$(sed -n 's/^\(mtd[0-9]*\): .* "misc"$/\1/p' "$X28_UD_PROC/mtd")"
+	[ -n "$misc" ] || return 0
+	x28_ud_node "$misc" "$X28_UD_SYS/class/mtd/$misc"
+	dd if="$X28_UD_DEV/$misc" bs=1 skip=2057 count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
+}
+
+do_x28_user_data() {
+	local mtd tries
+	mtd="$(sed -n 's/^mtd\([0-9]*\): .* "user_data"$/\1/p' "$X28_UD_PROC/mtd")"
+	[ -n "$mtd" ] || return 0
+	tries="$(x28_ud_tries)"
+	[ "${tries:-0}" -lt 3 ] || return 0
+	x28_ud_node ubi_ctrl "$X28_UD_SYS/class/misc/ubi_ctrl"
+	ubiattach /dev/ubi_ctrl -m "$mtd" -d 1 >/dev/null 2>&1 || return 0
+	x28_ud_node ubi1_2 "$X28_UD_SYS/class/ubi/ubi1_2"
+	x28_ud_new_image
+}
+
+[ -n "$X28_UD_TEST" ] || boot_hook_add preinit_main do_x28_user_data

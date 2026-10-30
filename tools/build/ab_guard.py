@@ -26,6 +26,16 @@ def bootok_exempt(real, data):
             and data.count(b'"$DDNAND" ') == 1 and data.count(b'of=') == 1)
 
 
+# The other reviewed exception (#183): attaching user_data in preinit. It only names the volume for block extroot; the
+# exemption holds only for this file, with one call, and any other UBI or flash writer in it is still reported.
+USER_DATA = 'lib/preinit/79_x28_user_data'
+
+
+def user_data_exempt(real, data):
+    return (real == USER_DATA and data.count(b'ubiattach') == 1 and b'ubiattach /dev/ubi_ctrl -m "$mtd" -d 1 ' in data
+            and b'"user_data"$/' in data)
+
+
 PATHS = re.compile(rb'(?<![\w.-])/((?:etc|lib|usr|sbin|bin)/[A-Za-z0-9_./-]*[A-Za-z0-9_])')
 ROOT_PREFIXES = ('etc/rc.d/','etc/hotplug.d/','etc/crontabs/','etc/uci-defaults/','lib/preinit/')
 ROOT_FILES = ('etc/inittab','etc/rc.local','etc/preinit','etc/rc.common','etc/init.d/rcS')
@@ -43,6 +53,7 @@ def violations(tree):
         if data[:2]!=b'#!' and not name.endswith('.sh') and not name.startswith(ROOT_PREFIXES):continue  # data, ELF, JSON
         for hit in sorted({m.decode() for m in FORBIDDEN.findall(data)}):
             if hit=='dd-nand' and bootok_exempt(real,data):continue
+            if hit=='ubiattach' and user_data_exempt(real,data):continue
             found.append((real,hit))
         for ref in PATHS.findall(data):
             ref=posixpath.normpath(ref.decode())

@@ -48,6 +48,15 @@ class GuardTests(unittest.TestCase):
             with self.assertRaises(ValueError,msg=root):g.check(tree({**BASE,root:b'#!/bin/sh\nmtd write a b\n'},LINK))
 
 
+    def test_only_the_reviewed_preinit_hook_may_attach_ubi(self):
+        hook=(Path(__file__).resolve().parents[2]/'package/x28-storage/files/x28-user-data.preinit').read_bytes()
+        name='lib/preinit/79_x28_user_data'
+        g.check(tree({**BASE,name:hook},LINK))  # as shipped
+        for label,bad in (('second call',hook+b'\nubiattach /dev/ubi_ctrl -m 3 -d 2\n'),('other writer',hook+b'\nubiformat /dev/mtd50\n'),
+                          ('new volume',hook+b'\nubimkvol /dev/ubi1 -N x -m\n')):
+            with self.subTest(label),self.assertRaises(ValueError):g.check(tree({**BASE,name:bad},LINK))
+        with self.assertRaises(ValueError):g.check(tree({**BASE,'lib/preinit/78_other':hook},LINK))  # same text, other file
+
     def test_only_the_reviewed_bootok_script_may_name_dd_nand(self):
         script=(Path(__file__).resolve().parents[2]/'package/x28-bootok/files/x28-bootok.init').read_bytes()
         link=[('etc/rc.d/S96x28-bootok','../init.d/x28-bootok')]

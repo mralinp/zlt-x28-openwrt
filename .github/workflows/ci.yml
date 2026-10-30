@@ -51,3 +51,4 @@ jobs:
       - run: sh tests/test_wifi.sh
       - run: sh tests/test_modem.sh
       - run: sh tests/test_bootok.sh
+      - run: sh tests/test_user_data.sh
