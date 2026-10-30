@@ -63,7 +63,7 @@ class PolicyTests(unittest.TestCase):
         self.archive=self.stage/'rootfs-staging.tar.gz'
         with tarfile.open(self.archive,'w:gz') as t:
             for name,data in {'etc/inittab':b'ttyS0::askfirst:/bin/sh\n','etc/shadow':b'root:::0:99999:7:::\nservice:old:0:0:99999:7:::\n',
-                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd', 'etc/init.d/rpcd':b'rpcd', 'etc/init.d/done':b'mount_root done', 'etc/init.d/uhttpd':b'uhttpd', 'etc/init.d/firewall':b'firewall',
+                              'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd', 'etc/init.d/rpcd':b'rpcd', 'etc/init.d/done':b'mount_root done', 'etc/init.d/uhttpd':b'uhttpd', 'etc/init.d/firewall':b'firewall', 'etc/init.d/sysntpd':b'sysntpd',
                               'www/luci-static/resources/view/network/wireless.js':b"if(hwtype=='mac80211'){x}\nelse if(hwtype=='broadcom'){y}",
                               'sbin/ujail':b'jail', 'usr/lib/opkg/info/procd-ujail.list':b'/sbin/ujail',
                               'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n',
@@ -140,6 +140,8 @@ class PolicyTests(unittest.TestCase):
         for name in ('sbin/dd-nand','usr/lib/libnandapi.so','etc/init.d/x28-bootok'):self.assertIn(name,tree)
         self.assertIn(b"option Port '22'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/rc.d/S95done'][0].linkname,'../init.d/done')
+        self.assertEqual(tree['etc/rc.d/S98sysntpd'][0].linkname,'../init.d/sysntpd')
+        self.assertIn("config timeserver 'ntp'",tree['etc/config/system'][1].decode())
         self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])  # an empty password never works over SSH
         self.assertIn(b"option RootPasswordAuth 'off'",tree['etc/config/dropbear'][1])
         self.assertNotIn(b'mtd',tree['etc/rc.local'][1])
