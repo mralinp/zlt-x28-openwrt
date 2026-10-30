@@ -64,7 +64,7 @@ class PolicyTests(unittest.TestCase):
         with tarfile.open(self.archive,'w:gz') as t:
             for name,data in {'etc/inittab':b'ttyS0::askfirst:/bin/sh\n','etc/shadow':b'root:::0:99999:7:::\nservice:old:0:0:99999:7:::\n',
                               'etc/init.d/dropbear':b'PasswordAuth RootPasswordAuth', 'etc/init.d/network':b'network', 'etc/init.d/dnsmasq':b'dnsmasq', 'etc/init.d/odhcpd':b'odhcpd', 'etc/init.d/rpcd':b'rpcd', 'etc/init.d/done':b'mount_root done', 'etc/init.d/uhttpd':b'uhttpd', 'etc/init.d/firewall':b'firewall', 'etc/init.d/sysntpd':b'sysntpd',
-                              'www/luci-static/resources/view/network/wireless.js':b"if(hwtype=='mac80211'){x}\nelse if(hwtype=='broadcom'){y}",
+                              'www/luci-static/resources/view/network/wireless.js':b"o.ucisection=s.section;if(hwtype=='mac80211'){o=ss.taboption('general',form.Flag,'legacy_rates'}\nif(hwtype=='mac80211'){var mode=ss.children[0],bssid=ss.children[5],encr;}\nif(hwtype=='mac80211'){x}\nelse if(hwtype=='broadcom'){y}",
                               'sbin/ujail':b'jail', 'usr/lib/opkg/info/procd-ujail.list':b'/sbin/ujail',
                               'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n',
                               'etc/uci-defaults/99-unsafe':b'mtd write', 'etc/rc.local':b'mtd write',
@@ -129,6 +129,8 @@ class PolicyTests(unittest.TestCase):
         for name in f.WIFI_PROFILES:self.assertEqual(tree[name][1],b'Default\nSSID1=stock\n')
         js=tree[f.LUCI_WIRELESS][1].decode()
         self.assertIn("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2'",js)
+        self.assertIn("if(hwtype=='mtwifi'){o=ss.taboption('general',form.ListValue,'txpower_pct'",js)
+        self.assertIn("if(hwtype=='mtwifi'){o=ss.taboption('macfilter',form.ListValue,'macfilter'",js)
         self.assertEqual(f.luci_mtwifi(js),js)  # idempotent
         with self.assertRaises(ValueError):f.luci_mtwifi('changed LuCI')
         self.assertIn('add_driver mtwifi',tree['lib/netifd/wireless/mtwifi.sh'][1].decode())

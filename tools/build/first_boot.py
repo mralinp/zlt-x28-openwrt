@@ -43,11 +43,37 @@ LUCI_MTWIFI = ("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2','WPA2-PSK',3
                "crypto_modes.push(['psk-mixed','WPA-PSK/WPA2-PSK Mixed Mode',22]);}\n")
 
 
+# LuCI shows radio and network options only for mac80211; offer the ones the mtwifi handler maps (#166).
+LUCI_DEV_ANCHOR = "o.ucisection=s.section;if(hwtype=='mac80211'){o=ss.taboption('general',form.Flag,'legacy_rates'"
+LUCI_MTWIFI_DEV = ("if(hwtype=='mtwifi'){o=ss.taboption('general',form.ListValue,'txpower_pct',_('Transmit power'),"
+                   "_('Share of the radio\\'s full power.'));o.value('',_('100 % (full)'));"
+                   "['75','50','25','15','9'].forEach(function(p){o.value(p,p+' %');});"
+                   "o=ss.taboption('advanced',form.Value,'beacon_int',_('Beacon Interval'));o.datatype='range(20,999)';"
+                   "o.placeholder=100;o.rmempty=true;}")
+LUCI_IFACE_ANCHOR = "if(hwtype=='mac80211'){var mode=ss.children[0],bssid=ss.children[5],encr;"
+LUCI_MTWIFI_IFACE = ("if(hwtype=='mtwifi'){o=ss.taboption('macfilter',form.ListValue,'macfilter',_('MAC Address Filter'));"
+                     "o.value('',_('disable'));o.value('allow',_('Allow listed only'));o.value('deny',_('Allow all except listed'));"
+                     "o=ss.taboption('macfilter',form.DynamicList,'maclist',_('MAC-List'));o.datatype='macaddr';"
+                     "o.depends('macfilter','allow');o.depends('macfilter','deny');"
+                     "o=ss.taboption('general',form.Flag,'hidden',_('Hide <abbr title=\"Extended Service Set Identifier\">ESSID</abbr>'));"
+                     "o=ss.taboption('general',form.Flag,'wmm',_('WMM Mode'));o.default=o.enabled;"
+                     "o=ss.taboption('advanced',form.Flag,'isolate',_('Isolate Clients'),_('Prevents client-to-client communication'));"
+                     "o=ss.taboption('advanced',form.Value,'dtim_period',_('DTIM Interval'));o.optional=true;o.placeholder=1;"
+                     "o.datatype='range(1,255)';"
+                     "o=ss.taboption('encryption',form.ListValue,'ieee80211w',_('802.11w Management Frame Protection'));"
+                     "o.value('',_('Driver default'));o.value('0',_('Disabled'));o.value('1',_('Optional'));o.value('2',_('Required'));"
+                     "['psk2','psk-mixed','sae','sae-mixed'].forEach(function(e){o.depends('encryption',e);});}")
+
+
 def luci_mtwifi(js):
-    """Stock wireless.js with the mtwifi encryption modes; refuses an unknown LuCI build."""
-    if LUCI_MTWIFI in js:return js
-    if js.count(LUCI_ANCHOR)!=1:raise ValueError('unexpected LuCI wireless.js: mtwifi patch anchor not found')
-    return js.replace(LUCI_ANCHOR,LUCI_MTWIFI+LUCI_ANCHOR)
+    """Stock wireless.js with the mtwifi encryption modes and options; refuses an unknown LuCI build."""
+    for anchor,block,where in ((LUCI_ANCHOR,LUCI_MTWIFI,'before'),(LUCI_DEV_ANCHOR,LUCI_MTWIFI_DEV,'inside'),
+                               (LUCI_IFACE_ANCHOR,LUCI_MTWIFI_IFACE,'before')):
+        if block in js:continue
+        if js.count(anchor)!=1:raise ValueError('unexpected LuCI wireless.js: mtwifi patch anchor not found')
+        if where=='inside':js=js.replace(anchor,anchor.replace("if(hwtype=='mac80211')",block+"if(hwtype=='mac80211')"))
+        else:js=js.replace(anchor,block+anchor)
+    return js
 
 
 WIFI_PROFILES = ('etc/wireless/l1profile.dat','etc/wireless/mediatek/mt7915.dbdc.b0.dat','etc/wireless/mediatek/mt7915.dbdc.b1.dat')
