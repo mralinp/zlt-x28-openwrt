@@ -118,6 +118,22 @@ def luci_mtwifi(js):
     return js
 
 
+# LuCI 23.05 bakes ?v=<revision> into these at package build; luci.js passes it on to every view it loads (#187).
+LUCI_HEADERS = ('usr/share/ucode/luci/template/header.ut','usr/share/ucode/luci/template/themes/bootstrap/header.ut')
+
+
+def luci_build_id(tree):
+    """Changes whenever a file under www/ does, so browsers drop what they cached from an older image."""
+    return digest(b''.join(name.encode()+tree[name][1] for name in sorted(tree) if name.startswith('www/')))[:12]
+
+
+def luci_version(ut,build):
+    """Stock header template with the build id on its ?v= strings; refuses an unknown LuCI build."""
+    ut,count=re.subn(r'\?v=([\w.-]+)',lambda m:f'?v={m[1]}-{build}',ut)
+    if not count:raise ValueError('unexpected LuCI header template: ?v= anchor not found')
+    return ut
+
+
 WIFI_PROFILES = ('etc/wireless/l1profile.dat','etc/wireless/mediatek/mt7915.dbdc.b0.dat','etc/wireless/mediatek/mt7915.dbdc.b1.dat')
 # vlan: (ports, untagged port whose PVID is that vlan). Copied from the observed stock table.
 SWITCH = {1:('1 5t',1),2:('2 5t',2),3:('4 5t',4),4:('0 6t',0)}
@@ -375,6 +391,9 @@ config interface 'wan'
     put('etc/shadow','\n'.join(locked)+'\n',0o600)
     put('etc/rc.local','#!/bin/sh\nexit 0\n',0o755)
     put('etc/fstab','# First-boot profile: no shared partition mounts.\n')
+    build=luci_build_id(tree)  # after the last change to www/
+    for name in LUCI_HEADERS:
+        if name in tree:put(name,luci_version(tree[name][1].decode(),build))
     validate_parents(tree)
     ab_check(tree)  # #87: refuse a profile whose boot path can reach flash or the other slot
     output.mkdir(parents=True,mode=0o700);(output/'NOT-FLASHABLE').write_text('Management profile only; overlay, UBI, signature/slot and hardware readiness unverified.\n');(output/'INCOMPLETE').touch()

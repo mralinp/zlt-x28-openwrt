@@ -379,6 +379,8 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an
   `mtwifi` radio count as having them, and drops the Client and Ad-Hoc modes for it until client mode exists (#175).
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
+  LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
+  of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
   Two networks per band (#167): the driver creates `ra1`/`rai1` once, at its first open after loading, from `BssidNum` in the
   profile, so the image ships `BssidNum=2` and the handler always renders it. A second `wifi-iface` on a radio brings the
   extra interface up; without one it stays down and silent (scanned). The MAC address of `rai0` depends on `BssidNum`.
