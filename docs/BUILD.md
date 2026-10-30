@@ -382,12 +382,18 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   Two networks per band (#167): the driver creates `ra1`/`rai1` once, at its first open after loading, from `BssidNum` in the
   profile, so the image ships `BssidNum=2` and the handler always renders it. A second `wifi-iface` on a radio brings the
   extra interface up; without one it stays down and silent (scanned). The MAC address of `rai0` depends on `BssidNum`.
-- **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/iwinfo_mtwifi.sh`
+- **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, fixed per-band channel and mode lists (2.4 GHz
   1-13; 5 GHz 36-165; no per-country or DFS flags), and associated stations from the driver's station table
   (`SIOCIWFIRSTPRIV + 0x1F`, 56-byte entries, the layout stock's `ioctl_helper.so` reads). Tx power, radio signal/noise and
   station data rates stay unknown. On a unit: `iwinfo rai0 info` shows `Type: mtwifi`; `iwinfo rai0 assoclist` lists clients.
+- **Install space (#183):** Disk space would be only `rootfs_data` (22.8 MB). `lib/preinit/79_x28_user_data` attaches `user_data`
+  (ubi1, stock's volumes `customer` and `data`) before `mount_root`, and `etc/config/fstab` makes `data` (278 MB free) the overlay
+  through stock OpenWrt's `block extroot`. Nothing is formatted, so stock slot B keeps its files. If the volume is missing or
+  doesn't mount, `rootfs_data` serves as before. `block` binds the overlay to the image's root UUID, so the hook starts the
+  overlay fresh on a new image, as flashing does to `rootfs_data`. The image ships only `ubiattach`, `ubidetach` and `ubinfo` of
+  `ubi-utils`; `ab_guard` allows `ubiattach` in that one file only. Factory reset (`firstboot`) clears `rootfs_data`, not this overlay.
 - **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
   `/dev/block/<name>` links from `/proc/mtd` plus active-slot aliases, mounts the vendor yaffs2 partitions, starts the
   vendor daemons through their own stock init scripts (`nvram_daemon` once, `ccci_fsd`, `ccci_mdinit`, `ql_ril_service`,

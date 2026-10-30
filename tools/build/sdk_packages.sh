@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Build iwinfo 2023-07-01 with our mtwifi backend (package/iwinfo-mtwifi, #165) using the official 23.05.5 SDK.
-# mt_wifi has no nl80211; without this LuCI has no channel list or associated stations for the X28 radios.
-# The release is bumped to 2 so ImageBuilder prefers these packages over the feed's.
+# Build what the 23.05.5 feeds lack for the X28, with the official SDK:
+# - iwinfo 2023-07-01 with our mtwifi backend (package/iwinfo-mtwifi, #165): mt_wifi has no nl80211, and without this LuCI
+#   has no channel list or associated stations. Release 2 makes ImageBuilder prefer it over the feed's.
+# - ubi-utils (#183): to attach user_data. The armsr target has no raw flash, so the feeds skip it (@NAND_SUPPORT).
 # Runs on Linux x86_64, like userspace.sh.
 #
-#   tools/build/iwinfo_mtwifi.sh OUT_DIR
+#   tools/build/sdk_packages.sh OUT_DIR
 set -euo pipefail
 
 VERSION=23.05.5
@@ -23,14 +24,19 @@ echo "$SDK_SHA256  $WORK/$SDK.tar.xz" | sha256sum -c -
 
 cd "$WORK/$SDK"
 ./scripts/feeds update base >/dev/null
-./scripts/feeds install iwinfo >/dev/null
+./scripts/feeds install iwinfo mtd-utils >/dev/null
 P=feeds/base/package/network/utils/iwinfo
 grep -q "^PKG_SOURCE_VERSION:=$IWINFO_COMMIT" $P/Makefile || { echo "iwinfo in the 23.05 feed moved off $IWINFO_COMMIT" >&2; exit 1; }
 mkdir -p $P/patches
 cp "$ROOT/package/iwinfo-mtwifi/100-mtwifi-backend.patch" $P/patches/
 sed -i -e 's/^PKG_RELEASE:=1$/PKG_RELEASE:=2/' -e 's/BACKENDS="nl80211"/BACKENDS="nl80211 mtwifi"/' $P/Makefile
 grep -q '^PKG_RELEASE:=2$' $P/Makefile && grep -q 'BACKENDS="nl80211 mtwifi"' $P/Makefile
+M=feeds/base/package/utils/mtd-utils/Makefile
+grep -q '@NAND_SUPPORT' $M && sed -i 's/@NAND_SUPPORT *//' $M
 make defconfig >/dev/null
-make package/iwinfo/compile -j1 >"$OUT/iwinfo-build.log" 2>&1 || { tail -40 "$OUT/iwinfo-build.log" >&2; exit 1; }
-find bin -name '*iwinfo*_2023-07-01-ca79f641-2_*.ipk' -exec cp {} "$OUT/" \;
-ls "$OUT"/libiwinfo20230701_2023-07-01-ca79f641-2_*.ipk
+sed -i '/ubi-utils/d' .config
+echo CONFIG_PACKAGE_ubi-utils=m >> .config
+make defconfig >/dev/null
+make package/iwinfo/compile package/mtd-utils/compile -j1 >"$OUT/sdk-build.log" 2>&1 || { tail -40 "$OUT/sdk-build.log" >&2; exit 1; }
+find bin \( -name '*iwinfo*_2023-07-01-ca79f641-2_*.ipk' -o -name 'ubi-utils_*.ipk' \) -exec cp {} "$OUT/" \;
+ls "$OUT"/libiwinfo20230701_2023-07-01-ca79f641-2_*.ipk "$OUT"/ubi-utils_*.ipk

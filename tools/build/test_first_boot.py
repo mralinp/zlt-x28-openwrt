@@ -131,6 +131,9 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('"/productinfo"',f.luci_storage(f.LUCI_SKIP_ANCHOR))
         self.assertEqual(f.luci_storage(f.LUCI_SKIP),f.LUCI_SKIP)  # idempotent
         with self.assertRaises(ValueError):f.luci_storage('changed LuCI')
+        self.assertIn('do_x28_user_data',tree['lib/preinit/79_x28_user_data'][1].decode())
+        self.assertIn("option device '/dev/ubi1_2'",tree['etc/config/fstab'][1].decode())
+        for name in f.UBI_WRITERS:self.assertNotIn(name,tree)
         js=tree[f.LUCI_WIRELESS][1].decode()
         self.assertIn("else if(hwtype=='mtwifi'){crypto_modes.push(['psk2'",js)
         self.assertIn("if(hwtype=='mtwifi'){o=ss.taboption('general',form.ListValue,'txpower_pct'",js)

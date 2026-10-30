@@ -33,6 +33,9 @@ WIFI = Path(__file__).resolve().parents[2]/'package/x28-wifi/files'
 MIPC = Path(__file__).resolve().parents[2]/'package/x28-mipc/files'
 LUCI_MIPC = Path(__file__).resolve().parents[2]/'package/luci-proto-x28-mipc'
 BOOTOK = Path(__file__).resolve().parents[2]/'package/x28-bootok/files'
+STORAGE = Path(__file__).resolve().parents[2]/'package/x28-storage/files'
+# ubi-utils for attaching user_data (#183); its writers have no business on a router that must not touch other slots.
+UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
@@ -283,6 +286,10 @@ config timeserver 'ntp'
     enable(19,'dnsmasq');enable(35,'odhcpd')
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
     put('etc/init.d/x28-bootok',(BOOTOK/'x28-bootok.init').read_text(),0o755);enable(96,'x28-bootok')
+    put('lib/preinit/79_x28_user_data',(STORAGE/'x28-user-data.preinit').read_text())
+    put('etc/config/fstab',(STORAGE/'fstab').read_text())
+    for name in UBI_WRITERS:
+        if name in tree:removed.append(name);del tree[name]
     enable(98,'sysntpd')  # without a set clock HTTPS (opkg) fails: the unit boots at 2010-01-01 (#169)
     enable(95,'done')  # `mount_root done`: without it mount_root discards the overlay at every boot (#143)
     # Stock defaults plus IPv6 on the LAN (#126): RA and DHCPv6 from the /64 the cellular WAN hands to netifd.
@@ -368,7 +375,6 @@ config interface 'wan'
     put('etc/shadow','\n'.join(locked)+'\n',0o600)
     put('etc/rc.local','#!/bin/sh\nexit 0\n',0o755)
     put('etc/fstab','# First-boot profile: no shared partition mounts.\n')
-    put('etc/config/fstab','# No shared volumes or swap enabled.\n')
     validate_parents(tree)
     ab_check(tree)  # #87: refuse a profile whose boot path can reach flash or the other slot
     output.mkdir(parents=True,mode=0o700);(output/'NOT-FLASHABLE').write_text('Management profile only; overlay, UBI, signature/slot and hardware readiness unverified.\n');(output/'INCOMPLETE').touch()
