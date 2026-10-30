@@ -15,4 +15,6 @@ mtwifi_auth wep-open && exit 1
 [ "$(mtwifi_bw HT20)" = "0 0" ] && [ "$(mtwifi_bw HT40)" = "1 0" ] && [ "$(mtwifi_bw HE80)" = "1 1" ] && [ "$(mtwifi_bw VHT160)" = "1 2" ] || exit 1
 [ "$(mtwifi_band 5g)" = "rai0 $dir/mt7915.dbdc.b1.dat" ] && ! mtwifi_band 6g || exit 1
 [ "$(mtwifi_band '' radio_2g)" = "ra0 $dir/mt7915.dbdc.b0.dat" ] && [ "$(mtwifi_band 2g radio_5g)" = "ra0 $dir/mt7915.dbdc.b0.dat" ] && ! mtwifi_band '' radio0 || exit 1
-echo "PASS: mtwifi profile rendering, encryption, bandwidth and band mapping"
+[ "$(mtwifi_pmf '')" = "1 0" ] && [ "$(mtwifi_pmf 0)" = "0 0" ] && [ "$(mtwifi_pmf 2)" = "1 1" ] || exit 1
+[ "$(mtwifi_policy allow)" = 1 ] && [ "$(mtwifi_policy deny)" = 2 ] && [ "$(mtwifi_policy '')" = 0 ] || exit 1
+echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF and MAC-policy mapping"
