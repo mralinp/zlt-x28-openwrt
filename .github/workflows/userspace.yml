@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - "tools/build/**"
+      - "package/iwinfo-mtwifi/**"
       - ".github/workflows/userspace.yml"
 
 permissions:
