@@ -5,7 +5,7 @@ Written for whoever picks this up later with no memory of the sessions: start he
 anywhere else in the repo.
 
 Conventions:
-- **Device**: one ZLT X28, kernel 4.19.205. Tests 1–22 ran on the stock firmware (OEM 1.5.13, OpenWrt 19.07-derived, active slot **B**); tests 23–30 ran on the native image on slot **A**.
+- **Device**: one ZLT X28, kernel 4.19.205. Tests 1–22 ran on the stock firmware (OEM 1.5.13, OpenWrt 19.07-derived, active slot **B**); tests 23–31 ran on the native image on slot **A**.
 - **Host**: Apple Silicon Mac (macOS), Docker Desktop (arm64 Linux, plus x86_64 emulation).
 - Private outputs (dumps, probe logs, chip IDs, vendor files) live in git-ignored `private/` and are never
   committed. Paths below under `private/` are on the maintainer's machine.
@@ -45,6 +45,7 @@ Conventions:
 | 28 | Download-agent block write to `misc` | 2026-10-29 | ❌ the first block write was not acknowledged, twice; `misc` stayed intact and was verified | this page |
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
+| 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ 162 Mbit/s download at 43 % CPU, limited by the test servers; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
