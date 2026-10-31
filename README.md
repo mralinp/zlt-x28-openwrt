@@ -150,6 +150,7 @@ The flash step, its gates and the typed approvals are described in
 | [docs/RECOVERY.md](docs/RECOVERY.md) | Backup, USB recovery, flash sessions, UART |
 | [docs/BOOT-FLOW.md](docs/BOOT-FLOW.md) | A/B slots, the preloader boot counter, the rootfs signature check |
 | [docs/research/recovery-slot-design.md](docs/research/recovery-slot-design.md) | Design for the recovery slot on B, not built yet |
+| [docs/research/preloader-slot-logic.md](docs/research/preloader-slot-logic.md) | How the preloader picks a slot, counts tries, rolls back and treats damaged copies |
 | [docs/NATIVE-CELLULAR.md](docs/NATIVE-CELLULAR.md) | The `x28_mipc` cellular protocol |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | CPU, RAM and flash use, the root filesystem tree and the device tree |
 | [docs/THERMAL.md](docs/THERMAL.md) | Heat baseline, the 12 V fan, current readings |

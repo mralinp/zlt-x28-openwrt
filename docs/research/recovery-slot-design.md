@@ -51,8 +51,8 @@ volume digests, not the raw partition. Logs and settings do not survive a rescue
 - Three commands: `x28-install`, `x28-stock` and `x28-return`. Nothing runs them at boot, and `ab_guard` checks that for
   this profile too. All three refuse unless the command line says `bootslot=b`, so a rehearsal on A cannot format its own
   root.
-- `zmtk_boot_done` is absent. `x28-bootok` is kept: it does nothing on B, and it stops the tries climbing during a
-  rehearsal on A.
+- `zmtk_boot_done` is absent. `x28-bootok` is kept: it stops the tries climbing during a rehearsal on A, and on B it must now
+  reset B's byte, which it skips today. The preloader counts B too, so six reboots of rescue would otherwise switch to A.
 
 Because rescue has no WAN, **the OpenWrt image must already be on your computer**. Rescue cannot download one.
 
@@ -61,14 +61,14 @@ Because rescue has no WAN, **the OpenWrt image must already be on your computer*
 | Method | How | Status |
 |---|---|---|
 | From a working A | `x28-recovery` on slot A lowers A's priority byte from `0f` to `0d` (B is `0e`), one `misc` copy at a time with the proven `dd-nand` method and a whole-partition compare after each, then reboots. | TESTING 29 proved this method on the tries byte only, not on priority. The priority effect is **inferred** from the vendor recipe. Refuses until `x28-bootok` has finished, as both write the same `misc` blocks; that script needs a done marker for this. Writes the copy at `0xc0800` first and `0x800` last, like `x28-bootok`; stock's own order is the reverse. |
-| Failed boots | The preloader adds a try on each boot of A. When they run out it should roll back to B. | **Inferred, never observed.** The limit of 7 tries is also inferred. It also needs a reset: a hang with no reset adds no tries, and watchdog behaviour is unknown. Must be drilled, see the transition. |
+| Failed boots | The preloader adds a try only on a software `reboot`, not on a power cycle, and rolls back to B on the boot that reads above 5 ([preloader reading](preloader-slot-logic.md)). So `x28-bootok` gains one change for this design: a boot still unhealthy after its two-minute wait issues `reboot`. Six of those and the seventh boot lands on B. | **Rollback read from the code, never observed.** Must be drilled, see the transition. The `reboot` is enabled only once rescue is on B, since stock B erases A above 3. A hang before userspace, or a panic, is not covered unless the kernel resets with a counted reason, which is not known. |
 | Download agent + UART | Last resort. | Proven for `rootfs_a`. Not proven for `misc` (#114). `slot_session.py` guards the head of stock `rootfs_b`, so its sessions, including restore, stop once rescue is on B until those guards are updated. |
 | Button | Not used. | `tz_gpio_keys` holds GPIO 18 and 19 but creates no input device (observed), and nothing shows the preloader or LK reading them. A userspace check would only work when A is alive, where `x28-recovery` already works. |
 
 **A good slot A does not land in recovery by accident.** `x28-bootok` resets A's tries after each boot where SSH and LAN
 come up, and WAN health plays no part. A's success byte stays 0 as today; it only makes the counter run, and rescue
-never sets it. The remaining accident is about seven power cuts in a row, each within the first minute or two of boot.
-That is harmless now: rescue changes nothing until told to, and `x28-return` (priority back to `0f`, tries back to 0, same write order) boots A. It refuses unless `rootfs_a` attaches and its `rootfs` volume is a SquashFS, so it cannot select a half-written A.
+never sets it. Power cuts add no tries, so they cannot cause it. The remaining accident is six `reboot`s in a row before each
+health check passes. That is harmless now: rescue changes nothing until told to, and `x28-return` (priority back to `0f`, tries back to 0, same write order) boots A. It refuses unless `rootfs_a` attaches and its `rootfs` volume is a SquashFS, so it cannot select a half-written A.
 
 This also removes a current hazard. Stock B erases A when it boots with A's tries above 3; rescue has no such script.
 
@@ -98,11 +98,11 @@ SSH over LAN is the only route. USB is wired as a device port to the preloader a
 
 Power loss up to step 5 leaves A below B, so the unit returns to rescue and the install can be repeated.
 
-**Power loss during step 6 is the worst case in this design.** Copies with different but intact values are benign, since
-either reading finds a bootable slot. But `dd-nand` rewrites a whole erase block, so a cut can tear a copy. The preloader
-contains the string `no valid slot!` and its handling of damaged copies has not been read. `misc` cannot be written over
-USB (TESTING 28), so such a state may have no way back. Every `x28-recovery`, `x28-return` and install has this exposure,
-as `x28-bootok` already does on a smaller scale. Disassembling the preloader's record handling offline is a gate for #153.
+**Power loss during step 6 is covered by the preloader.** It uses the first copy from `0x800` up that reads cleanly with the
+magic, so an erased or unreadable copy is skipped and repaired, and this write order keeps the old value until `0x800` is
+rewritten. If all four were bad it would rebuild the record and boot A, which here could be half-written, but one cut only
+hits one copy. A part-programmed page that passes ECC is the case left, see the [preloader reading](preloader-slot-logic.md).
+Every `misc` writer also refuses a record whose up-type is not 0, because the preloader acts on that byte by erasing itself.
 
 ## Back to stock
 
@@ -136,10 +136,9 @@ to keep an image on your computer. Keeping stock bootable would mean no recovery
 
 1. **Confirm the dump.** Present and rechecked on 2026-10-31: `SHA256SUMS` passes for all 102 listed files, including the
    51 partitions. UART and the download agent remain the last resort.
-2. **Read the preloader offline.** Slot choice, rollback, what rollback writes to the record, and damaged copies. A result
-   that makes `misc` writes unsafe stops the plan here. So does a rollback that leaves A at the higher priority: stock
-   derives its slot from priority, not the command line (`bootctrl.sh:263-273`), so it would act as if on A and copy
-   native A over running B, and step 6 must not run.
+2. **Read the preloader offline. Done, passed:** [preloader-slot-logic.md](preloader-slot-logic.md). `misc` writes are safe to
+   continue with, and rollback leaves A below B, so stock, which derives its slot from priority (`bootctrl.sh:263-273`), knows
+   it is on B. If step 6 shows otherwise it stops there.
 3. **Prepare the tools.** Teach `package_ubi` and `slot_session.py` the rescue layout, and `slot_session.py` a `rootfs_b`
    spec with updated guards. The router-safety-auditor reviews them.
 4. **Rehearse on A.** Flash rescue to `rootfs_a`, with stock B untouched. This proves boot, LAN, SSH, the tmpfs overlay and
@@ -147,7 +146,7 @@ to keep an image on your computer. Keeping stock bootable would mean no recovery
    B erases A above 3. Then restore native A.
 5. **Prove `0d` with stock B still there.** With A's tries at 3 or below, stock B skips its repair and B has success 1,
    so A's priority can be lowered and raised with nothing erased.
-6. **Observe rollback with stock B still there.** Only after step 2 passes. Set A's tries to the limit live and reboot, with
+6. **Observe rollback with stock B still there.** Set A's tries to 6 live and reboot, with
    UART on, since `x28-bootok` would reset the tries if A still boots and only UART shows that result. The expected outcome
    is that stock B's repair clones all 15 A partitions, including `lk_a`, `tee_a` and `boot_a`, and writes A's tries byte.
    The dump shows those partitions match B, so only the native image should be lost. No power cuts until the tries read 0.
@@ -169,23 +168,20 @@ embedded stock copy plus the dump cover the gap.
 ## Implementation steps (#153)
 
 1. `tools/build`: rescue profile and `package_ubi` layout with its tests; reproducible, with size and hash recorded.
-2. `x28-install`, `x28-stock`, `x28-return`, `x28-recovery` for slot A and a done marker in `x28-bootok`, each with host tests on a fake `misc` and `/proc/mtd`, like
+2. `x28-install`, `x28-stock`, `x28-return`, `x28-recovery` for slot A, and in `x28-bootok` a done marker, B's reset and the
+   `reboot` when unhealthy, each with host tests on a fake `misc` and `/proc/mtd`, like
    `x28-bootok`.
 3. `ab_guard` run on the rescue profile.
-4. The preloader reading and tool changes: transition steps 2 and 3.
+4. Tool changes: transition step 3.
 5. Transition steps 4 to 8, on the unit.
 
 `sysupgrade` (#154) follows and can rely on rescue as its backstop.
 
 ## Not known yet
 
-- Whether the preloader rolls back at all, at what count, and what it writes to the record.
-- How it treats mixed or torn `misc` copies.
-- Whether a hung kernel gets reset, without which failed boots do not count.
+- Whether rollback behaves on hardware as the code reads. It has never been observed.
+- Whether a hung or panicking kernel gets reset, and whether that reset is counted or looks abnormal.
 - Whether `ubiformat` works on this NAND driver.
 - Whether the tmpfs overlay fallback works in this image.
-- Whether B's tries count once A is below B. B has success 1, so inferred not. Stock resets them on each B boot, so today's
-  zero proves nothing, and rescue does not reset them.
-- What rollback writes to the record.
 - Whether the Ethernet path needs anything from the stock daemons in rescue. It comes up from `netifd` on native.
 - What stock needs in a fresh `rootfs_data`, and how `zmtk_boot_done` behaves after `x28-stock`.

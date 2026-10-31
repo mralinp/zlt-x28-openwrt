@@ -40,7 +40,8 @@ Three candidate controls were found. Which one actually decides is **not yet est
    (`0x0`, `0x40000`), with a 32-bit value `2` at offset `0x0c`, a marker `AABB9876`, the module name `RG500L`
    and per-device MAC addresses (not reproduced here). `2` is the best candidate for "slot B".
 
-**Unknown**: which of these LK reads, whether a failed boot falls back to the other slot (retry counting), and
+The preloader's use of the `misc` record, including retry counting and fallback, is read from its code in
+[preloader-slot-logic.md](research/preloader-slot-logic.md). **Unknown**: which of these LK reads, and
 what the vendor's FOTA path writes when it switches slots. `boot_para` holds data from `0x100000` that looks like
 DRAM calibration; it is not shown to be slot-related.
 
