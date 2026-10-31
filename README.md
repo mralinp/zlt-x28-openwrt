@@ -150,6 +150,7 @@ The flash step, its gates and the typed approvals are described in
 | [docs/RECOVERY.md](docs/RECOVERY.md) | Backup, USB recovery, flash sessions, UART |
 | [docs/BOOT-FLOW.md](docs/BOOT-FLOW.md) | A/B slots, the preloader boot counter, the rootfs signature check |
 | [docs/NATIVE-CELLULAR.md](docs/NATIVE-CELLULAR.md) | The `x28_mipc` cellular protocol |
+| [docs/HARDWARE.md](docs/HARDWARE.md) | CPU, RAM and flash: what the unit has, what Linux gets, what uses it |
 | [docs/THERMAL.md](docs/THERMAL.md) | Heat baseline, the 12 V fan, current readings |
 | [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | Issues, branches, commits, automatic releases |
