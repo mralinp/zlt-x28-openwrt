@@ -24,7 +24,7 @@ docs/
 ├── TESTING.md                test log: every test, result, reproduce command, what is not proven
 ├── PROJECT-PLAN.md           goal, strategy, phase status, roadmap to a stable release, risks, operating rules
 ├── BUILD.md                  the native image: CI userspace, private staging, first-boot profile, UBI, boot guards
-├── HARDWARE.md               CPU, RAM and flash: what the unit has, what Linux gets, what uses it
+├── HARDWARE.md               CPU, RAM and flash use, the root filesystem tree and the device tree
 ├── RECOVERY.md               NAND backup, USB preloader/DA access, flash sessions, UART
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
@@ -37,7 +37,7 @@ docs/
 ├── WORKFLOW.md               trunk-based flow, labels, Conventional Commits, release and changelog rules
 ├── COMMUNITY-BRIEF.md        the project's public-facing brief
 ├── research/                 boot-flow, signature, slot-selection and flash-session research and plans
-├── firmware/                 the stock kernel's embedded config (identical in both slots)
+├── firmware/                 the stock kernel's embedded config (identical in both slots) and the device tree
 ├── assets/                   logo kit (SVG, icons, social preview) and BRAND.md usage guide
 ├── images/                   board photos (UART candidate)
 ├── archive/                  superseded plans, readmes and status snapshots
