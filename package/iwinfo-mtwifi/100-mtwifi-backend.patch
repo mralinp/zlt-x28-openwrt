@@ -48,10 +48,10 @@ index 579efc4..e8f3f60 100644
  #endif
 diff --git a/iwinfo_mtwifi.c b/iwinfo_mtwifi.c
 new file mode 100644
-index 0000000..e97a887
+index 0000000..d6f8343
 --- /dev/null
 +++ b/iwinfo_mtwifi.c
-@@ -0,0 +1,511 @@
+@@ -0,0 +1,525 @@
 +/*
 + * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
 + *
@@ -446,23 +446,31 @@ index 0000000..e97a887
 +}
 +/* end mtwifi_scan_line */
 +
-+/* LuCI's Scan and Channel Analysis ask again every few seconds, and a survey takes the band off its channel, so start
-+ * one at most this often and answer from the driver's table in between. */
-+#define MTWIFI_SCAN_EVERY	30
-+#define MTWIFI_SCAN_WAIT	4	/* about 4 s on either band (measured); slept here, as the table ioctl would wait in the kernel */
-+#define MTWIFI_SCAN_BUF		5000			/* a table read returns at most about 4 KB, then continues at an index */
++/* A full survey leaves the band long enough that a 5 GHz phone moved to 2.4 GHz every time (observed); a partial one visits
++ * a channel at a time and it stayed. That takes up to these seconds (measured 16 and 9), and the table ioctl would wait
++ * for it in the kernel, so a call starts a survey and returns nothing until it is done: LuCI asks again every few seconds
++ * and keeps showing what it had. Start one at most every MTWIFI_SCAN_EVERY seconds, as LuCI keeps asking while it is open. */
++#define MTWIFI_SCAN_EVERY	60
++#define MTWIFI_SCAN_TIME(five)	((five) ? 18 : 11)
++#define MTWIFI_SCAN_BUF		5000	/* a table read returns at most about 4 KB, then continues at an index */
 +
-+static int mtwifi_scan_start(const char *ifn)
++/* 1 while a survey runs (one is started if due), 0 when the table can be read, -1 on error. */
++static int mtwifi_scan_busy(const char *ifn, int five)
 +{
-+	char stamp[32], cmd[] = "SiteSurvey=";
++	char stamp[32], cmd[] = "PartialScan=1";
 +	struct iwreq wrq = {};
 +	struct stat st;
++	time_t age;
 +	FILE *f;
 +
 +	snprintf(stamp, sizeof(stamp), "/tmp/mtwifi-scan-%s", ifn);
-+	if (!stat(stamp, &st) && time(NULL) - st.st_mtime < MTWIFI_SCAN_EVERY)
-+		return 0;
-+	/* An empty SSID makes it passive: nothing is sent on a channel the region might not allow. */
++	if (!stat(stamp, &st)) {
++		age = time(NULL) - st.st_mtime;
++		if (age < MTWIFI_SCAN_TIME(five))
++			return 1;
++		if (age < MTWIFI_SCAN_EVERY)
++			return 0;
++	}
 +	strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
 +	wrq.u.data.pointer = cmd;
 +	wrq.u.data.length = sizeof(cmd);
@@ -471,23 +479,24 @@ index 0000000..e97a887
 +	f = fopen(stamp, "w");
 +	if (f)
 +		fclose(f);
-+	sleep(MTWIFI_SCAN_WAIT);
-+	return 0;
++	return 1;
 +}
 +
 +static int mtwifi_scanlist(const char *n, char *buf, int *len)
 +{
-+	struct iwinfo_scanlist_entry *out = (struct iwinfo_scanlist_entry *)buf;
++	struct iwinfo_scanlist_entry *first = (struct iwinfo_scanlist_entry *)buf, *out = first;
 +	char *data, *line, *next;
 +	const char *ifn = mtwifi_ifname(n);
-+	int five, idx = 0, total = -1, cnt = 0;
++	int five, busy, i, idx = 0, total = -1, cnt = 0;
 +
 +	if (!ifn)
 +		return -1;
 +	five = mtwifi_is_5g(ifn);
 +	ifn = five ? "rai0" : "ra0";
-+	if (mtwifi_scan_start(ifn))
-+		return -1;
++	*len = 0;
++	busy = mtwifi_scan_busy(ifn, five);
++	if (busy)
++		return busy < 0 ? -1 : 0;
 +	data = malloc(MTWIFI_SCAN_BUF + 1);
 +	if (!data)
 +		return -1;
@@ -509,9 +518,14 @@ index 0000000..e97a887
 +			if (total < 0 && sscanf(line, "Total=%d", &total) == 1)
 +				continue;
 +			if ((cnt + 1) * (int)sizeof(*out) <= IWINFO_BUFSIZE && mtwifi_scan_line(line, five, out)) {
-+				out++;
-+				cnt++;
 +				idx++;
++				/* The table can list a network twice right after a survey (observed). */
++				for (i = 0; i < cnt && memcmp(first[i].mac, out->mac, 6); i++)
++					;
++				if (i == cnt) {
++					out++;
++					cnt++;
++				}
 +			}
 +		}
 +		if (idx == before)
