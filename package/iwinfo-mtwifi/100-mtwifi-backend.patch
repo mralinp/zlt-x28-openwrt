@@ -48,15 +48,15 @@ index 579efc4..e8f3f60 100644
  #endif
 diff --git a/iwinfo_mtwifi.c b/iwinfo_mtwifi.c
 new file mode 100644
-index 0000000..eed4cb6
+index 0000000..e97a887
 --- /dev/null
 +++ b/iwinfo_mtwifi.c
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,511 @@
 +/*
 + * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
 + *
 + * mt_wifi has no nl80211. Its wireless extensions answer ESSID, BSSID, channel, mode and bit rate, but report
-+ * no frequency range, tx power list or stations. Those come from fixed per-band tables and from the driver's
++ * no frequency range, tx power list or stations. Those come from the country's channel tables and the driver's
 + * station table (RTPRIV_IOCTL_GET_MAC_TABLE_STRUCT), with the layout the stock firmware's ioctl_helper.so reads.
 + * ra0/ra1 are the 2.4 GHz band and rai0/rai1 the 5 GHz band; radio sections named *_2g / *_5g map to ra0 / rai0.
 + * The station table of an interface holds only that interface's clients (checked on the unit).
@@ -64,10 +64,16 @@ index 0000000..eed4cb6
 + * Licensed under GPL-2.0 like the rest of iwinfo.
 + */
 +
++#include <sys/stat.h>
++#include <time.h>
++#include <unistd.h>
++
 +#include "iwinfo.h"
 +#include "iwinfo/utils.h"
 +#include "api/wext.h"
 +
++#define MTWIFI_SET		(SIOCIWFIRSTPRIV + 0x02)
++#define MTWIFI_GET_SURVEY	(SIOCIWFIRSTPRIV + 0x0D)
 +#define MTWIFI_GET_MAC_TABLE	(SIOCIWFIRSTPRIV + 0x1F)
 +#define MTWIFI_TABLE_SIZE	0x7938	/* buffer size the stock firmware passes */
 +#define MTWIFI_ENTRY_SIZE	56
@@ -162,26 +168,101 @@ index 0000000..eed4cb6
 +	return 0;
 +}
 +
-+/* ponytail: fixed ETSI-style channel set per band, no per-country or DFS flags; read the driver's
-+ * channel list (SIOCGIWRANGE stays empty) if a private ioctl for it turns up. */
++/* Value of a key in the 5 GHz profile; the handler renders both profiles with the same country. */
++static int mtwifi_profile(const char *key, char *val, size_t size)
++{
++	char line[128];
++	size_t klen = strlen(key);
++	int found = -1;
++	FILE *f = fopen("/etc/wireless/mediatek/mt7915.dbdc.b1.dat", "r");
++
++	if (!f)
++		return -1;
++	while (found && fgets(line, sizeof(line), f)) {
++		if (strncmp(line, key, klen) || line[klen] != '=')
++			continue;
++		snprintf(val, size, "%s", line + klen + 1);
++		val[strcspn(val, "\r\n")] = 0;
++		found = 0;
++	}
++	fclose(f);
++	return found;
++}
++
++static int mtwifi_country(const char *n, char *b)
++{
++	char val[8];
++
++	if (mtwifi_profile("CountryCode", val, sizeof(val)) || strlen(val) != 2)
++		return -1;
++	strcpy(b, val);
++	return 0;
++}
++
++/* The countries /usr/share/x28-wifi/regions maps to driver regions; rpcd names them from the ISO table. */
++static int mtwifi_countrylist(const char *n, char *buf, int *len)
++{
++	struct iwinfo_country_entry *e = (struct iwinfo_country_entry *)buf;
++	char line[16];
++	int cnt = 0;
++	FILE *f = fopen("/usr/share/x28-wifi/regions", "r");
++
++	if (!f)
++		return -1;
++	while (fgets(line, sizeof(line), f) && (cnt + 1) * (int)sizeof(*e) <= IWINFO_BUFSIZE) {
++		e->iso3166 = line[0] * 256 + line[1];
++		e->ccode[0] = line[0];
++		e->ccode[1] = line[1];
++		e->ccode[2] = 0;
++		e++;
++		cnt++;
++	}
++	fclose(f);
++	*len = cnt * sizeof(*e);
++	return 0;
++}
++
++/* ponytail: the channels of the region in the rendered profile, so a saved country shows after apply; no DFS flags,
++ * add them if LuCI should mark those channels. */
 +static int mtwifi_freqlist(const char *n, char *buf, int *len)
 +{
-+	static const uint8_t ch2[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
-+	static const uint8_t ch5[] = { 36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128,
-+	                               132, 136, 140, 144, 149, 153, 157, 161, 165 };
 +	struct iwinfo_freqlist_entry *e = (struct iwinfo_freqlist_entry *)buf;
-+	const uint8_t *ch;
-+	int i, cnt, five;
++	char val[8], line[128], *tok;
++	int i, cnt = 0, five;
 +
 +	IFN(n);
 +	five = mtwifi_is_5g(ifn);
-+	ch = five ? ch5 : ch2;
-+	cnt = five ? sizeof(ch5) : sizeof(ch2);
-+	for (i = 0; i < cnt; i++, e++) {
-+		memset(e, 0, sizeof(*e));
-+		e->band = five ? IWINFO_BAND_5 : IWINFO_BAND_24;
-+		e->channel = ch[i];
-+		e->mhz = mtwifi_ch2mhz(ch[i], five);
++	if (five) {
++		/* /usr/share/x28-wifi/channels5: "<CountryRegionABand> <channels...>", shared with the handler. */
++		int region = mtwifi_profile("CountryRegionABand", val, sizeof(val)) ? 9 : atoi(val);
++		FILE *f = fopen("/usr/share/x28-wifi/channels5", "r");
++
++		if (!f)
++			return -1;
++		while (fgets(line, sizeof(line), f))
++			if (atoi(line) == region)
++				break;
++		if (feof(f))
++			line[0] = 0;
++		fclose(f);
++		tok = strtok(line, " \n");
++		while (tok && (tok = strtok(NULL, " \n"))) {
++			memset(e, 0, sizeof(*e));
++			e->band = IWINFO_BAND_5;
++			e->channel = atoi(tok);
++			e->mhz = mtwifi_ch2mhz(e->channel, 1);
++			e++;
++			cnt++;
++		}
++	} else {
++		int last = !mtwifi_profile("CountryRegion", val, sizeof(val)) && atoi(val) == 1 ? 13 : 11;
++
++		for (i = 1; i <= last; i++, e++, cnt++) {
++			memset(e, 0, sizeof(*e));
++			e->band = IWINFO_BAND_24;
++			e->channel = i;
++			e->mhz = mtwifi_ch2mhz(i, 0);
++		}
 +	}
 +	*len = cnt * sizeof(*e);
 +	return 0;
@@ -255,6 +336,192 @@ index 0000000..eed4cb6
 +	return 0;
 +}
 +
++/* begin mtwifi_scan_line */
++/* One RTMPCommSiteSurveyData line: No Ch SSID(%-33s) BSSID Security(%-23s) Signal(%) W-Mode ExtCH NT SSID_Len. Columns
++ * are fixed up to the BSSID; the rest are tokens, as a Security of 23 chars or more runs into the signal digits. Returns
++ * 0 for other lines. */
++static int mtwifi_scan_line(const char *l, int five, struct iwinfo_scanlist_entry *e)
++{
++	char sec[40], wmode[16], ext[8], nt[4], *ciph;
++	unsigned m[6];
++	int i, ch, pct = -1, slen, used = 0;
++	size_t flen;
++
++	if (strlen(l) < 62 || sscanf(l + 4, "%d", &ch) != 1 || ch <= 0 ||
++	    sscanf(l + 41, "%2x:%2x:%2x:%2x:%2x:%2x", &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) != 6 ||
++	    sscanf(l + 61, "%39s%n", sec, &used) != 1)
++		return 0;
++	if (strlen(sec) >= 23 && (ciph = strrchr(sec, '/'))) {
++		while (*ciph && (*ciph < '0' || *ciph > '9'))
++			ciph++;
++		if (!strncmp(ciph - 2, "MP", 2))	/* CCMP256, GCMP128: those digits are the cipher's */
++			ciph += strlen(ciph) >= 3 ? 3 : 0;
++		if (*ciph)
++			pct = atoi(ciph);
++		*ciph = 0;
++	}
++	if (pct < 0) {
++		int more = 0;
++
++		if (sscanf(l + 61 + used, "%d%n", &pct, &more) != 1)
++			return 0;
++		used += more;
++	}
++	if (sscanf(l + 61 + used, "%15s %7s %3s %d", wmode, ext, nt, &slen) != 4)
++		return 0;
++
++	memset(e, 0, sizeof(*e));
++	for (i = 0; i < 6; i++)
++		e->mac[i] = m[i];
++	for (flen = 33; flen && l[8 + flen - 1] == ' '; flen--)
++		;
++	if (slen > 0 && (size_t)slen != flen && flen > 2 && !strncmp(l + 8, "0x", 2)) {
++		/* Not printable: the driver gives hex of the first 14 bytes at most. */
++		for (i = 0; i * 2 + 2 < (int)flen && i < IWINFO_ESSID_MAX_SIZE; i++) {
++			unsigned c;
++
++			if (sscanf(l + 10 + i * 2, "%2x", &c) != 1)
++				break;
++			e->ssid[i] = c;
++		}
++	} else if (slen > 0) {
++		memcpy(e->ssid, l + 8, flen < IWINFO_ESSID_MAX_SIZE ? flen : IWINFO_ESSID_MAX_SIZE);
++	}
++	e->mode = !strcmp(nt, "Ad") ? IWINFO_OPMODE_ADHOC : IWINFO_OPMODE_MASTER;
++	e->band = five ? IWINFO_BAND_5 : IWINFO_BAND_24;
++	e->channel = ch;
++	e->mhz = mtwifi_ch2mhz(ch, five);
++	/* The driver's percent back to dBm; 100 % is anything from -50 dBm up. */
++	e->signal = (pct >= 24 ? (pct - 24) * 10 / 26 - 80 : pct * 10 / 26 - 90) + 0x100;
++	e->quality = pct;
++	e->quality_max = 100;
++	e->ht_chan_info.primary_chan = ch;
++	e->ht_chan_info.secondary_chan_off = !strcmp(ext, "ABOVE") ? 1 : !strcmp(ext, "BELOW") ? 3 : 0;
++	e->ht_chan_info.chan_width = !!e->ht_chan_info.secondary_chan_off;
++
++	ciph = strchr(sec, '/');
++	if (ciph)
++		*ciph++ = 0;
++	if (!strcmp(sec, "OPEN") && (!ciph || !strcmp(ciph, "NONE")))
++		return 1;
++	e->crypto.enabled = 1;
++	if (!strcmp(sec, "OWE")) {
++		e->crypto.wpa_version = 4;
++		e->crypto.auth_suites = IWINFO_KMGMT_OWE;
++	} else if (strstr(sec, "WPA") || strstr(sec, "SAE")) {
++		int psk = !!strstr(sec, "PSK");
++
++		if (strstr(sec, "WPAPSK") || strstr(sec, "WPA1") || !strcmp(sec, "WPA"))
++			e->crypto.wpa_version |= 1;
++		if (strstr(sec, "WPA2"))
++			e->crypto.wpa_version |= 2;
++		if (strstr(sec, "WPA3") || strstr(sec, "SAE"))
++			e->crypto.wpa_version |= 4;
++		if (psk && (e->crypto.wpa_version & 3))
++			e->crypto.auth_suites |= IWINFO_KMGMT_PSK;
++		if ((psk || strstr(sec, "SAE")) && (e->crypto.wpa_version & 4))
++			e->crypto.auth_suites |= IWINFO_KMGMT_SAE;
++		if (!psk && !strstr(sec, "SAE"))
++			e->crypto.auth_suites |= IWINFO_KMGMT_8021x;
++	} else {
++		e->crypto.auth_algs = !strcmp(sec, "OPEN") ? IWINFO_AUTH_OPEN : !strcmp(sec, "SHARED") ? IWINFO_AUTH_SHARED :
++		                      IWINFO_AUTH_OPEN | IWINFO_AUTH_SHARED;
++	}
++	if (ciph && !strcmp(ciph, "WEP"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_WEP40 | IWINFO_CIPHER_WEP104;
++	else if (ciph && !strcmp(ciph, "TKIPAES"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_TKIP | IWINFO_CIPHER_CCMP;
++	else if (ciph && !strcmp(ciph, "TKIP"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_TKIP;
++	else if (ciph && !strcmp(ciph, "AES"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_CCMP;
++	else if (ciph && !strcmp(ciph, "GCMP256"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_GCMP256;
++	else if (ciph && !strcmp(ciph, "CCMP256"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_CCMP256;
++	else if (ciph && !strcmp(ciph, "GCMP128"))
++		e->crypto.pair_ciphers = IWINFO_CIPHER_GCMP;
++	e->crypto.group_ciphers = e->crypto.pair_ciphers;
++	return 1;
++}
++/* end mtwifi_scan_line */
++
++/* LuCI's Scan and Channel Analysis ask again every few seconds, and a survey takes the band off its channel, so start
++ * one at most this often and answer from the driver's table in between. */
++#define MTWIFI_SCAN_EVERY	30
++#define MTWIFI_SCAN_WAIT	4	/* about 4 s on either band (measured); slept here, as the table ioctl would wait in the kernel */
++#define MTWIFI_SCAN_BUF		5000			/* a table read returns at most about 4 KB, then continues at an index */
++
++static int mtwifi_scan_start(const char *ifn)
++{
++	char stamp[32], cmd[] = "SiteSurvey=";
++	struct iwreq wrq = {};
++	struct stat st;
++	FILE *f;
++
++	snprintf(stamp, sizeof(stamp), "/tmp/mtwifi-scan-%s", ifn);
++	if (!stat(stamp, &st) && time(NULL) - st.st_mtime < MTWIFI_SCAN_EVERY)
++		return 0;
++	/* An empty SSID makes it passive: nothing is sent on a channel the region might not allow. */
++	strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
++	wrq.u.data.pointer = cmd;
++	wrq.u.data.length = sizeof(cmd);
++	if (iwinfo_ioctl(MTWIFI_SET, &wrq) < 0)
++		return -1;
++	f = fopen(stamp, "w");
++	if (f)
++		fclose(f);
++	sleep(MTWIFI_SCAN_WAIT);
++	return 0;
++}
++
++static int mtwifi_scanlist(const char *n, char *buf, int *len)
++{
++	struct iwinfo_scanlist_entry *out = (struct iwinfo_scanlist_entry *)buf;
++	char *data, *line, *next;
++	const char *ifn = mtwifi_ifname(n);
++	int five, idx = 0, total = -1, cnt = 0;
++
++	if (!ifn)
++		return -1;
++	five = mtwifi_is_5g(ifn);
++	ifn = five ? "rai0" : "ra0";
++	if (mtwifi_scan_start(ifn))
++		return -1;
++	data = malloc(MTWIFI_SCAN_BUF + 1);
++	if (!data)
++		return -1;
++	while (total < 0 || idx < total) {
++		struct iwreq wrq = {};
++		int before = idx;
++
++		snprintf(data, MTWIFI_SCAN_BUF, "%d", idx);
++		strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
++		wrq.u.data.pointer = data;
++		wrq.u.data.length = MTWIFI_SCAN_BUF;
++		if (iwinfo_ioctl(MTWIFI_GET_SURVEY, &wrq) < 0 || wrq.u.data.length >= MTWIFI_SCAN_BUF)
++			break;
++		data[wrq.u.data.length] = 0;
++		for (line = data; line; line = next) {
++			next = strchr(line, '\n');
++			if (next)
++				*next++ = 0;
++			if (total < 0 && sscanf(line, "Total=%d", &total) == 1)
++				continue;
++			if ((cnt + 1) * (int)sizeof(*out) <= IWINFO_BUFSIZE && mtwifi_scan_line(line, five, out)) {
++				out++;
++				cnt++;
++				idx++;
++			}
++		}
++		if (idx == before)
++			break;
++	}
++	free(data);
++	*len = cnt * sizeof(*out);
++	return 0;
++}
++
 +static int mtwifi_encryption(const char *n, char *b) { return -1; }
 +
 +/* iwinfo_finish() calls every backend's close() unchecked. */
@@ -282,16 +549,16 @@ index 0000000..eed4cb6
 +	.htmode           = mtwifi_none,
 +	.ssid             = mtwifi_ssid,
 +	.bssid            = mtwifi_bssid,
-+	.country          = mtwifi_nostr,
++	.country          = mtwifi_country,
 +	.hardware_id      = mtwifi_nostr,
 +	.hardware_name    = mtwifi_hardware_name,
 +	.encryption       = mtwifi_encryption,
 +	.phyname          = mtwifi_phyname,
 +	.assoclist        = mtwifi_assoclist,
 +	.txpwrlist        = mtwifi_nolist,
-+	.scanlist         = mtwifi_nolist,
++	.scanlist         = mtwifi_scanlist,
 +	.freqlist         = mtwifi_freqlist,
-+	.countrylist      = mtwifi_nolist,
++	.countrylist      = mtwifi_countrylist,
 +	.survey           = mtwifi_nolist,
 +	.lookup_phy       = mtwifi_nostr,
 +	.close            = mtwifi_close,

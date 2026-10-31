@@ -386,10 +386,18 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   extra interface up; without one it stays down and silent (scanned). The MAC address of `rai0` depends on `BssidNum`.
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
-  ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, fixed per-band channel and mode lists (2.4 GHz
-  1-13; 5 GHz 36-165; no per-country or DFS flags), and associated stations from the driver's station table
+  ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
   (`SIOCIWFIRSTPRIV + 0x1F`, 56-byte entries, the layout stock's `ioctl_helper.so` reads). Tx power, radio signal/noise and
   station data rates stay unknown. On a unit: `iwinfo rai0 info` shows `Type: mtwifi`; `iwinfo rai0 assoclist` lists clients.
+- **Wi-Fi country (#177):** `/usr/share/x28-wifi/regions` maps a country to the driver's `CountryRegion` and `CountryRegionABand`, picked
+  from the SDK driver's `rt_channel.c` as the largest region that stays inside the country's channels; `channels5` lists each 5 GHz
+  region's channels. The merged profile takes the country from the 5 GHz profile, so LuCI sets it on both radios. The driver doesn't
+  enforce the region (observed: Iran stayed on 36), so the handler replaces `auto` or a channel the country doesn't allow with the
+  region's first channel. `auto` is therefore not an automatic choice.
+- **Wi-Fi scan (#176):** the backend's `scanlist` starts a passive `SiteSurvey` at most every 30 s per band, waits 4 s (measured) and reads
+  the table with `RTPRIV_IOCTL_GSITESURVEY`. LuCI asks every few seconds, so the other calls read the table only. The driver reports signal in
+  percent, so it converts back to dBm (-50 dBm or better shows as -50), and widths above 40 MHz aren't in this table. `sh tests/test_mtwifi_scan.sh`
+  checks the line parser.
 - **Install space (#183):** Disk space would be only `rootfs_data` (22.8 MB). `lib/preinit/79_x28_user_data` attaches `user_data`
   (ubi1, stock's volumes `customer` and `data`) before `mount_root`, and `etc/config/fstab` makes `data` (278 MB free) the overlay
   through stock OpenWrt's `block extroot`. Nothing is formatted, so stock slot B keeps its files. If the volume is missing or

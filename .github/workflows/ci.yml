@@ -49,6 +49,7 @@ jobs:
       - run: sh package/x28-leds/files/x28-leds selftest
       - run: sh package/x28-mipc/files/x28-apn selftest
       - run: sh tests/test_wifi.sh
+      - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
       - run: sh tests/test_bootok.sh
       - run: sh tests/test_user_data.sh
