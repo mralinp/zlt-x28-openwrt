@@ -132,6 +132,9 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('"/productinfo"',f.luci_storage(f.LUCI_SKIP_ANCHOR))
         self.assertEqual(f.luci_storage(f.LUCI_SKIP),f.LUCI_SKIP)  # idempotent
         with self.assertRaises(ValueError):f.luci_storage('changed LuCI')
+        self.assertIn('results.length&&',f.luci_analysis(f.LUCI_ONCE_ANCHOR))
+        self.assertEqual(f.luci_analysis(f.LUCI_ONCE),f.LUCI_ONCE)  # idempotent
+        with self.assertRaises(ValueError):f.luci_analysis('changed LuCI')
         self.assertIn('do_x28_user_data',tree['lib/preinit/79_x28_user_data'][1].decode())
         self.assertIn("option device '/dev/ubi1_2'",tree['etc/config/fstab'][1].decode())
         for name in f.UBI_WRITERS:self.assertNotIn(name,tree)

@@ -397,7 +397,7 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
 - **Wi-Fi scan (#176):** the backend's `scanlist` starts a `PartialScan` at most every 60 s per band and reads the table with
   `RTPRIV_IOCTL_GSITESURVEY`. A full `SiteSurvey` moved a phone from 5 GHz to 2.4 GHz every time (2 of 2, 3 pings lost); a partial one, a channel
   at a time, didn't (3 of 3, 0 of 74 lost), but takes about 16 s on 5 GHz and 9 s on 2.4 GHz. The table ioctl would wait that long in the kernel, so
-  a call returns nothing until the survey time has passed and LuCI's next polls fill in. The driver reports signal in percent, so it converts back
+  a call returns nothing until the survey time has passed and LuCI's next polls fill in. Channel Analysis stops polling after its first answer, so `first_boot.py` makes it wait for one with results. The driver reports signal in percent, so it converts back
   to dBm (-50 dBm or better shows as -50), and widths above 40 MHz aren't in this table. `sh tests/test_mtwifi_scan.sh` checks the line parser.
 - **Install space (#183):** Disk space would be only `rootfs_data` (22.8 MB). `lib/preinit/79_x28_user_data` attaches `user_data`
   (ubi1, stock's volumes `customer` and `data`) before `mount_root`, and `etc/config/fstab` makes `data` (278 MB free) the overlay

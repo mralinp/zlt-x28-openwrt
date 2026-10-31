@@ -88,6 +88,10 @@ def two_bss(profile):
 
 # The modem stack's and Wi-Fi calibration's partitions aren't user storage: keep them out of LuCI's Storage list.
 LUCI_STORAGE = 'www/luci-static/resources/view/status/include/25_storage.js'
+# Channel Analysis stops polling after its first answer, but a partial scan answers only once it's done (#176).
+LUCI_ANALYSIS = 'www/luci-static/resources/view/status/channel_analysis.js'
+LUCI_ONCE_ANCHOR = "if(!radio.loadedOnce){radio.loadedOnce=true;poll.stop();}"
+LUCI_ONCE = "if(results.length&&!radio.loadedOnce){radio.loadedOnce=true;poll.stop();}"
 LUCI_SKIP_ANCHOR = 'var MountSkipList=["/rom","/tmp","/dev","/overlay","/",]'
 LUCI_SKIP = ('var MountSkipList=["/rom","/tmp","/dev","/overlay","/","/mnt/vendor/nvcfg","/mnt/vendor/nvdata","/mnt/vendor/nvram",'
              '"/mnt/vendor/protect_f","/mnt/vendor/protect_s","/mnt/data","/productinfo",]')
@@ -99,6 +103,13 @@ def luci_storage(js):
     if js.count(LUCI_SKIP_ANCHOR)!=1:raise ValueError('unexpected LuCI 25_storage.js: mount list anchor not found')
     return js.replace(LUCI_SKIP_ANCHOR,LUCI_SKIP)
 
+
+
+def luci_analysis(js):
+    """Stock channel_analysis.js that keeps polling until a scan has results; refuses an unknown LuCI build."""
+    if LUCI_ONCE in js:return js
+    if js.count(LUCI_ONCE_ANCHOR)!=1:raise ValueError('unexpected LuCI channel_analysis.js: poll anchor not found')
+    return js.replace(LUCI_ONCE_ANCHOR,LUCI_ONCE)
 
 
 def luci_edits():
@@ -285,6 +296,7 @@ def integrate(stage,key,stock_path,output):
     put('usr/share/x28-wifi/channels5',(WIFI/'channels5').read_text())
     if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
     if LUCI_STORAGE in tree:put(LUCI_STORAGE,luci_storage(tree[LUCI_STORAGE][1].decode()))
+    if LUCI_ANALYSIS in tree:put(LUCI_ANALYSIS,luci_analysis(tree[LUCI_ANALYSIS][1].decode()))
     # Cellular WAN as a stock-looking netifd protocol (#135): the proto handler, its APN helper and the LuCI form.
     put('lib/netifd/proto/x28_mipc.sh',(MIPC/'x28_mipc.sh').read_text(),0o755)
     put('sbin/x28-apn',(MIPC/'x28-apn').read_text(),0o755)
