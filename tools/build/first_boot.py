@@ -52,7 +52,13 @@ LUCI_MTWIFI_DEV = ("if(hwtype=='mtwifi'){o=ss.taboption('general',form.ListValue
                    "_('Share of the radio\\'s full power.'));o.value('',_('100 % (full)'));"
                    "['75','50','25','15','9'].forEach(function(p){o.value(p,p+' %');});"
                    "o=ss.taboption('advanced',form.Value,'beacon_int',_('Beacon Interval'));o.datatype='range(20,999)';"
-                   "o.placeholder=100;o.rmempty=true;}")
+                   "o.placeholder=100;o.rmempty=true;"
+                   # One card, one country: the driver takes it from one profile, so every mtwifi radio gets the choice (#177).
+                   "o=ss.taboption('advanced',CBIWifiCountryValue,'country',_('Country Code'));o.wifiNetwork=radioNet;"
+                   "o.write=function(sid,v){uci.sections('wireless','wifi-device').forEach(function(d){"
+                   "if(d.type=='mtwifi')uci.set('wireless',d['.name'],'country',v);});};"
+                   "o.remove=function(sid){uci.sections('wireless','wifi-device').forEach(function(d){"
+                   "if(d.type=='mtwifi')uci.unset('wireless',d['.name'],'country');});};}")
 LUCI_IFACE_ANCHOR = "if(hwtype=='mac80211'){var mode=ss.children[0],bssid=ss.children[5],encr;"
 LUCI_MTWIFI_IFACE = ("if(hwtype=='mtwifi'){o=ss.taboption('macfilter',form.ListValue,'macfilter',_('MAC Address Filter'));"
                      "o.value('',_('disable'));o.value('allow',_('Allow listed only'));o.value('deny',_('Allow all except listed'));"
@@ -82,6 +88,10 @@ def two_bss(profile):
 
 # The modem stack's and Wi-Fi calibration's partitions aren't user storage: keep them out of LuCI's Storage list.
 LUCI_STORAGE = 'www/luci-static/resources/view/status/include/25_storage.js'
+# Channel Analysis stops polling after its first answer, but a partial scan answers only once it's done (#176).
+LUCI_ANALYSIS = 'www/luci-static/resources/view/status/channel_analysis.js'
+LUCI_ONCE_ANCHOR = "if(!radio.loadedOnce){radio.loadedOnce=true;poll.stop();}"
+LUCI_ONCE = "if(results.length&&!radio.loadedOnce){radio.loadedOnce=true;poll.stop();}"
 LUCI_SKIP_ANCHOR = 'var MountSkipList=["/rom","/tmp","/dev","/overlay","/",]'
 LUCI_SKIP = ('var MountSkipList=["/rom","/tmp","/dev","/overlay","/","/mnt/vendor/nvcfg","/mnt/vendor/nvdata","/mnt/vendor/nvram",'
              '"/mnt/vendor/protect_f","/mnt/vendor/protect_s","/mnt/data","/productinfo",]')
@@ -93,6 +103,13 @@ def luci_storage(js):
     if js.count(LUCI_SKIP_ANCHOR)!=1:raise ValueError('unexpected LuCI 25_storage.js: mount list anchor not found')
     return js.replace(LUCI_SKIP_ANCHOR,LUCI_SKIP)
 
+
+
+def luci_analysis(js):
+    """Stock channel_analysis.js that keeps polling until a scan has results; refuses an unknown LuCI build."""
+    if LUCI_ONCE in js:return js
+    if js.count(LUCI_ONCE_ANCHOR)!=1:raise ValueError('unexpected LuCI channel_analysis.js: poll anchor not found')
+    return js.replace(LUCI_ONCE_ANCHOR,LUCI_ONCE)
 
 
 def luci_edits():
@@ -275,8 +292,11 @@ def integrate(stage,key,stock_path,output):
     # The staged boot script runs `wifi config` once when /etc/config/wireless is missing: WPA2 with a random key.
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
+    put('usr/share/x28-wifi/regions',(WIFI/'regions').read_text())
+    put('usr/share/x28-wifi/channels5',(WIFI/'channels5').read_text())
     if LUCI_WIRELESS in tree:put(LUCI_WIRELESS,luci_mtwifi(tree[LUCI_WIRELESS][1].decode()))
     if LUCI_STORAGE in tree:put(LUCI_STORAGE,luci_storage(tree[LUCI_STORAGE][1].decode()))
+    if LUCI_ANALYSIS in tree:put(LUCI_ANALYSIS,luci_analysis(tree[LUCI_ANALYSIS][1].decode()))
     # Cellular WAN as a stock-looking netifd protocol (#135): the proto handler, its APN helper and the LuCI form.
     put('lib/netifd/proto/x28_mipc.sh',(MIPC/'x28_mipc.sh').read_text(),0o755)
     put('sbin/x28-apn',(MIPC/'x28-apn').read_text(),0o755)

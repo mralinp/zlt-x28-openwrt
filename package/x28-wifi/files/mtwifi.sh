@@ -11,6 +11,8 @@
 }
 
 MTWIFI_DIR=${MTWIFI_DIR:-/etc/wireless/mediatek}
+MTWIFI_REGIONS=${MTWIFI_REGIONS:-/usr/share/x28-wifi/regions}
+MTWIFI_CHANNELS5=${MTWIFI_CHANNELS5:-/usr/share/x28-wifi/channels5}
 
 # mtwifi_band <band> <radio section>: prints the band's main interface and profile, e.g. "rai0 .../mt7915.dbdc.b1.dat".
 # LuCI's frequency widget needs iwinfo, which mt_wifi lacks, so saving a radio there deletes band, channel and htmode
@@ -78,6 +80,29 @@ mtwifi_bw() {
 	esac
 }
 
+# Prints "code CountryRegion CountryRegionABand" for a country; an unknown one gets US, so a bad value can't take Wi-Fi down.
+mtwifi_country() {
+	grep "^${1:-US} " "$MTWIFI_REGIONS" || grep '^US ' "$MTWIFI_REGIONS" || echo "US 0 9"
+}
+
+# mtwifi_channel <band ifname> <channel> <CountryRegion> <CountryRegionABand>: the channel to use. The driver doesn't enforce
+# the region itself (observed: Iran's region stayed on 36 with Channel=0 or 36), so "auto" or a channel the country doesn't
+# allow becomes the region's first one.
+mtwifi_channel() {
+	local list c
+	if [ "$1" = ra0 ]; then
+		list="1 2 3 4 5 6 7 8 9 10 11"
+		[ "$3" != 1 ] || list="$list 12 13"
+	else
+		list="$(sed -n "s/^$4 //p" "$MTWIFI_CHANNELS5")"
+		[ -n "$list" ] || list=36
+	fi
+	for c in $list; do
+		[ "$c" != "$2" ] || { echo "$c"; return; }
+	done
+	echo "${list%% *}"
+}
+
 drv_mtwifi_init_device_config() {
 	config_add_string country
 	config_add_int txpower_pct beacon_int
@@ -126,7 +151,7 @@ mtwifi_is_up() {
 }
 
 drv_mtwifi_setup() {
-	local channel htmode country band txpower_pct beacon_int ifname dat second other other2 was ifn
+	local channel htmode country band txpower_pct beacon_int ifname dat second other other2 was ifn cc
 	local vif_count=0 vif_name= vif_ssid= vif_key= vif_policy=0 vif_acl= vif2_name= vif2_ssid= vif2_key= vif2_policy=0 vif2_acl=
 	local vif_auth=OPEN vif_enc=NONE vif_mfpc=1 vif_mfpr=0 vif_hidden=0 vif_isolate=0 vif_wmm=1 vif_dtim=1
 	json_select config
@@ -146,8 +171,10 @@ drv_mtwifi_setup() {
 		vif_ssid="x28-off" vif_hidden=1 vif_auth=WPA2PSK vif_enc=AES
 		vif_key="$(head -c 24 /dev/urandom | hexdump -ve '1/1 "%02x"')"
 	}
-	set -- $(mtwifi_bw "$htmode")
-	[ "$channel" != auto ] || channel=0
+	# The merged profile takes CountryCode and CountryRegion from the 5 GHz one (multi_profile.c), so LuCI sets both radios.
+	cc="$(mtwifi_country "$country")"
+	set -- $(mtwifi_bw "$htmode") $cc
+	channel="$(mtwifi_channel "$ifname" "$channel" "$4" "$5")"
 	# The driver merges both profiles into DBDC_card0.dat and reads it only when the card opens, i.e. with every
 	# interface down (observed: bouncing ra0 alone left 2.4 GHz on its old key). Close all, reopen what was up.
 	was=
@@ -160,8 +187,8 @@ drv_mtwifi_setup() {
 	# BssidNum is always 2: the driver creates ra1/rai1 once, at the first open after loading (observed), so a second
 	# network added later could not come up without a reboot otherwise. A network stays silent while its interface is down.
 	mtwifi_render "$dat" "BssidNum=2" "SSID1=$vif_ssid" "SSID2=$vif2_ssid" "AuthMode=$vif_auth" "EncrypType=$vif_enc" \
-		"WPAPSK1=$vif_key" "WPAPSK2=$vif2_key" "HideSSID=$vif_hidden" "NoForwarding=$vif_isolate" "Channel=${channel:-0}" \
-		"CountryCode=${country:-US}" "HT_BW=$1" "VHT_BW=$2" "PMFMFPC=$vif_mfpc" "PMFMFPR=$vif_mfpr" "WmmCapable=$vif_wmm" \
+		"WPAPSK1=$vif_key" "WPAPSK2=$vif2_key" "HideSSID=$vif_hidden" "NoForwarding=$vif_isolate" "Channel=$channel" \
+		"CountryCode=$3" "CountryRegion=$4" "CountryRegionABand=$5" "HT_BW=$1" "VHT_BW=$2" "PMFMFPC=$vif_mfpc" "PMFMFPR=$vif_mfpr" "WmmCapable=$vif_wmm" \
 		"DtimPeriod=$vif_dtim" "AccessPolicy0=$vif_policy" "AccessControlList0=$vif_acl" "AccessPolicy1=$vif2_policy" \
 		"AccessControlList1=$vif2_acl" "TxPower=${txpower_pct:-100}" "BeaconPeriod=${beacon_int:-100}" ||
 		{ wireless_setup_failed PROFILE_WRITE; return 1; }
