@@ -1,6 +1,6 @@
-# Hardware: CPU, RAM and flash
+# Hardware: CPU, RAM, flash and trees
 
-What the X28 has, what Linux gets, and what uses it. Measured read-only on the test unit on 2026-10-31, on the native
+What the X28 has, what Linux gets, what uses it, and how its filesystem and device tree are laid out. Measured read-only on the test unit on 2026-10-31, on the native
 image, about 2 h 50 min after boot with the LAN, Wi-Fi and 5G up. Run-time figures vary; the sizes do not.
 
 | | |
@@ -91,4 +91,75 @@ would keep its size but change what `rootfs_b` holds.
 
 ```bash
 ssh router 'cat /proc/mtd; ubinfo -a; df -h'
+```
+
+## Root filesystem
+
+`/` is an overlay: the read-only image with your changes on top. A file changed on `/` is stored in `/overlay/upper`.
+
+```text
+/                  overlay of /rom + /overlay
+├── rom            the image, read-only SquashFS (7.8 MiB compressed)
+├── overlay        installs and settings, UBIFS on user_data
+├── bin sbin usr   programs
+├── lib            libraries and kernel modules
+├── etc            configuration
+├── www            LuCI
+├── root           root's home
+├── vendor         vendor modem files
+├── mnt
+│   ├── vendor     modem calibration and settings: nvcfg, nvdata, nvram, protect_f, protect_s
+│   └── data       stock's user_config
+├── productinfo    unit identity data
+├── tmp            RAM; var links here
+├── dev proc sys   the kernel's virtual filesystems
+└── config         the kernel's configfs
+```
+
+Kernel modules are the largest part of the image: about 21 MiB of about 39 MiB uncompressed.
+
+| Where | Reboot | New image | Change it? |
+|---|---|---|---|
+| `/etc`, `/root`, installed packages (the overlay) | Kept | Starts fresh | Yes |
+| `/tmp`, `/var` | Lost | Lost | Yes, it is RAM |
+| `/rom` | Kept | Replaced | No, read-only |
+| `/mnt/vendor`, `/productinfo`, `/mnt/data` | Kept | Kept | **No.** The unit's calibration and identity; the vendor stack uses them |
+
+Reflashing byte-identical image bytes keeps the overlay, and the usual resets do not reach it, see
+[RECOVERY](RECOVERY.md#clearing-settings-when-the-overlay-is-on-user_data-183).
+
+```bash
+ssh router 'ls -la /; cat /proc/mounts; du -sk /rom/*'
+```
+
+## Device tree
+
+The bootloader passes the kernel this description of the hardware. It identifies the board as `Tozed,X28`, on MediaTek's
+`evb6890v1_64_cpe_nand` reference design (`mediatek,mt6890`), and has about 326 top-level entries. Most are register blocks
+of little use here.
+
+| Node | What it is |
+|---|---|
+| `cpus` | The four cores; `opp-table0` holds the speed steps |
+| `memory`, `reserved-memory` | RAM, and the [regions kept from Linux](#ram) |
+| `nfi@11005000` | NAND controller (`mediatek,mt6880-nfc`) |
+| `ethernet@15100000`, `gsw@0` | Ethernet (`mediatek,mt6890-eth`) and its switch (`mediatek,mt753x`) |
+| `pcie@11280000`, `@11288000`, `@11290000`, `@11298000` | PCIe controllers |
+| `wed@15010000`, `wed2@15011000`, `wocpu@15180000` | Wi-Fi offload |
+| `mddriver`, `dpmaif@10014000`, `md_ccif*` | Modem driver and its links to Linux |
+| `usb@11201000` | USB (`mediatek,mtu3`) |
+| `serial@11002000`, `@11003000`, `@11004000` | UARTs |
+| `lvts@1100b000`, `thermal-ntc1` to `4`, `thermal-zones` | Temperature sensors |
+| `tz_gpio_keys`, `tz_gpio_leds` | Tozed's button and LED drivers |
+
+A node does not prove a part is wired up. This tree comes from a reference design and still has nodes for parts such as a
+display (`disp_*`) and GPU (`mali@13000000`), which this doc has not checked against the board.
+
+The full tree is in [firmware/x28-device-tree.dts](firmware/x28-device-tree.dts), decompiled from `/sys/firmware/fdt`. The
+parts specific to one unit are removed: `/chosen` (serial number, boot arguments), `/atag_rawdata_item` (MAC addresses) and
+other MAC addresses. **Do not paste your own unfiltered tree into a public issue.** The command below prints only node
+names and the board identity.
+
+```bash
+ssh router 'cd /proc/device-tree; ls; tr "\0" " " < compatible'
 ```
