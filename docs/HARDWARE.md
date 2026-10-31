@@ -1,4 +1,4 @@
-# Hardware: RAM and flash
+# Hardware: CPU, RAM and flash
 
 What the X28 has, what Linux gets, and what uses it. Measured read-only on the test unit on 2026-10-31, on the native
 image, about 2 h 50 min after boot with the LAN, Wi-Fi and 5G up. Run-time figures vary; the sizes do not.
@@ -6,10 +6,20 @@ image, about 2 h 50 min after boot with the LAN, Wi-Fi and 5G up. Run-time figur
 | | |
 |---|---|
 | SoC | MediaTek MT6890 (T750), 4x Cortex-A55, aarch64 |
+| CPU speed | 0.5 to 2.0 GHz, all four cores together, set by the `schedutil` governor |
 | Modem | Quectel RG500L, on the SoC's own modem processor |
 | Wi-Fi | MT7915, dual band |
 | RAM | 1 GiB, of which Linux gets about 628 MiB |
 | Flash | 1 GiB NAND, 51 partitions, of which OpenWrt gets about 288 MiB for installs and settings |
+
+## CPU
+
+The kernel's limits are 500 MHz and 2,000 MHz, in 16 steps, with one frequency shared by all four cores. It was running at
+1.5 GHz when measured.
+
+```bash
+ssh router 'cd /sys/devices/system/cpu/cpufreq/policy0; cat cpuinfo_min_freq cpuinfo_max_freq scaling_cur_freq scaling_governor'
+```
 
 ## RAM
 
