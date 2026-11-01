@@ -57,6 +57,8 @@ class VendorIpset(unittest.TestCase):
             self.assertIn('hash:ip,mac', index['x28-ipset-kernel']['Description'])
             with self.assertRaises(FileExistsError):
                 v.build(original, library, v.REQUIRED_MODULES, out)
+            v.build(original, library, v.REQUIRED_MODULES, Path(d)/'stubs', ['kmod-tun'])
+            self.assertEqual(feed.parse_index((Path(d)/'stubs/Packages').read_text())['kmod-tun']['Depends'], 'kernel (= '+feed.VERSION+')')
 
 
 if __name__ == '__main__':

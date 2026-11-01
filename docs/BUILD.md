@@ -483,14 +483,16 @@ The official core feed stays enabled because it also carries packages such as `i
 
 - **List:** `package/x28-kmod-stubs/stubs.txt`, 178 of the core feed's 976 kmods. A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
 - **Renames:** 4.19's `nf_log_common`, `nf_log_ipv4` and `nf_log_ipv6` count as 5.15's `nf_log_syslog`, and `ipt_MASQUERADE` and `ip6t_MASQUERADE` as `xt_MASQUERADE`.
-- **Incomplete packages are refused:** no stub for `kmod-ipt-ipset` (missing `ip_set_hash_ipmac`), `kmod-ipt-extra` (missing `xt_cgroup`) or `kmod-inet-diag` (missing `raw_diag`). Dependents are also excluded. This deliberately leaves ordinary `ipset` installation blocked until we provide accurate vendor-version package metadata or the missing capabilities; do not use `--nodeps` to hide that gap.
-- **Limit:** built-in modules come from `modules.builtin` in the SDK tree configured with the stock config, not from the stock build itself.
+- **Incomplete packages are refused:** no stub for `kmod-ipt-ipset` (missing `ip_set_hash_ipmac`), `kmod-ipt-extra` (missing `xt_cgroup`) or `kmod-inet-diag` (missing `raw_diag`). Dependents are also excluded. `ipset` itself installs through the explicit vendor subset below; do not use `--nodeps` to hide a gap.
+- **Check:** `map` takes built-in modules from `modules.builtin` in the SDK tree. `verify` then confirms each one against the unit's own `/proc/config.gz` and `/sys/module`.
 
 ```sh
 # Regenerate or check the list. Downloads the core feed's kmods (about 29 MB) and reads their file lists.
 python3 tools/build/kmod_stub_feed.py map --modules MODULES.txt --builtin modules.builtin [--check]
-# Build, sign, and test with the image's real opkg (arm64 host; see the script's header)
-python3 tools/build/kmod_stub_feed.py build --out FEED_DIR
+# Confirm the list against the unit's kernel. The three files are read-only captures from the unit.
+python3 tools/build/kmod_stub_feed.py verify --modules MODULES.txt --config CONFIG --sysmodule SYSMODULE.txt --kernel-tree KERNEL_TREE
+# Build the whole feed (stubs and ipset; see the vendor-ipset doc for its inputs), then test with the image's real opkg (arm64 host)
+python3 tools/build/vendor_ipset.py --upstream IPSET.ipk --library LIBIPSET.ipk --modules MODULES.txt --out FEED_DIR
 docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$PWD/tools/build:/t:ro" \
   debian:stable-slim bash /t/opkg_feed_test.sh
 ```
@@ -508,7 +510,7 @@ unavailable. This is a locally tested candidate, not a hosted feed or installed 
 
 ### Signed-feed release preparation (#200)
 
-The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed four-package
-candidate, signs and verifies it locally, and stages an allowlisted release bundle. Its public key is
-checked in; its private key stays outside Git. Hosting uses a version-pinned approved GitHub Release,
+The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed 182-package feed
+(stubs and vendor ipset), signs and verifies it locally, and stages an allowlisted release bundle. Its public
+key is checked in; its private key stays outside Git. Hosting uses a version-pinned approved GitHub Release,
 with no overwrite or private-directory upload. Publication and #202 image integration are still pending.

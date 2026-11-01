@@ -16,6 +16,8 @@ its library's transitive dependency unsatisfied; real-opkg testing reproduced th
 
 ## What the candidate contains
 
+The released feed adds the kmod stubs to these four packages; see the [signed-feed preparation](signed-package-feed.md).
+
 | Package | Contents / dependency |
 |---|---|
 | `kernel` | File-free record for `1:4.19.205-x28`; changes no kernel code. |

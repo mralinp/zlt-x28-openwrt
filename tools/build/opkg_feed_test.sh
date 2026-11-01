@@ -40,8 +40,9 @@ opkg update >/tmp/o 2>&1
 check "feed update succeeds" $? 0
 check "the feed's signature verifies" "$(grep -c 'Signature check failed' /tmp/o)" 0
 check "opkg info prints no errors" "$(opkg info kmod-tun 2>&1 | grep -c 'ERROR')" 0
-check "incomplete ipset dependency is refused" "$(try ipset)" 255
-check "  ipset is not installed" "$(inst ipset)" 0
+check "ipset installs through the vendor subset" "$(try ipset)" 0
+check "  as the X28 build" "$(opkg status ipset | grep -c '^Version: 1:7.17-1-x28-1$')" 1
+check "incomplete kmod-ipt-ipset is refused" "$(try kmod-ipt-ipset)" 255
 check "available tun stub installs" "$(try kmod-tun)" 0
 check "  kernel" "$(inst kernel)" 1
 check "  no incomplete ipset stub" "$(inst kmod-ipt-ipset)" 0
@@ -54,6 +55,7 @@ check "iptables-mod-tproxy is refused" "$(try iptables-mod-tproxy)" 255
 check "  and not installed" "$(inst kmod-ipt-tproxy)" 0
 check "no 5.15 upgrade is offered" "$(opkg list-upgradable 2>/dev/null | grep -cE '^(kernel|kmod-)')" 0
 check "userspace still installs" "$(try tcpdump)" 0
+check "userspace needing kmod-tun installs" "$(try openvpn-mbedtls)" 0
 echo "failures: $fails"
 exit $((fails > 0))
 EOF

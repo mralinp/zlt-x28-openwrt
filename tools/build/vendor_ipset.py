@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a local ipset feed for the observed vendor subset (#200); no device operations.
+"""Build the local X28 feed: kmod stubs plus ipset for the observed vendor subset (#200); no device operations.
 
 The upstream payload and maintainer scripts are preserved. Only ipset's version,
 description and kernel dependency metadata change. This does
@@ -60,11 +60,11 @@ def repackage(upstream, modules, name='ipset'):
     return text, result
 
 
-def build(upstream, library, modules, out):
+def build(upstream, library, modules, out, stubs=()):
     control, package = repackage(upstream, modules)
     library_control, library_package = repackage(library, modules, 'libipset13')
     out.mkdir(parents=True, exist_ok=False)
-    feed.build([], out)  # Only the kernel marker; no SDK-derived aggregate stubs.
+    feed.build(list(stubs), out)
     marker, marker_ipk = feed.stub('x28-ipset-kernel', 'kernel (= ' + feed.VERSION + ')', DESCRIPTION)
     for filename, metadata, payload in (
             ('x28-ipset-kernel_4.19.205-x28_all.ipk', marker, marker_ipk),
@@ -89,10 +89,11 @@ def main():
     parser.add_argument('--library', type=Path, required=True)
     parser.add_argument('--modules', type=Path, required=True, help='read-only observed module-file inventory')
     parser.add_argument('--out', type=Path, required=True, help='new private output directory')
+    parser.add_argument('--stubs', type=Path, default=feed.STUBS, help='kmod stub list to include')
     args = parser.parse_args()
     modules = {Path(name).stem for name in args.modules.read_text().split()}
-    build(args.upstream.read_bytes(), args.library.read_bytes(), modules, args.out)
-    print('Four-package local candidate built; unsigned and not deployed:', args.out)
+    build(args.upstream.read_bytes(), args.library.read_bytes(), modules, args.out, args.stubs.read_text().split())
+    print('Local feed built; unsigned and not deployed:', args.out)
 
 
 if __name__ == '__main__':

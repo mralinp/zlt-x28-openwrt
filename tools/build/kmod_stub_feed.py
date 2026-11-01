@@ -7,9 +7,12 @@ outrank the 5.15 packages, so a kmod the kernel lacks fails to install instead o
 
   kmod_stub_feed.py map --modules FILE --builtin FILE [--check] [--out package/x28-kmod-stubs/stubs.txt]
   kmod_stub_feed.py build --out DIR [--stubs package/x28-kmod-stubs/stubs.txt]
+  kmod_stub_feed.py verify --modules FILE --config FILE --sysmodule FILE --kernel-tree DIR [--stubs FILE]
 
 --modules: one name per line, `ls /lib/modules/4.19.205/*.ko` on the unit, without the suffix.
 --builtin: `modules.builtin` from a kernel tree configured with docs/firmware/kernel-4.19.205-x28.config.
+verify proves each stub module that has no .ko on the unit is really built in: --config is the unit's `zcat /proc/config.gz`,
+--sysmodule its `ls /sys/module`, and --kernel-tree a 4.19 tree used only to map module names to CONFIG options.
 Signing is separate: `usign -S -m DIR/Packages -s KEY -x DIR/Packages.sig`.
 """
 import argparse
@@ -17,7 +20,9 @@ import concurrent.futures
 import gzip
 import hashlib
 import io
+import os
 import pathlib
+import re
 import sys
 import tarfile
 import urllib.request
@@ -55,6 +60,26 @@ def covered(kmods, have):
                 all(ok(d, seen + (name,)) for d in k['depends'] if d.startswith('kmod-'))
         return memo[name]
     return sorted(n for n in kmods if ok(n))
+
+
+def builtin_objects(tree):
+    """Module name -> the CONFIG options that build it, from the tree's Makefiles."""
+    out = {}
+    for root, _, files in os.walk(tree):
+        for name in {'Makefile', 'Kbuild'} & set(files):
+            text = (pathlib.Path(root) / name).read_text(errors='replace').replace('\\\n', ' ')
+            for option, objs in re.findall(r'^\s*obj-\$\((CONFIG_\w+)\)\s*[+:]?=\s*(.*)$', text, re.M):
+                for obj in objs.split():
+                    if obj.endswith('.o'):
+                        out.setdefault(norm(obj[:-2]), set()).add(option)
+    return out
+
+
+def unproven(stubs, kmods, on_unit, objects, config, sysmodules):
+    """Stub modules with no .ko on the unit, no =y option in its config and no /sys/module entry."""
+    assumed = {norm(m) for name in stubs for m in missing(kmods[name]['ko'], on_unit)}
+    return sorted(m for m in assumed if m not in sysmodules and
+                  not any(config.get(c) == 'y' for c in objects.get(m, ())))
 
 
 def parse_index(text):
@@ -135,7 +160,20 @@ def main():
     b = sub.add_parser('build')
     b.add_argument('--out', required=True, type=pathlib.Path)
     b.add_argument('--stubs', default=STUBS, type=pathlib.Path)
+    v = sub.add_parser('verify')
+    v.add_argument('--modules', required=True, type=pathlib.Path)
+    v.add_argument('--config', required=True, type=pathlib.Path)
+    v.add_argument('--sysmodule', required=True, type=pathlib.Path)
+    v.add_argument('--kernel-tree', required=True, type=pathlib.Path)
+    v.add_argument('--stubs', default=STUBS, type=pathlib.Path)
     a = ap.parse_args()
+    if a.cmd == 'verify':
+        config = dict(re.findall(r'^(CONFIG_\w+)=(.*)$', a.config.read_text(errors='replace'), re.M))
+        on_unit = {norm(pathlib.PurePath(x).stem) for x in a.modules.read_text().split()}
+        bad = unproven(a.stubs.read_text().split(), feed_kmods(), on_unit, builtin_objects(a.kernel_tree), config,
+                       {norm(x) for x in a.sysmodule.read_text().split()})
+        print('every stub module is on the unit or built in' if not bad else 'unproven: ' + ' '.join(bad))
+        return 1 if bad else 0
     if a.cmd == 'build':
         print(build(a.stubs.read_text().split(), a.out), 'packages in', a.out)
         return 0

@@ -44,6 +44,19 @@ class Covered(unittest.TestCase):
         self.assertEqual(f.covered({'kmod-a': kmod(['mdio-gpio'])}, {f.norm('mdio-gpio')}), ['kmod-a'])
 
 
+class Verify(unittest.TestCase):
+    def test_builtin_needs_live_proof(self):
+        kmods = {'kmod-a': kmod(['a', 'b', 'c', 'd', 'e'])}
+        objects = {'b': {'CONFIG_B'}, 'c': {'CONFIG_C'}, 'd': {'CONFIG_D'}}
+        config = {'CONFIG_B': 'y', 'CONFIG_C': 'm'}
+        self.assertEqual(f.unproven(['kmod-a'], kmods, {'a'}, objects, config, {'e'}), ['c', 'd'])
+
+    def test_objects_read_from_makefile(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'Makefile').write_text('obj-$(CONFIG_TUN) += tun.o \\\n  mdio-gpio.o\nfoo := bar.o\n')
+            self.assertEqual(f.builtin_objects(d), {'tun': {'CONFIG_TUN'}, 'mdio_gpio': {'CONFIG_TUN'}})
+
+
 class Build(unittest.TestCase):
     def test_index_matches_the_packages(self):
         with tempfile.TemporaryDirectory() as d:
