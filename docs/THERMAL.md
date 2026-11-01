@@ -27,8 +27,8 @@ margin and longevity, not avoiding a shutdown. The Quectel `ql_ntc` policy has i
 Read on the native image (`v0.22.0`), modem registered with data up, CPU about 97 % idle: `soc_max` 39.6–40.4, `cpu_little0`
 38.6–39.7, modem 38.6–39.6, `rf_ntc` 34.9, PMIC 37.7 °C. That is below even the "12 V fan" column above. Fewer vendor services run on the native image, which is the likely reason,
 but it has not been isolated. Whether the fan was running during this reading is not recorded here (owner to
-confirm); a no-fan reading on the native image is still to be taken. The load average sits around 3 while the CPU is idle,
-which is unexplained and does not show up as heat.
+confirm); a no-fan reading on the native image is still to be taken. The load average sits around 3 while the CPU is idle: three
+vendor kernel threads in uninterruptible sleep ([TESTING 33](TESTING.md)). It does not show up as heat.
 
 ## How it was measured
 

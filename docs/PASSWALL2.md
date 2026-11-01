@@ -22,8 +22,9 @@ binary was not checked.
 
 ## When to come back to this
 
-1. Build a 4.19 kernel module feed ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)) with `xt_TPROXY`,
-   `xt_socket` and the matching `nf_tproxy` modules, and make `opkg` resolve kmod dependencies against it.
+1. Add TPROXY support. Modules built from the SDK can't load on the stock kernel
+   ([result](research/kernel-module-crc.md)), so this needs the exact source or a route without those modules.
+   Make `opkg` resolve kmod dependencies against a feed that matches the kernel.
 2. Build `dnsmasq-full` with ipset on and nftset off, in `tools/build/sdk_packages.sh`, or carry a suitable build in
    the feed.
 3. Undo the workarounds below, then enable Passwall2 and finish the steps in #198.

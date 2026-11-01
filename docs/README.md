@@ -29,6 +29,7 @@ docs/
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
 ├── THERMAL.md                baseline, fan result and the native image reading, how it was measured
+├── research/kernel-module-crc.md  why TPROXY modules built from the SDK can't load on the stock kernel
 ├── PASSWALL2.md              Passwall2 on hold: what blocks it, tunnel speed results, state of the test unit
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── FIRMWARE-EXTRACTION.md    offline extraction of the stock rootfs

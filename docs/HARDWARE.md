@@ -52,7 +52,7 @@ What Linux's 628 MiB held at the time of measuring:
 **The 286 MiB is not explained.** It is memory taken directly by kernel code, which `/proc/meminfo` does not list; the
 likely owners are the vendor Wi-Fi (`mt_wifi`, `mtk_warp`) and modem network drivers, but this has not been measured.
 `VmallocUsed` (43 MiB) and the CMA pool (16 MiB) may overlap it. The programs are too small to be the cause of the
-falling `MemAvailable` seen in the soak ([#149](https://github.com/mralinp/zlt-x28-openwrt/issues/149)).
+falling `MemAvailable` seen in the soak ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)).
 
 `/tmp` is RAM. Its 313 MiB limit is a ceiling, not a reservation.
 
