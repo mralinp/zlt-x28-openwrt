@@ -30,9 +30,6 @@ STUBS = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmod-stubs/st
 # Same code under another name in 4.19.
 RENAMED = {'nf_log_syslog': ('nf_log_common', 'nf_log_ipv4', 'nf_log_ipv6'),
            'xt_MASQUERADE': ('ipt_MASQUERADE', 'ip6t_MASQUERADE')}
-# Modules the kernel lacks that we accept losing, so that the rest of the package stays usable.
-ACCEPTED_MISSING = {'kmod-ipt-ipset': {'ip_set_hash_ipmac'}, 'kmod-ipt-extra': {'xt_cgroup'},
-                    'kmod-inet-diag': {'raw_diag'}}
 
 
 def norm(name):
@@ -54,7 +51,7 @@ def covered(kmods, have):
             return True
         if name not in memo:
             k = kmods.get(name)
-            memo[name] = bool(k) and not missing(k['ko'], have) - ACCEPTED_MISSING.get(name, set()) and \
+            memo[name] = bool(k) and not missing(k['ko'], have) and \
                 all(ok(d, seen + (name,)) for d in k['depends'] if d.startswith('kmod-'))
         return memo[name]
     return sorted(n for n in kmods if ok(n))

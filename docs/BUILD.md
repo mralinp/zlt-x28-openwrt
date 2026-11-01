@@ -481,9 +481,9 @@ Userspace packages install from the official feeds, but their kmods need kernel 
 
 The official core feed stays enabled because it also carries packages such as `iptables-mod-*`. The stubs' version has an epoch (`1:4.19.205-x28`), so they outrank the 5.15 packages. A kmod with no stub still depends on the 5.15 `kernel`, so `opkg` refuses it instead of installing a module that can't load.
 
-- **List:** `package/x28-kmod-stubs/stubs.txt`, 181 of the core feed's 976 kmods. A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
+- **List:** `package/x28-kmod-stubs/stubs.txt`, 178 of the core feed's 976 kmods. A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
 - **Renames:** 4.19's `nf_log_common`, `nf_log_ipv4` and `nf_log_ipv6` count as 5.15's `nf_log_syslog`, and `ipt_MASQUERADE` and `ip6t_MASQUERADE` as `xt_MASQUERADE`.
-- **Accepted gaps:** `kmod-ipt-ipset` without `ip_set_hash_ipmac`, `kmod-ipt-extra` without `xt_cgroup`, `kmod-inet-diag` without `raw_diag`. These packages install, but those features are absent.
+- **Incomplete packages are refused:** no stub for `kmod-ipt-ipset` (missing `ip_set_hash_ipmac`), `kmod-ipt-extra` (missing `xt_cgroup`) or `kmod-inet-diag` (missing `raw_diag`). Dependents are also excluded. This deliberately leaves ordinary `ipset` installation blocked until we provide accurate vendor-version package metadata or the missing capabilities; do not use `--nodeps` to hide that gap.
 - **Limit:** built-in modules come from `modules.builtin` in the SDK tree configured with the stock config, not from the stock build itself.
 
 ```sh
@@ -496,3 +496,5 @@ docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$P
 ```
 
 Not done yet: hosting the feed and its signing key, testing on a unit, and shipping it in the image (#202). Built images also carry 72 old stock kmod records with a foreign architecture in their `opkg` status, which print warnings until the first write removes them.
+
+**Beta feed audit (2026-11-01, #200):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.

@@ -76,7 +76,6 @@ kmod-iio-core
 kmod-ikconfig
 kmod-imx2-wdt
 kmod-imx7-ulp-wdt
-kmod-inet-diag
 kmod-input-core
 kmod-input-evdev
 kmod-input-gpio-keys
@@ -86,11 +85,9 @@ kmod-ipip
 kmod-ipt-conntrack
 kmod-ipt-conntrack-extra
 kmod-ipt-core
-kmod-ipt-extra
 kmod-ipt-filter
 kmod-ipt-ipopt
 kmod-ipt-iprange
-kmod-ipt-ipset
 kmod-ipt-nat
 kmod-ipt-nat-extra
 kmod-ipt-nat6

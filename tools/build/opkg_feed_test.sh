@@ -37,13 +37,14 @@ check "without the feed, ipset fails" "$(try ipset)" 255
 
 echo 'src/gz x28 file:///feed' >> /etc/opkg/customfeeds.conf
 opkg update >/tmp/o 2>&1
+check "feed update succeeds" $? 0
 check "the feed's signature verifies" "$(grep -c 'Signature check failed' /tmp/o)" 0
 check "opkg info prints no errors" "$(opkg info kmod-tun 2>&1 | grep -c 'ERROR')" 0
-check "ipset installs without --nodeps" "$(try ipset)" 0
-check "  with no dependency errors" "$(grep -c 'cannot find dep' /tmp/o)" 0
-check "  ipset" "$(inst ipset)" 1
+check "incomplete ipset dependency is refused" "$(try ipset)" 255
+check "  ipset is not installed" "$(inst ipset)" 0
+check "available tun stub installs" "$(try kmod-tun)" 0
 check "  kernel" "$(inst kernel)" 1
-check "  kmod-ipt-ipset" "$(inst kmod-ipt-ipset)" 1
+check "  no incomplete ipset stub" "$(inst kmod-ipt-ipset)" 0
 check "  no 5.15 kmod" "$(opkg list-installed | grep -E '^kmod-' | grep -c '5\.15')" 0
 check "  stubs add no module files" "$(find /lib/modules -newer /k.sec -type f | wc -l)" 0
 check "iptables-mod-iprange installs" "$(try iptables-mod-iprange)" 0

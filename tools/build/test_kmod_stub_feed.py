@@ -30,9 +30,11 @@ class Covered(unittest.TestCase):
         self.assertEqual(f.covered(kmods, {'nf_log_common', 'nf_log_ipv4'}), [])
         self.assertEqual(f.covered(kmods, {'nf_log_common', 'nf_log_ipv4', 'nf_log_ipv6'}), ['kmod-log'])
 
-    def test_accepted_missing_applies_only_to_its_package(self):
-        kmods = {'kmod-ipt-ipset': kmod(['ip_set', 'ip_set_hash_ipmac']), 'kmod-other': kmod(['ip_set_hash_ipmac'])}
-        self.assertEqual(f.covered(kmods, {'ip_set'}), ['kmod-ipt-ipset'])
+    def test_partially_available_packages_and_dependents_are_refused(self):
+        kmods = {'kmod-ipt-ipset': kmod(['ip_set', 'ip_set_hash_ipmac']),
+                 'kmod-ipt-extra': kmod(['xt_cgroup']), 'kmod-inet-diag': kmod(['raw_diag']),
+                 'kmod-dependent': kmod([], ['kmod-ipt-ipset'])}
+        self.assertEqual(f.covered(kmods, {'ip_set'}), [])
 
     def test_dependency_cycle_ends(self):
         kmods = {'kmod-a': kmod(['a'], ['kmod-b']), 'kmod-b': kmod(['b'], ['kmod-a'])}
