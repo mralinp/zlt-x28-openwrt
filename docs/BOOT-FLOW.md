@@ -10,6 +10,10 @@ Local Ghidra analysis now maps the separate boot-image certificate/header/payloa
 see [LK authentication paths](research/lk-authentication-ghidra.md). No LK patch was selected or made.
 The older slot-B and unresolved-custom-boot statements below describe their original observation dates.
 
+**Local follow-up (#211):** a separate saved Ghidra program now previews two boot/recovery authentication
+branch changes; the source dump and device remain unchanged. The [check explanation and replacement plan](research/lk-boot-auth-preview.md)
+distinguish binary patching from rebuilding LK and list the unresolved preloader, artifact and recovery stages.
+
 ## Current slot
 
 **Confirmed: slot B is active.** `/proc/cmdline` contains `bootslot=b` and mounts the root filesystem from
