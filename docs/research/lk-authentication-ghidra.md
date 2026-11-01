@@ -134,6 +134,10 @@ authoritative semantics remain unexamined. This is not a fuse-state determinatio
 instruction offsets to report. Rootfs-certificate failure handling and boot certificate/header/payload
 authentication have different callers, outputs and state. The policy function also serves other loaders.
 
+The later [#211 local Ghidra preview](lk-boot-auth-preview.md) implements two boot/recovery branch changes
+inside a separate saved analysis program only. It preserves the original dump and is not a flashed or
+hardware-tested bypass; that follow-up records its exact offsets and remaining trust-chain limits.
+
 Before proposing any patch: settle the active first/duplicate LK payload, trace runtime policy/configuration
 writers and secure-monitor services, bind the exact boot container/certificate coverage and inspect callers'
 required output state. Preloader authentication of a modified LK remains a separate constraint. Retain the
