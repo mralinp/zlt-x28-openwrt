@@ -36,7 +36,7 @@ make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" BIN_DIR="
 
 # The rootfs carries armsr's 5.15 kernel modules from dependencies; the X28 assembly replaces them.
 ls -l "$OUT"
-grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-2$' "$OUT"/*.manifest ||
+grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-3$' "$OUT"/*.manifest ||
   { echo "the image did not take the mtwifi libiwinfo" >&2; exit 1; }
 # The preinit hook relies on this block's extroot behaviour (#183).
 grep -q '^ubi-utils - ' "$OUT"/*.manifest && grep -q '^block-mount - 2023-02-28-bfe882d5-' "$OUT"/*.manifest ||

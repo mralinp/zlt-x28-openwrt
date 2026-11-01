@@ -577,3 +577,28 @@ index 0000000..d6f8343
 +	.lookup_phy       = mtwifi_nostr,
 +	.close            = mtwifi_close,
 +};
+diff --git a/iwinfo_wext.c b/iwinfo_wext.c
+index b68d230..ffae5d8 100644
+--- a/iwinfo_wext.c
++++ b/iwinfo_wext.c
+@@ -542,6 +542,12 @@ static int wext_get_frequency_offset(const char *ifname, int *buf)
+ 	return -1;
+ }
+ 
++/* wext_ops had no htmode, and iwinfo_cli calls it unchecked (apcli0 info segfaulted). */
++static int wext_get_htmode(const char *ifname, int *buf)
++{
++	return -1;
++}
++
+ const struct iwinfo_ops wext_ops = {
+ 	.name             = "wext",
+ 	.probe            = wext_probe,
+@@ -561,6 +567,7 @@ const struct iwinfo_ops wext_ops = {
+ 	.hwmodelist       = wext_get_hwmodelist,
+ 	.htmodelist       = wext_get_htmodelist,
+ 	.mode             = wext_get_mode,
++	.htmode           = wext_get_htmode,
+ 	.ssid             = wext_get_ssid,
+ 	.bssid            = wext_get_bssid,
+ 	.country          = wext_get_country,
