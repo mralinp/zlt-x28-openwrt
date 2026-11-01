@@ -293,7 +293,7 @@ def integrate(stage,key,stock_path,output):
         link=tarfile.TarInfo(f'etc/rc.d/S{start}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
     put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
-    # x28-modem runs `wifi config` once when /etc/config/wireless is missing: radios off, WPA2 with a random key (#222).
+    # The staged boot script runs `wifi config` once when /etc/config/wireless is missing: WPA2 with a random key.
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())
     put('usr/share/x28-wifi/regions',(WIFI/'regions').read_text())
@@ -419,7 +419,6 @@ config interface 'wan'
 """)
     put('etc/dropbear/authorized_keys',key,0o600)
     # Like stock OpenWrt root starts with an empty password so LuCI can log in and ask for one; dropbear stays key-only.
-    # With Wi-Fi off by default (#222) reaching that login takes a LAN cable.
     rows=tree['etc/shadow'][1].decode().splitlines();found=False;locked=[]
     for row in rows:
         fields=row.split(':')

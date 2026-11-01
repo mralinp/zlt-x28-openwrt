@@ -365,12 +365,8 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   virtual interface of `ra0` (opens only while `ra0` is up). `package/x28-wifi` is a netifd wireless handler (`mtwifi`):
   it renders `/etc/wireless/mediatek/mt7915.dbdc.b0/b1.dat` from `/etc/config/wireless` on a saved stock copy and
   hands the interface to netifd, which bridges it into `lan`. The image copies `l1profile.dat` and both profiles from
-  the stock rootfs; calibration stays in `/mnt/vendor/nvcfg/e2p`. First boot's `wifi config` creates one AP per band with the
-  radios **off** (#222): connect a LAN cable, then press Enable in LuCI. Each network already has WPA2 and a random key made
-  on the unit, which LuCI shows under Edit > Wireless Security, so Enable can't start an open network. Enable clears
-  `disabled` only on that network's radio, and netifd skips a disabled radio, so before `ra0` opens to carry `rai0` the
-  handler locks a disabled `radio_2g`'s profile (hidden, WPA2, random key); otherwise `ra0` would beacon the stock open one.
-  Only a missing `/etc/config/wireless` gets these defaults: a unit with saved settings keeps them, including an open network.
+  the stock rootfs; calibration stays in `/mnt/vendor/nvcfg/e2p`. First boot's `wifi config` creates one open AP per
+  band (like root's empty password; set both in LuCI on first login).
   Stock LuCI 23.05 builds Wireless Security choices only for `mac80211`/`broadcom` radios, so the builder inserts an
   `mtwifi` branch (WPA2-PSK, WPA3-SAE, mixed modes) into `wireless.js`; it refuses a LuCI build without the anchor.
   LuCI also hides radio and network options for non-mac80211 radios, so the builder adds `mtwifi` blocks for the ones the
@@ -459,8 +455,7 @@ that procd creates `/dev/ttyS0` without devtmpfs (stock does the same for its ge
 
 ## Root password and overlay persistence (#143)
 
-Like stock OpenWrt, root starts with an **empty password** and Wi-Fi off (#222), so reaching that login takes a LAN cable: LuCI
-accepts it and asks you to set one (Network is LAN only; the
+Like stock OpenWrt, root starts with an **empty password**: LuCI accepts it and asks you to set one (Network is LAN only; the
 `wan` firewall zone rejects input). SSH is unchanged: Dropbear stays key-only (`PasswordAuth` and `RootPasswordAuth` off), so an
 empty or any password never works over SSH. The image also enables `S95done` (`mount_root done`); without it `mount_root`
 reports 'overlay filesystem has not been fully initialized yet' and discards the overlay at every boot, losing passwords, host

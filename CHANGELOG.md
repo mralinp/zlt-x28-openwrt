@@ -7,7 +7,6 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 ## Unreleased
 
 - Docs and README aligned with the working native image; this changelog added (#147).
-- A clean flash starts with Wi-Fi off and a random WPA2 key per network, instead of open networks (#222).
 
 ## Milestones
 

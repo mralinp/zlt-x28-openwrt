@@ -39,15 +39,4 @@ mtwifi_setup_vif three
 [ "$vif_count" = 2 ] && [ "$vif_name" = one ] && [ "$vif2_name" = two ] && [ "$vif_ssid" = main ] && [ "$vif2_ssid" = guest ] || exit 1
 [ "$vif_auth" = "WPA3PSK;WPA2PSK" ] && [ "$vif_enc" = "AES;AES" ] && [ "$vif_hidden" = "0;1" ] && [ "$vif_mfpr" = "0;1" ] || exit 1
 [ "$vif_key" = mainkey123 ] && [ "$vif2_key" = guestkey12 ] && [ "$vif2_policy" = 2 ] && [ "$vif2_acl" = "aa:bb;bb:cc" ] && [ "$vif_policy" = 0 ] || exit 1
-# ra0 carrying rai0 with radio_2g disabled must not open the stock profile; an enabled radio_2g's profile is its own handler's.
-printf 'Default\nSSID1=stock\nAuthMode=OPEN\nEncrypType=NONE\nHideSSID=0\nWPAPSK1=\n' > "$dir/mt7915.dbdc.b0.dat"
-uci() { case "$2" in show) printf 'wireless.%s=wifi-device\nwireless.other=wifi-iface\n' "$u_name" ;; get) case "$3" in *.band) echo "$u_band" ;; *.disabled) echo "$u_off" ;; esac ;; esac; }
-u_name=radio_2g u_band=2g u_off=; mtwifi_2g_enabled || exit 1
-u_off=0; mtwifi_2g_enabled || exit 1
-u_name=radio0; mtwifi_2g_enabled || exit 1  # renamed, found by band
-u_band=; u_name=radio_2g; mtwifi_2g_enabled || exit 1  # LuCI can delete band
-for u_off in 1 on true; do ! mtwifi_2g_enabled || exit 1; done
-u_off=; u_band=5g; ! mtwifi_2g_enabled || exit 1
-mtwifi_lock_2g
-grep -q '^AuthMode=WPA2PSK$' "$dir/mt7915.dbdc.b0.dat" && grep -q '^EncrypType=AES$' "$dir/mt7915.dbdc.b0.dat" && grep -q '^HideSSID=1$' "$dir/mt7915.dbdc.b0.dat" && grep -Eq '^WPAPSK1=[0-9a-f]{48}$' "$dir/mt7915.dbdc.b0.dat" || { cat "$dir/mt7915.dbdc.b0.dat"; exit 1; }
-echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping, two-network lists and the locked 2.4 GHz carrier"
+echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-network lists"

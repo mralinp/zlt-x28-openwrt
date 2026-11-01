@@ -1,8 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
-# `wifi config` defaults for the MT7915 DBDC: one AP per band on lan, off until the owner enables it in LuCI
-# (Network > Wireless) over the wired LAN. A disabled radio is never opened. The key is made here so that Enable can't
-# start an open network and no key lives in the repo or the image; LuCI shows it.
+# `wifi config` defaults for the MT7915 DBDC: one open AP per band on lan, like root's empty password: the owner
+# sets both in LuCI (Network > Wireless) on first login.
 
 append DRIVERS "mtwifi"
 
@@ -19,14 +18,12 @@ detect_mtwifi() {
 			set wireless.$name.channel=auto
 			set wireless.$name.htmode=$([ $band = 2g ] && echo HT40 || echo HE80)
 			set wireless.$name.country=US
-			set wireless.$name.disabled=1
 			set wireless.default_$name=wifi-iface
 			set wireless.default_$name.device=$name
 			set wireless.default_$name.network=lan
 			set wireless.default_$name.mode=ap
 			set wireless.default_$name.ssid=X28-$(echo $band | tr g G)
-			set wireless.default_$name.encryption=psk2
-			set wireless.default_$name.key=$(head -c 12 /dev/urandom | hexdump -ve '1/1 "%02x"')
+			set wireless.default_$name.encryption=none
 		UCI
 	done
 	uci -q commit wireless

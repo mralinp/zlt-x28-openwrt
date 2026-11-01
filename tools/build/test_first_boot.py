@@ -174,28 +174,6 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn(b'mtd',tree['etc/rc.local'][1])
         self.assertFalse(r['flashable'])
 
-    def wifi_defaults(self,tree):
-        """What `wifi config` asks uci to set on a clean flash, from the detect script the image ships."""
-        bin=self.root/'bin';bin.mkdir(exist_ok=True);out=self.root/'uci.out'
-        (bin/'uci').write_text('#!/bin/sh\n[ "$2" = batch ] && cat >> "$UCI_OUT"\nexit 0\n');(bin/'uci').chmod(0o755)
-        (self.root/'sys').mkdir(exist_ok=True);out.write_text('')
-        script=tree['lib/wifi/mtwifi.sh'][1].decode().replace('/sys/class/net/ra0',str(self.root/'sys'))
-        subprocess.run(['sh','-c','append() { :; }\n'+script+'\ndetect_mtwifi'],env={**os.environ,'PATH':f'{bin}:{os.environ["PATH"]}','UCI_OUT':str(out)},check=True)
-        return dict(l.strip()[4:].split('=',1) for l in out.read_text().splitlines())
-
-    def test_clean_flash_has_wifi_off_and_no_open_or_shared_key_network(self):
-        tree,_=self.integrate_ok()
-        first,second=self.wifi_defaults(tree),self.wifi_defaults(tree)
-        for band in ('2g','5g'):
-            self.assertEqual(first[f'wireless.radio_{band}.disabled'],'1')
-            self.assertEqual(first[f'wireless.default_radio_{band}.encryption'],'psk2')
-            self.assertRegex(first[f'wireless.default_radio_{band}.key'],r'^[0-9a-f]{24}$')
-            self.assertNotEqual(first[f'wireless.default_radio_{band}.key'],second[f'wireless.default_radio_{band}.key'])
-        self.assertNotEqual(first['wireless.default_radio_2g.key'],first['wireless.default_radio_5g.key'])
-        self.assertNotIn('etc/config/wireless',tree)  # no key in the image: made on the unit
-        self.assertIn(b"list ports 'eth1'",tree['etc/config/network'][1])  # the wired LAN doesn't depend on Wi-Fi
-        self.assertEqual(tree['etc/rc.d/S19dropbear'][0].linkname,'../init.d/dropbear')
-
     def test_switch_profile_ships_swconfig_table_and_single_early_owner(self):
         r=self.integrate_ok()
         tree=r[0]
