@@ -307,6 +307,92 @@ for start, end in [(0x248c2, 0x24954), (0x2856a, 0x2887e),
 
 The displayed addresses are file offsets; apply the mapping above for virtual addresses.
 
+## Where Linux gets its device tree (offline, 2026-11-01, #215)
+
+**Linux's tree comes from the dtb section of `boot_a` or `boot_b`, not from LK's own copy.** A kernel built by us can bring
+its own tree without changing `lk`. Whether LK accepts a changed `boot` is a separate question and has not been tested; see
+[LK authentication paths](research/lk-authentication-ghidra.md).
+
+This comes from the verified backup and static disassembly. Nothing was run on or written to the router. Addresses are VAs
+in LK, using the same mapping as that report: VA = file offset + `0x83fffe00`.
+
+### Two identical copies
+
+**Observed:** a scan of all 51 partitions for the magic `d0 0d fe ed` finds valid trees in four places, all 102,980 bytes with
+SHA-256 starting `7534a146`.
+
+| Copy | Location | Used by |
+|---|---|---|
+| `lk_main_dtb` | Image at `0x7fc70` in `lk_a` and `lk_b`, tree at `0x7feb0` | LK's own drivers: `0x84000464` loads it from `lk`, then passes it to three init functions at `0x840004c4`, `0x840004ce`, `0x840004d8` |
+| Boot image dtb section | Section at `0x89a000` in `boot_a` and `boot_b`, tree at `0x89a040` | Linux, through the path below |
+
+Because the bytes match, only the code tells them apart. The two copies are independent, so changing the tree in `boot` should
+not change what LK's drivers read (**inferred**).
+
+### The path to Linux
+
+**Observed in the header:** `boot` uses Android boot header version 2, with kernel address `0x40080000`, `dtb_size` 103,044 and
+`dtb_addr` `0x41f00000`. The section is a 64-byte Android DTB table header (magic `d7 b7 ab 1e`, one entry) followed by the tree.
+
+**Observed in the code** (`app/mt_boot/mt_boot.c`, function at `0x84003c3a`):
+
+| Address | Step |
+|---|---|
+| `0x84003c8c` | Header version 2 or above takes the v2 path. |
+| `0x840041c4` | Reads the dtb size. If it is 0, it prints `can't find v2 dtb` and falls back. |
+| `0x84003d1e`, `0x84003d2a` | Allocates 1 MiB as `mb_dtb`. When the caller's address argument is set, it panics unless the buffer landed at `0x42f00000`. The header's `dtb_addr` plays no part in this check. |
+| `0x84003d74` | Looks for a `dtbo` partition. The X28 has none, so the next two steps run. |
+| `0x8401dd4a` | Reads the table, looks for entry ID 0, and uses the first entry if none matches. |
+| `0x84003d9e` | Copies `0x80000` bytes to the buffer. |
+| `0x84003fda` onward | Edits the copy, for example `linux,initrd-start` in `/chosen`. |
+
+Version 0 and 1 images use other paths, including a backward search for a tree appended to the kernel. They were not traced further.
+
+### What LK adds
+
+**Observed:** comparing the stored tree with `/sys/firmware/fdt` from the running unit gives 20 new nodes, 90 new properties, 2
+changed properties and nothing removed. The live tree is 131,334 bytes.
+
+- `/chosen`: the `rootfs,*` properties, `atag,*`, `serialno`, `mrdump,*`, `log_store`, `ram_console`, `linux,initrd-*`, and a longer `bootargs`.
+- `/memory`: a changed `reg`, and `mblock_info`.
+- `/reserved-memory`: 19 `mblock-*` regions, including the modem's.
+- `/atag_rawdata_item`: a new node.
+
+### What a kernel built by us must provide
+
+| Requirement | Value | Evidence |
+|---|---|---|
+| Boot image | Android header version 2 with a dtb section | Observed as the stock path; other versions not traced |
+| Kernel address | 512 KiB aligned (`0x84003ca2`) | Observed |
+| Decompressed kernel | At most 40 MiB; stock is about 31 MiB (`0x84003e2c`) | **Inferred:** the buffer size chosen when a load address is set |
+| `/chosen` | Must exist; several edits assert on it | Observed |
+| `/memory`, `/reserved-memory` | Should exist; LK looks them up at `0x8401ca74` and `0x8401c7ec` | Lookup observed; the failure paths were not read |
+| Final tree | Should fit 512 KiB with LK's additions | **Inferred** from the copy size |
+
+### Not known
+
+- Whether LK boots a changed `boot`. The authentication policy decides this, and it needs a real flash with UART and a way back.
+- Whether the code path above is what runs. A UART log of a boot with a changed tree would confirm it.
+- What the modem driver needs from LK. The function at `0x840203fa` looks up `/mddriver` and writes `ccci,modem_info_v2`; it was not traced further.
+
+### Reproduce
+
+```bash
+python3 - <<'PY'
+import hashlib, struct
+B = "private/recovery/20261020-capture-prepared-20261021/images/"
+for name, off in (("mtd25-lk_a", 0x7feb0), ("mtd38-lk_b", 0x7feb0), ("mtd27-boot_a", 0x89a040), ("mtd40-boot_b", 0x89a040)):
+    d = open(B + name + ".bin", "rb").read()
+    assert d[off:off + 4] == bytes.fromhex("d00dfeed") and d.find(bytes.fromhex("d00dfeed")) == off
+    size = struct.unpack(">I", d[off + 4:off + 8])[0]
+    print(name, hex(off), size, hashlib.sha256(d[off:off + size]).hexdigest()[:8])
+b = open(B + "mtd40-boot_b.bin", "rb").read()
+print("header version", struct.unpack("<I", b[40:44])[0], "kernel addr", hex(struct.unpack("<I", b[12:16])[0]))
+print("dtb size", struct.unpack("<I", b[1648:1652])[0], "dtb addr", hex(struct.unpack("<Q", b[1652:1660])[0]))
+print("table magic", b[0x89a000:0x89a004].hex())
+PY
+```
+
 ## Reproduce (offline, from the backup)
 
 ```bash
