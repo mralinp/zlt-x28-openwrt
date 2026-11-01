@@ -474,3 +474,25 @@ success byte, priorities or any other partition; a boot that never reaches it ke
 `ab_guard` allows the `dd-nand` token in that one script only while it keeps the reviewed shape. Dropbear now listens on
 port 22 (LAN only, key-only), like standard OpenWrt; update `~/.ssh/config` and the known_hosts entry when you flash it.
 If one write fails, earlier copies stay at 0 and later ones keep their tries (a mixed record, which the preloader's handling of is unverified); the next boot retries.
+
+## opkg feed for the vendor kernel (#200)
+
+Userspace packages install from the official feeds, but their kmods need kernel 5.15 and no `kernel` package is installed, so anything depending on a kmod fails. `tools/build/kmod_stub_feed.py` builds a feed with a `kernel` package for the running kernel and an empty package for each feed kmod the kernel already has. It installs no files.
+
+The official core feed stays enabled because it also carries packages such as `iptables-mod-*`. The stubs' version has an epoch (`1:4.19.205-x28`), so they outrank the 5.15 packages. A kmod with no stub still depends on the 5.15 `kernel`, so `opkg` refuses it instead of installing a module that can't load.
+
+- **List:** `package/x28-kmod-stubs/stubs.txt`, 181 of the core feed's 976 kmods. A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
+- **Renames:** 4.19's `nf_log_common`, `nf_log_ipv4` and `nf_log_ipv6` count as 5.15's `nf_log_syslog`, and `ipt_MASQUERADE` and `ip6t_MASQUERADE` as `xt_MASQUERADE`.
+- **Accepted gaps:** `kmod-ipt-ipset` without `ip_set_hash_ipmac`, `kmod-ipt-extra` without `xt_cgroup`, `kmod-inet-diag` without `raw_diag`. These packages install, but those features are absent.
+- **Limit:** built-in modules come from `modules.builtin` in the SDK tree configured with the stock config, not from the stock build itself.
+
+```sh
+# Regenerate or check the list. Downloads the core feed's kmods (about 29 MB) and reads their file lists.
+python3 tools/build/kmod_stub_feed.py map --modules MODULES.txt --builtin modules.builtin [--check]
+# Build, sign, and test with the image's real opkg (arm64 host; see the script's header)
+python3 tools/build/kmod_stub_feed.py build --out FEED_DIR
+docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$PWD/tools/build:/t:ro" \
+  debian:stable-slim bash /t/opkg_feed_test.sh
+```
+
+Not done yet: hosting the feed and its signing key, testing on a unit, and shipping it in the image (#202). Built images also carry 72 old stock kmod records with a foreign architecture in their `opkg` status, which print warnings until the first write removes them.

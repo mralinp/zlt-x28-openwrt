@@ -46,6 +46,7 @@ Conventions:
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
 | 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ 162 Mbit/s download at 43 % CPU, limited by the test servers; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
+| 33 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 18 of 18 checks: `ipset` installs without `--nodeps`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 

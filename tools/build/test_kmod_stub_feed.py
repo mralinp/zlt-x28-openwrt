@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+import gzip
+import hashlib
+import io
+import tarfile
+import tempfile
+import unittest
+from pathlib import Path
+import kmod_stub_feed as f
+
+
+def kmod(ko=(), depends=()):
+    return {'ko': set(ko), 'depends': list(depends)}
+
+
+class Covered(unittest.TestCase):
+    def test_present_and_missing_modules(self):
+        kmods = {'kmod-a': kmod(['a']), 'kmod-b': kmod(['b'])}
+        self.assertEqual(f.covered(kmods, {'a'}), ['kmod-a'])
+
+    def test_missing_dependency_excludes_the_user(self):
+        kmods = {'kmod-a': kmod(['a'], ['kmod-b', 'libc']), 'kmod-b': kmod(['b'])}
+        self.assertEqual(f.covered(kmods, {'a'}), [])
+
+    def test_dependency_not_in_feed_excludes_the_user(self):
+        self.assertEqual(f.covered({'kmod-a': kmod(['a'], ['kmod-gone'])}, {'a'}), [])
+
+    def test_renamed_needs_every_replacement(self):
+        kmods = {'kmod-log': kmod(['nf_log_syslog'])}
+        self.assertEqual(f.covered(kmods, {'nf_log_common', 'nf_log_ipv4'}), [])
+        self.assertEqual(f.covered(kmods, {'nf_log_common', 'nf_log_ipv4', 'nf_log_ipv6'}), ['kmod-log'])
+
+    def test_accepted_missing_applies_only_to_its_package(self):
+        kmods = {'kmod-ipt-ipset': kmod(['ip_set', 'ip_set_hash_ipmac']), 'kmod-other': kmod(['ip_set_hash_ipmac'])}
+        self.assertEqual(f.covered(kmods, {'ip_set'}), ['kmod-ipt-ipset'])
+
+    def test_dependency_cycle_ends(self):
+        kmods = {'kmod-a': kmod(['a'], ['kmod-b']), 'kmod-b': kmod(['b'], ['kmod-a'])}
+        self.assertEqual(f.covered(kmods, {'a', 'b'}), ['kmod-a', 'kmod-b'])
+
+    def test_dash_and_underscore_are_the_same_module(self):
+        self.assertEqual(f.covered({'kmod-a': kmod(['mdio-gpio'])}, {f.norm('mdio-gpio')}), ['kmod-a'])
+
+
+class Build(unittest.TestCase):
+    def test_index_matches_the_packages(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            self.assertEqual(f.build(['kmod-a'], out), 2)
+            index = f.parse_index((out / 'Packages').read_text())
+            self.assertEqual(gzip.decompress((out / 'Packages.gz').read_bytes()), (out / 'Packages').read_bytes())
+            self.assertEqual(index['kmod-a']['Depends'], f'kernel (= {f.VERSION})')
+            self.assertEqual(index['kmod-a']['Version'], f.VERSION)
+            for p in index.values():
+                data = (out / p['Filename']).read_bytes()
+                self.assertEqual(hashlib.sha256(data).hexdigest(), p['SHA256sum'])
+                self.assertEqual(len(data), int(p['Size']))
+                self.assertNotIn(':', p['Filename'])
+
+    def test_stub_installs_no_files(self):
+        _, ipk = f.stub('kmod-a', '', 'x')
+        outer = tarfile.open(fileobj=io.BytesIO(ipk), mode='r:gz')
+        self.assertEqual(set(outer.getnames()), {'./debian-binary', './data.tar.gz', './control.tar.gz'})
+        data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+        self.assertEqual(data.getnames(), [])
+
+    def test_epoch_keeps_the_stub_above_the_feed(self):
+        self.assertTrue(f.VERSION.startswith('1:'))
+
+
+if __name__ == '__main__':
+    unittest.main()

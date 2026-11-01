@@ -46,6 +46,7 @@ jobs:
       - run: python3 tools/build/test_ab_guard.py
       - run: python3 tools/build/test_first_boot.py
       - run: python3 tools/build/test_package_ubi.py
+      - run: python3 tools/build/test_kmod_stub_feed.py
       - run: sh package/x28-leds/files/x28-leds selftest
       - run: sh package/x28-mipc/files/x28-apn selftest
       - run: sh tests/test_wifi.sh
