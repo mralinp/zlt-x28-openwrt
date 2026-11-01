@@ -174,3 +174,44 @@ Check for `INPUT VERIFIED`, the 17 `FUNCTION file=` entries and `ANALYSIS COMPLE
 The script refuses unknown input hashes, a wrong mapping/language or changed analysis-memory bytes.
 To inspect graphically, open the resulting `.gpr`, double-click the imported program, then press G and
 enter a VA from the tables above. Do not export a patched binary as part of this reproduction.
+
+### Reading the annotated project
+
+Readable function/variable annotations are the follow-up tracked in #209; #208 merged the initial
+authentication-path report and analysis script before that metadata follow-up landed.
+
+The script also assigns descriptive **analyst** function names under `Boot`, `Rootfs`, `Policy`,
+`Crypto` and `Failure` namespaces, labels selected state/table locations, and adds plate comments,
+branch comments and categorized bookmarks. These are navigation aids, not vendor symbols or proof
+of runtime state. Comments retain the unknowns, including the monitor-backed payload calculation.
+Runtime-state labels refer to their VAs; backing bytes in the raw full-partition import do not establish
+what those addresses hold after relocation/initialization.
+
+Open Window → Bookmarks and start with category **01 Start here**. In Symbol Tree → Namespaces,
+expand `Rootfs` → `verify_rootfs_certificates_or_panic`, or `Boot` → `load_boot_or_recovery_image`.
+`Policy` → `partition_authentication_required` explains the gate before the three boot checks.
+Double-click calls in the decompiler to follow them; Function Graph shows branches, including the
+commented assertion sites. Original file offsets are in the function comments; Go To accepts VAs.
+
+The annotated run must additionally report `ANNOTATIONS VERIFIED`; it checks all 17 function names
+and comments and compares the complete mapped image against the original again after annotation.
+The saved database was independently reopened read-only: all 17 names/comments, seven labels at their
+exact VAs, 26 bookmarks and the complete original byte hash passed the presentation check.
+The script additionally names 100 existing parameters/locals across 14 functions, using their observed
+roles: for example `signature_partition_name`, `metadata_buffer_out`, `verification_status`,
+`policy_row_index`, `secure_policy_S`, `header_bytes` and `payload_buffer`. Each saved variable receives
+an analyst-role comment. Ambiguous/coalesced values, uninitialized-register artifacts and uncertain
+failure-handler arguments retain neutral Ghidra names. Stack buffer fragments use a `_word0` suffix
+rather than inventing a complete struct or array layout.
+
+These are not original source variable names. The rename operation retains recovered data types;
+Ghidra can persist its recovered parameter list to support a parameter rename. That is not proof of
+the original C prototype. Generated-name bindings are tied to this tested input/analysis: a missing or
+ambiguous symbol stops the script instead of silently annotating a different value. Check the
+`VARIABLES VERIFIED` marker as well as the final completion marker.
+
+The variable-named saved database was independently reopened read-only: all 100 role names/comments
+across 14 functions persisted, key names appeared in fresh decompilations, and the existing 17 function
+names, seven global labels, 26 bookmarks and original byte hash still passed their checks.
+The latest private project is `private/research/207-lk-ghidra/project/X28_LK_Readable.gpr`; its database
+and logs remain ignored. It was built alongside the open `X28_LK_Annotated` project to preserve that GUI session.
