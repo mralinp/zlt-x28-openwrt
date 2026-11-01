@@ -4,6 +4,12 @@ Read-only findings for [#3](https://github.com/mralinp/zlt-x28-openwrt/issues/3)
 OEM 1.5.13) and the verified NAND backup ([RECOVERY.md](RECOVERY.md)). Nothing was written to the device.
 What is **confirmed** and what is only **inferred** is marked; do not plan a flash on inferred items.
 
+**Later observation (2026-11-01, #207):** the custom rootfs runs on slot A. Read-only live hashes of
+both preloaders, LK A/B, boot A/B, rootfs signatures A/B and `seccfg` match the original captures.
+Local Ghidra analysis now maps the separate boot-image certificate/header/payload checks and policy gate;
+see [LK authentication paths](research/lk-authentication-ghidra.md). No LK patch was selected or made.
+The older slot-B and unresolved-custom-boot statements below describe their original observation dates.
+
 ## Current slot
 
 **Confirmed: slot B is active.** `/proc/cmdline` contains `bootslot=b` and mounts the root filesystem from
