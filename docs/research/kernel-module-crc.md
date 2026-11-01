@@ -11,8 +11,8 @@ The feed in [#200](https://github.com/mralinp/zlt-x28-openwrt/issues/200) and th
 
 - **Target:** the running kernel's exported symbols and CRCs, read from the `boot_a` dump. This gave 11,606 exports.
   The table agrees with the CRCs recorded in the stock modules on 945 of 945 shared symbols, so the extraction is sound.
-- **Source:** the FG360 SDK's 4.19.190 kernel, brought to 4.19.205 with upstream incremental patches. 8 hunks' files
-  had rejects, none in the networking code the modules need. The 13 groups of files that collide on a case-insensitive
+- **Source:** the FG360 SDK's 4.19.190 kernel, brought to 4.19.205 with upstream incremental patches. 8 files
+  had rejected hunks, none in the networking code the modules need. The 13 groups of files that collide on a case-insensitive
   disk were restored from upstream 4.19.205.
 - **Config:** `docs/firmware/kernel-4.19.205-x28.config` plus the 6 TPROXY and socket options as modules.
 - **Build:** GCC 11 on Debian bookworm, `make -k`. 2 files failed, in sound and video code, so `vmlinux` didn't link.
@@ -46,7 +46,7 @@ don't, which points to changes in those types. CRCs can't show which fields diff
 
 Not settled, but the source is clearly not the X28's:
 
-- The stock config has options that appear in no Kconfig file in the SDK, including `CONFIG_QL_MTD_ERASE_COUNT`,
+- The stock config has options that appear in no Kconfig file in the SDK, including
   `CONFIG_QUECTEL_NETCARD_1`, `CONFIG_TOZED_GPIO_KEYS` and `CONFIG_DNS_TRAP_MGR`. The X28 was built from a Quectel and
   Tozed tree; the SDK is Fibocom's.
 - The SDK's `skbuff.h` and `sock.h` already differ from upstream, so vendors do change these headers.
