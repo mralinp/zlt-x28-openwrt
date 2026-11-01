@@ -505,3 +505,10 @@ The [vendor-ipset packaging follow-up](research/vendor-ipset-packaging.md) suppl
 variants of both `ipset` and `libipset13`, depending on an explicitly named vendor subset rather than the
 incomplete official aggregate. Their upstream payloads/scripts are preserved, and `hash:ip,mac` remains
 unavailable. This is a locally tested candidate, not a hosted feed or installed image feature.
+
+### Signed-feed release preparation (#200)
+
+The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed four-package
+candidate, signs and verifies it locally, and stages an allowlisted release bundle. Its public key is
+checked in; its private key stays outside Git. Hosting uses a version-pinned approved GitHub Release,
+with no overwrite or private-directory upload. Publication and #202 image integration are still pending.
