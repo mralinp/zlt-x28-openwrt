@@ -50,6 +50,7 @@ Conventions:
 | 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
+| 36 | X28 opkg feed on the unit (live on 190b, then a clean flash of 219) | 2026-11-02 | ✅ see [section 36](#36-x28-opkg-feed-on-the-unit-2026-11-02); ipset set types and running features not tested |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -328,3 +329,37 @@ in uninterruptible sleep in every sample, which counts as 3 of load on a CPU tha
 
 **Not verified:** a full 48 h, sustained load under heavy traffic, and whether available memory keeps falling or levels off
 ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)). There is no stock CPU baseline: not measured.
+
+## 36. X28 opkg feed on the unit (2026-11-02)
+
+- **Question**: does the signed `feed-1` feed work on the real unit, and does a freshly flashed image have a working
+  package manager with no setup? (#200, #202)
+- **Live on 190b**: added the key and feed line by hand, then `opkg update`, `opkg install kernel kmod-tun ipset`, removed
+  and reinstalled `kmod-tun`, and rebooted. Everything persisted. LuCI's Software page listed `kernel`.
+- **Flash**: `native-ubi-219` over `native-ubi-190b` with `slot_entry.py rootfs_a identical`, a power cycle, then `write`.
+  Both receipts read `VERIFIED`, with one write attempt. The first boot reset the overlay.
+
+| Check on the clean image, no setup | Result |
+|---|---|
+| Rootfs hash, slot, tries | Match the build; slot A; 0 in all four copies |
+| `kernel` listed, X28 key and feed present, no `kmod-*` control files | Yes |
+| `opkg update` | No errors, feed signature accepted |
+| `opkg install ipset`, no `--nodeps` | Installs `1:7.17-1-x28-1` and `x28-ipset-kernel`, and removes and reinstalls cleanly |
+| `opkg install kmod-tun tcpdump` | Install |
+| `opkg install kmod-nft-core` | Refused, exit 255 |
+| Kernel or kmod upgrades offered; packages with 5.15 in the version | None; none |
+| `/lib/modules/4.19.205` | Still 146 files |
+| `luci-app-passwall2`, `xray-core`, `htop` from their feeds | Install with no force flags, 139 packages in all |
+| After one reboot with the settings restored | Slot A, tries 0; packages, config and host key hashes unchanged; 9 signature checks pass; WAN, guest and Wi-Fi up |
+| LuCI System → Software | Lists `kernel` |
+
+**Found along the way:**
+- The Mac only sees the unit as `MT65xx Preloader` for about a second after power-on. While running, the unit's USB gadget
+  reports `not attached` even with a data cable connected, so that state doesn't mean the cable is bad.
+- The image's Wi-Fi ships open and root has no password, so a clean unit is open to anyone nearby until it is set up.
+- `iwinfo` with no arguments crashed with a segmentation fault on 219. `iwinfo ra0 info` works.
+- `ipset --version` warns that the kernel supports protocol 6 and the program 6-7.
+
+**Not verified:** creating ipset sets or the kernel features behind any stub, a Passwall2 run on this image, and the UART
+shell's transmit line. Restoring a saved overlay as a whole would hide the new `opkg` state, so settings were restored file
+by file.

@@ -81,6 +81,9 @@ the library payload's regular file is `/usr/lib/libipset.so.13.4.0`.
 checks, LuCI Software, and on-device install/remove/persistence. The container does not use the router's
 kernel and cannot prove its ipset capabilities. Nothing here closes #200's on-device acceptance criterion.
 
+**2026-11-02:** hosting, image integration, on-device install/remove/persistence and LuCI Software are now done: see
+[test 36](../TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02). Real kernel type/functionality checks remain open.
+
 A host-side read-only backup of the current package database/control files and affected payloads was
 captured and verified (1,077,760 bytes). Both installed regular-file payload hashes match upstream.
 Stale `kernel.control`, `kernel.list` and `kernel.prerm` files already exist even though no kernel

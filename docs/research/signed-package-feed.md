@@ -1,6 +1,6 @@
-# Signed package-feed release preparation (#200)
+# Signed package feed (#200)
 
-**2026-11-02: published, not yet tested on a unit.** The feed holds 182 packages: the `kernel`
+**2026-11-02: published and working on the unit ([test 36](../TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)).** The feed holds 182 packages: the `kernel`
 record, 178 kmod stubs and the vendor-ipset set from PR #217. A feed with only the ipset packages would
 still refuse everything else that needs a kmod, such as the 28 official packages that need `kmod-tun`.
 
@@ -75,5 +75,5 @@ The public files were downloaded and compared byte for byte, and the image's rea
 from that URL in a container. An encrypted copy of the private key is on the owner's USB drive, and its passphrase is
 in their iCloud Drive; a test restore matched. `first_boot.py` puts this URL and key in the image (#202).
 
-**Still unverified:** on-device package/type operations, persistence and LuCI Software. The unsigned candidate's vendor feature
+**Still unverified:** ipset set types and the kernel features behind the stubs. The vendor feature
 limits remain; signing does not add kernel features or make the full official aggregate compatible.

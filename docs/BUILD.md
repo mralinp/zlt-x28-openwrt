@@ -497,7 +497,7 @@ docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$P
   debian:stable-slim bash /t/opkg_feed_test.sh
 ```
 
-Not done yet: testing on a unit.
+Tested on a unit: [test 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02).
 
 **Beta feed audit (2026-11-01, #200):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.
 

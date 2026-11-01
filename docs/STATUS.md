@@ -41,7 +41,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - The vendor modem userspace is closed and not redistributable, so no ready-to-flash image can be published; the build
   copies it from the owner's own backup.
 - The vendor 4.19.205 kernel has no `nf_tables` (so fw3), no namespaces (so no `ujail`), and `CONFIG_MODVERSIONS`: the
-  official feeds' kernel modules do not load, userspace packages do.
+  official feeds' kernel modules do not load, userspace packages do. `opkg` works through our signed
+  [feed](research/signed-package-feed.md): stubs for what the kernel has, and a clear refusal for what it lacks ([TESTING 36](TESTING.md)).
 
 ## Next
 
