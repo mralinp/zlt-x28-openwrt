@@ -153,6 +153,7 @@ The flash step, its gates and the typed approvals are described in
 | [docs/HARDWARE.md](docs/HARDWARE.md) | CPU, RAM and flash use, the root filesystem tree and the device tree |
 | [docs/THERMAL.md](docs/THERMAL.md) | Heat baseline, the 12 V fan, current readings |
 | [docs/PASSWALL2.md](docs/PASSWALL2.md) | Passwall2 on hold: what blocks it, tunnel speed results |
+| [docs/research/kernel-module-crc.md](docs/research/kernel-module-crc.md) | Why TPROXY modules built from the SDK can't load on the stock kernel |
 | [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | Issues, branches, commits, automatic releases |
 | [docs/README.md](docs/README.md) | Full documentation tree and code map |
