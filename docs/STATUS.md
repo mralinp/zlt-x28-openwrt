@@ -18,10 +18,10 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 **Working on that unit**
 - 5G data through the `x28_mipc` netifd protocol (IPv4, IPv6, IPv4v6, APN from the SIM) and its LuCI page.
 - LuCI, a four-socket LAN bridge, `dnsmasq` DHCP and DNS, IPv6 on the LAN, firewall and NAT.
-- Wi-Fi on the MT7915 dual band through the vendor `mt_wifi` driver (both radios up, WPA2).
+- Wi-Fi on the MT7915 dual band through the vendor `mt_wifi` driver (both radios up, WPA2). The off-by-default first boot (#222) is not yet tested on hardware.
 - Front panel LEDs from radio, signal and WAN state.
 - The modem stack, services and Wi-Fi defaults start at boot; settings, host keys and the root password survive reboots.
-- SSH is key-only on port 22 (LAN only); root has an empty password until the owner sets one, like stock OpenWrt.
+- SSH is key-only on port 22 (LAN only); root has an empty password until the owner sets one, like stock OpenWrt. A clean flash starts with Wi-Fi off: first setup needs a LAN cable.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 

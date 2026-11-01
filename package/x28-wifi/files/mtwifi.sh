@@ -146,6 +146,30 @@ mtwifi_setup_vif() {
 	vif_count=$((vif_count + 1))
 }
 
+mtwifi_random_key() {
+	head -c 24 /dev/urandom | hexdump -ve '1/1 "%02x"'
+}
+
+# True when netifd runs this handler for a 2.4 GHz radio: a section with that band (or name) that is not disabled.
+mtwifi_2g_enabled() {
+	local s band
+	for s in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+		band="$(uci -q get "wireless.$s.band")"
+		case "${band:-$s}" in 2g|*_2g) ;; *) continue ;; esac
+		case "$(uci -q get "wireless.$s.disabled")" in 1|on|true|yes|enabled) ;; *) return 0 ;; esac
+	done
+	return 1
+}
+
+# netifd never runs this handler for a disabled radio, so its 2.4 GHz profile is stock (open) or stale, yet ra0 must open
+# to carry rai0 (LuCI's Enable clears `disabled` only on that network's radio).
+mtwifi_lock_2g() {
+	local key="$(mtwifi_random_key)"
+	[ "${#key}" = 48 ] || return 1
+	mtwifi_render "$MTWIFI_DIR/mt7915.dbdc.b0.dat" "SSID1=x28-off" "SSID2=" "HideSSID=1" "AuthMode=WPA2PSK" "EncrypType=AES" \
+		"WPAPSK1=$key" "WPAPSK2="
+}
+
 mtwifi_is_up() {
 	[ -n "$(ip link show dev "$1" up 2>/dev/null)" ]
 }
@@ -169,7 +193,7 @@ drv_mtwifi_setup() {
 	# random, never stored key, and its interface stays up only when ra0 has to carry rai0.
 	[ "$vif_count" != 0 ] || {
 		vif_ssid="x28-off" vif_hidden=1 vif_auth=WPA2PSK vif_enc=AES
-		vif_key="$(head -c 24 /dev/urandom | hexdump -ve '1/1 "%02x"')"
+		vif_key="$(mtwifi_random_key)"
 	}
 	# The merged profile takes CountryCode and CountryRegion from the 5 GHz one (multi_profile.c), so LuCI sets both radios.
 	cc="$(mtwifi_country "$country")"
@@ -194,7 +218,11 @@ drv_mtwifi_setup() {
 		{ wireless_setup_failed PROFILE_WRITE; return 1; }
 	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
 	# sets up both radios at once; with 2g disabled ra0 then carries the hidden, locked network above.
-	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
+	if [ "$ifname" != ra0 ]; then
+		# A locked profile has no second network, so ra1 stays down.
+		mtwifi_2g_enabled || { mtwifi_lock_2g && was=; } || { wireless_setup_failed PROFILE_WRITE; return 1; }
+		ip link set dev ra0 up 2>/dev/null
+	fi
 	if [ "$vif_count" != 0 ] || { [ "$ifname" = ra0 ] && [ -n "$was" ]; }; then
 		ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	fi

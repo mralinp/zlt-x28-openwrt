@@ -46,7 +46,7 @@ Last updated 2026-10-29 (release `v0.22.0`). One unit, one SIM, one carrier.
 | Native OpenWrt 23.05.5 on slot A (vendor 4.19.205 kernel, fw3 + iptables-legacy) | ✅ boots; stock slot B untouched |
 | 5G data as a normal netifd interface (`x28_mipc`: IPv4, IPv6, IPv4v6, APN from the SIM) | ✅ works, with its own LuCI protocol page |
 | LuCI, LAN bridge (4 sockets), DHCP/DNS, IPv6 on the LAN, firewall and NAT | ✅ works; root has an empty password until you set one |
-| Wi-Fi (MT7915 dual band, vendor `mt_wifi` through a netifd handler) | 🟡 both radios come up with WPA2; client and throughput tests pending |
+| Wi-Fi (MT7915 dual band, vendor `mt_wifi` through a netifd handler) | 🟡 both radios come up with WPA2; off after a clean flash, enable in LuCI over a LAN cable; client and throughput tests pending |
 | Front panel LEDs (radio, signal, WAN) | ✅ works |
 | Everything at boot, settings surviving reboots, SSH key-only on port 22 | ✅ works |
 | A/B boot counter | ✅ the preloader adds a try per boot; `x28-bootok` resets it after a good boot, like stock |
