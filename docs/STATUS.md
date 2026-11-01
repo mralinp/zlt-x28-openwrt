@@ -30,8 +30,9 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   Stock marks success together with copying A over B, which this image never does ([BOOT-FLOW](BOOT-FLOW.md)).
 - The download-agent block write to `misc` was never acknowledged (twice). `misc` is changed live with the stock
   `dd-nand` method instead; there is no proven off-device way to rewrite `misc`.
-- Wi-Fi client and throughput tests, more LED states, and a long soak are pending. The load average sits around 3 with
-  an idle CPU (probably vendor driver threads in uninterruptible sleep); not yet explained.
+- Wi-Fi client and throughput tests and more LED states are pending. A 26.6 h soak showed no unexplained restart, but
+  available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)). The load average of about 3 is
+  vendor threads in uninterruptible sleep, harmless ([TESTING 33](TESTING.md)).
 - SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
 - One unit, one SIM, one carrier. Hardware revision differences are unknown.
 
@@ -44,7 +45,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
 ## Next
 
-See the roadmap in [PROJECT-PLAN.md](PROJECT-PLAN.md): soak and test slot A, then a recovery slot on B (a small kernel
+See the roadmap in [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, then a recovery slot on B (a small kernel
 and rescue path that installs OpenWrt on A and can restore stock), `sysupgrade` for that layout, a stable release and
 the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
 sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

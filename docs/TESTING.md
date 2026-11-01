@@ -47,6 +47,7 @@ Conventions:
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
 | 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ 162 Mbit/s download at 43 % CPU, limited by the test servers; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
 | 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported, so the modules can't load | [kernel-module-crc](research/kernel-module-crc.md) |
+| 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -302,5 +303,26 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
 - **Gotchas found**: the preloader counts every boot; a `reboot` without the reset service left the byte at 1; stock B
   repairs (erases) slot A if it ever boots with A's tries above 3; `misc` cannot be rewritten over USB (28); the log
   buffer is flooded by vendor RIL messages, so early boot lines scroll out of `logread`.
-- **Not proven**: Wi-Fi client and throughput behaviour, a multi-day soak, other SIMs, reconnect after a modem reset on
-  the final image, the preloader's fall-back to B (inferred), and the load average of about 3 with an idle CPU.
+- **Not proven**: Wi-Fi client and throughput behaviour, other SIMs, reconnect after a modem reset on
+  the final image, and the preloader's fall-back to B (inferred).
+
+## 33. Soak of slot A (2026-10-31 to 2026-11-01)
+
+One read-only sample every 5 minutes, 322 in all, from a logger kept on the router and removed afterwards. It ran 26.6 h of
+the planned 48 h: 21.2 h, then the owner's own power or USB disturbance restarted the unit, then 5.4 h. The owner then stopped
+it and accepted the behaviour, after daily use as the home connection throughout.
+
+| Measure | Result |
+|---|---|
+| Unexplained restarts | None. UART shows no panic before the one restart. |
+| WAN | Up in every sample |
+| Slot A tries | 0 in all four copies, every sample |
+| SoC temperature | 36.5–45.4 °C, median 41.5 (test 30: about 40) |
+| Load average | 3.00–4.55, median 3.09 |
+| `MemAvailable` | 320 → 215 MB, lowest 187, in the first run; 319 → 244 MB, lowest 219, in the second |
+
+**The load average is explained, and harmless.** `ccci_poll1`, `isr_count_polli` and `wed_task0`, vendor kernel threads, are
+in uninterruptible sleep in every sample, which counts as 3 of load on a CPU that stays idle. They do not show up as heat.
+
+**Not verified:** a full 48 h, sustained load under heavy traffic, and whether available memory keeps falling or levels off
+([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)). There is no stock CPU baseline: not measured.
