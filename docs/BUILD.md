@@ -498,3 +498,10 @@ docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$P
 Not done yet: hosting the feed and its signing key, testing on a unit, and shipping it in the image (#202). Built images also carry 72 old stock kmod records with a foreign architecture in their `opkg` status, which print warnings until the first write removes them.
 
 **Beta feed audit (2026-11-01, #200):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.
+
+### Explicit vendor-ipset subset (#200)
+
+The [vendor-ipset packaging follow-up](research/vendor-ipset-packaging.md) supplies local metadata-only
+variants of both `ipset` and `libipset13`, depending on an explicitly named vendor subset rather than the
+incomplete official aggregate. Their upstream payloads/scripts are preserved, and `hash:ip,mac` remains
+unavailable. This is a locally tested candidate, not a hosted feed or installed image feature.

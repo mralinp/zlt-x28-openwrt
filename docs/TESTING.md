@@ -49,6 +49,7 @@ Conventions:
 | 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported, so the modules can't load | [kernel-module-crc](research/kernel-module-crc.md) |
 | 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
+| 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
