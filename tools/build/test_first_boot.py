@@ -67,7 +67,8 @@ class PolicyTests(unittest.TestCase):
                               f.LUCI_HEADERS[0]:b'<script src="{{ resource }}/luci.js?v=git-1.2-abc"></script>',
                               'www/luci-static/resources/view/network/wireless.js':b"o.ucisection=s.section;if(hwtype=='mac80211'){o=ss.taboption('general',form.Flag,'legacy_rates'}\nif(hwtype=='mac80211'){var mode=ss.children[0],bssid=ss.children[5],encr;}\nif(hwtype=='mac80211'){x}\nelse if(hwtype=='broadcom'){y}\n.then(L.bind(function(data){this.channels={'2g':L.hasSystemFeature('hostapd','acs')?['auto','auto',true]:[],'5g':L.hasSystemFeature('hostapd','acs')?['auto','auto',true]:[],'6g':[]};m=[L.hasSystemFeature('hostapd','11ac')&&hwmodelist.ac,L.hasSystemFeature('hostapd','11ax')&&hwmodelist.ax]}));\no.value('ap',_('Access Point'));o.value('sta',_('Client'));o.value('adhoc',_('Ad-Hoc'));",
                               'sbin/ujail':b'jail', 'usr/lib/opkg/info/procd-ujail.list':b'/sbin/ujail',
-                              'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n',
+                              'usr/lib/opkg/status':b'Package: procd\nStatus: installed\n\nPackage: procd-ujail\nStatus: installed\n\nPackage: zlib\n\nPackage: kernel\nVersion: 4.19.205-1\n\nPackage: kmod-old\nVersion: 4.19.205-1\n\n',
+                              'usr/lib/opkg/info/kmod-old.list':b'/lib/modules/old.ko', 'usr/lib/opkg/info/kernel.prerm':b'old', 'etc/opkg/customfeeds.conf':b'# custom\n',
                               'etc/uci-defaults/99-unsafe':b'mtd write', 'etc/rc.local':b'mtd write',
                               'etc/fstab':b'/dev/other /data ubifs rw 0 0',
                               'etc/rc.d/S99zmtk_boot_done':b'unsafe', 'etc/board.d/02_network':b'generic',
@@ -110,7 +111,11 @@ class PolicyTests(unittest.TestCase):
         dhcp=tree['etc/config/dhcp'][1].decode()
         self.assertIn("config dhcp 'lan'\n option interface 'lan'",dhcp)
         self.assertIn(" option ra 'server'\n option dhcpv6 'server'",dhcp)
-        self.assertEqual(tree['usr/lib/opkg/status'][1],b'Package: procd\nStatus: installed\n\nPackage: zlib\n')
+        self.assertEqual(tree['usr/lib/opkg/status'][1],b'Package: procd\nStatus: installed\n\nPackage: zlib\n\nPackage: kernel\nVersion: 1:4.19.205-x28\nArchitecture: all\nStatus: install user installed\n')
+        self.assertNotIn('usr/lib/opkg/info/kmod-old.list',tree);self.assertNotIn('usr/lib/opkg/info/kernel.prerm',tree)
+        self.assertEqual(tree['usr/lib/opkg/info/kernel.control'][1],b'Package: kernel\nVersion: 1:4.19.205-x28\nArchitecture: all\n')
+        self.assertEqual(tree['etc/opkg/customfeeds.conf'][1].decode(),'# custom\n'+f.FEED_LINE)
+        self.assertIn(f.FEED_KEY_ID.encode(),tree['etc/opkg/keys/'+f.FEED_KEY_ID][1])
         self.assertNotIn('sbin/ujail',tree);self.assertNotIn('usr/lib/opkg/info/procd-ujail.list',tree)
         self.assertEqual(tree['etc/rc.d/S99x28-leds'][0].linkname,'../init.d/x28-leds')
         self.assertIn('/dev/tz_gpio_leds',tree['sbin/x28-leds'][1].decode())

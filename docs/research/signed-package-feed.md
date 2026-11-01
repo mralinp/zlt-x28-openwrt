@@ -1,6 +1,6 @@
 # Signed package-feed release preparation (#200)
 
-**2026-11-02: prepared locally, not published or installed.** The feed holds 182 packages: the `kernel`
+**2026-11-02: published, not yet tested on a unit.** The feed holds 182 packages: the `kernel`
 record, 178 kmod stubs and the vendor-ipset set from PR #217. A feed with only the ipset packages would
 still refuse everything else that needs a kmod, such as the 28 official packages that need `kmod-tun`.
 
@@ -35,9 +35,7 @@ using any partial output; an incomplete directory is not a release.
 The committed public key is `package/x28-feed/files/x28-feed.pub`, fingerprint **`7fec994ab0d15b97`**.
 Its private counterpart was generated offline and remains under ignored
 `private/signing/x28-feed-20261101/`, mode 0600 in a mode-0700 directory. It is not committed,
-uploaded or installed as a repository secret. Before relying on this key for a public feed, the owner
-must retain a secure off-host backup; the host copy alone does not provide disaster recovery.
-Only the public key belongs in images. Trust must come from the reviewed key/image, not merely a
+uploaded or installed as a repository secret. Only the public key belongs in images. Trust must come from the reviewed key/image, not merely a
 public key downloaded beside a feed. An asset checksum list is an integrity check, not a replacement
 for the usign trust anchor.
 
@@ -61,30 +59,21 @@ usign signed and verified the staged feed, and every checksum passed. The image'
 arm64 container passes `opkg_feed_test.sh` (21 checks) and `vendor_ipset_test.sh` (5 groups) against this feed.
 No key bytes were printed. Current staged bundle: `private/research/200-signed-feed/release-3/`.
 
-## Hosting choice and remaining approval
+## Hosting
 
-Use **version-pinned assets on an approved existing GitHub Release** of this repository. This reuses
-the existing release mechanism, needs no Pages service or new repository setting, and gives opkg a
-single asset-directory URL. Do not use a moving `latest` URL or overwrite published feed assets.
-For a release tag selected after the relevant code/key reviews merge, the eventual feed line is:
+The feed is the separate pre-release [`feed-1`](https://github.com/mralinp/zlt-x28-openwrt/releases/tag/feed-1), with
+187 assets, published 2026-11-01. It can't share an automatic `vX.Y.Z` release because those already have a `SHA256SUMS`
+asset, and `scripts/release.py` only reads `v*` tags, so `feed-*` tags don't affect versions. A changed feed gets a new
+tag; published assets are never overwritten. Upload one file at a time to a draft, because `gh release create` with all
+the assets timed out.
 
 ```text
-src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/APPROVED_TAG
+src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-1
 ```
 
-Before publication: confirm the approved release/tag and source commit, verify the staged key fingerprint,
-usign signature and every checksum, and confirm no assets of those names already exist. Then upload
-**only the 187 assets listed above**, without `--clobber`, to that existing release. Never upload the
-source directory, `private/`, an enclosing archive, the private key or a vendor firmware image.
-No upload, tag creation/movement, Actions secret, automatic release-job change or repository setting
-change is performed by this PR. A future automated publisher would need its own reviewed secret-handling
-and publication path; this tool deliberately performs no network operation.
+The public files were downloaded and compared byte for byte, and the image's real opkg updated, verified and installed
+from that URL in a container. An encrypted copy of the private key is on the owner's USB drive, and its passphrase is
+in their iCloud Drive; a test restore matched. `first_boot.py` puts this URL and key in the image (#202).
 
-After upload, download from the exact public URL and independently verify signature, index and package
-hashes. Only then integrate the pinned URL and this public key into the private native image under #202,
-including correct package records and stale-record cleanup. Test the actual image's opkg/LuCI behavior
-before any separately approved deployment. Keep the signature-checking option enabled.
-
-**Still unverified:** public asset availability/opkg downloads, off-host key backup, image integration,
-on-device package/type operations, persistence and LuCI Software. The unsigned candidate's vendor feature
+**Still unverified:** on-device package/type operations, persistence and LuCI Software. The unsigned candidate's vendor feature
 limits remain; signing does not add kernel features or make the full official aggregate compatible.

@@ -497,7 +497,7 @@ docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$P
   debian:stable-slim bash /t/opkg_feed_test.sh
 ```
 
-Not done yet: hosting the feed and its signing key, testing on a unit, and shipping it in the image (#202). Built images also carry 72 old stock kmod records with a foreign architecture in their `opkg` status, which print warnings until the first write removes them.
+Not done yet: testing on a unit.
 
 **Beta feed audit (2026-11-01, #200):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.
 
@@ -512,5 +512,4 @@ unavailable. This is a locally tested candidate, not a hosted feed or installed 
 
 The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed 182-package feed
 (stubs and vendor ipset), signs and verifies it locally, and stages an allowlisted release bundle. Its public
-key is checked in; its private key stays outside Git. Hosting uses a version-pinned approved GitHub Release,
-with no overwrite or private-directory upload. Publication and #202 image integration are still pending.
+key is checked in; its private key stays outside Git. It is hosted on the pre-release `feed-1`, and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.

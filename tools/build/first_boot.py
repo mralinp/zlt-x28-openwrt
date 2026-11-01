@@ -37,6 +37,10 @@ STORAGE = Path(__file__).resolve().parents[2]/'package/x28-storage/files'
 # ubi-utils for attaching user_data (#183); its writers have no business on a router that must not touch other slots.
 UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubidetach','ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
+FEED_KEY = Path(__file__).resolve().parents[2]/'package/x28-feed/files/x28-feed.pub'
+FEED_KEY_ID = '7fec994ab0d15b97'
+FEED_LINE = 'src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-1\n'
+KERNEL_VERSION = '1:4.19.205-x28'
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
 LUCI_WIRELESS = 'www/luci-static/resources/view/network/wireless.js'
@@ -367,6 +371,19 @@ config dhcp 'wan'
     if 'usr/lib/opkg/status' in tree:  # or opkg would still list it and could reinstall it
         stanzas=tree['usr/lib/opkg/status'][1].decode().split('\n\n')
         put('usr/lib/opkg/status','\n\n'.join(x for x in stanzas if not x.startswith('Package: procd-ujail\n')))
+    # The X28 feed describes the kernel (#202). The stock records have a foreign architecture and opkg drops them on its
+    # first write, which leaves nothing to satisfy a kmod's kernel dependency.
+    for name in [n for n in tree if n.startswith(('usr/lib/opkg/info/kmod-','usr/lib/opkg/info/kernel.'))]:
+        removed.append(name);del tree[name]
+    if 'usr/lib/opkg/status' in tree:
+        stanzas=tree['usr/lib/opkg/status'][1].decode().strip('\n').split('\n\n')
+        record=f'Package: kernel\nVersion: {KERNEL_VERSION}\nArchitecture: all\nStatus: install user installed\n'
+        kept=[x for x in stanzas if not x.startswith(('Package: kernel\n','Package: kmod-'))]
+        put('usr/lib/opkg/status','\n\n'.join(kept+[record]))
+        put('usr/lib/opkg/info/kernel.control',record.replace('Status: install user installed\n',''))
+        put('usr/lib/opkg/info/kernel.list','')
+    put('etc/opkg/keys/'+FEED_KEY_ID,FEED_KEY.read_text())
+    put('etc/opkg/customfeeds.conf',(tree['etc/opkg/customfeeds.conf'][1].decode() if 'etc/opkg/customfeeds.conf' in tree else '')+FEED_LINE)
     # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. This is the single
     # way in if switch/network init fails, since failsafe is removed.
     if 'bin/ash' not in tree:raise ValueError('missing /bin/ash for the console shell')
