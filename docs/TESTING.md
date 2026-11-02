@@ -52,6 +52,7 @@ Conventions:
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
 | 36 | X28 opkg feed on the unit (live on 190b, then a clean flash of 219) | 2026-11-02 | ✅ see [section 36](#36-x28-opkg-feed-on-the-unit-2026-11-02); ipset set types and running features not tested |
 | 37 | VPN speed and CPU limits, image 219 | 2026-11-02 | ✅ OpenVPN about 100 Mbit/s, limited by one core; WireGuard 715 sending and 330 receiving, CPU not saturated: [section 37](#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02) |
+| 38 | Image with the VPN set on the unit (#230) | 2026-11-02 | ✅ flashed, settings restored, survives a reboot: [section 38](#38-image-with-the-vpn-set-on-the-unit-2026-11-02) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -404,3 +405,29 @@ the laptop, which carries about 365 Mbit/s with no tunnel.
 
 **Not verified:** LAN clients forwarded through a tunnel, which adds NAT and routing cost; a tunnel across the carrier; other
 OpenVPN builds; and long-term WireGuard stability.
+
+## 38. Image with the VPN set on the unit (2026-11-02)
+
+- **Question**: does the image from #230 boot and serve the LAN, and does the WireGuard loader behave on a clean flash?
+- **Flash**: `native-ubi-234b` over 219 with `slot_entry.py rootfs_a identical`, a power cycle, then `write`. Both receipts read
+  `VERIFIED`, with one write attempt. The rootfs hash after boot matched the build; the overlay was reset on first boot.
+- **Restore**: settings from a fresh overlay backup, one file at a time (password, network, DHCP, firewall, Wi-Fi, Passwall2,
+  LuCI and cron configs, SSH host keys). Passwall2, `xray-core`, `ipset`, `tcpdump`, `htop` and `kmod-tun` were reinstalled with
+  `opkg` and no force flags. `opkg` state and the old feed line were not restored, so the image's own stay in use.
+
+| Check, after one reboot with settings restored | Result |
+|---|---|
+| Slot, tries | A; 0 in all four copies |
+| Settings and SSH host key hashes, installed packages | Unchanged (154 packages) |
+| `dnsmasq-full` | Running with `ipset no-nftset`; DNS answers, DHCP serves the LAN |
+| WireGuard | Module loaded after the tries were reset, crash marker cleared; `wireguard`, `l2tp` and `pptp` protocols in netifd |
+| WAN, guest network, Wi-Fi | Up |
+| `opkg update` | 9 signature checks pass; no kernel, kmod or `dnsmasq` upgrade offered |
+| Kernel errors | None in `dmesg` or on UART |
+
+**Found:** Wi-Fi is open and root has no password for the first minutes of a clean flash, by design, until settings are
+restored. Restoring the old SSH host keys switches the served key at once, so the next connection in a script sees a
+changed key.
+
+**Not verified:** L2TP and PPTP against a server, OpenVPN with a provider, Passwall2 enabled, and WireGuard over hours
+([#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227)).
