@@ -482,3 +482,8 @@ The modules were then moved to `/lib/modules/x28` (a safety review found that th
 **Not verified:** switching it off from LuCI with `ucitrack` running, LAN throughput, the modules over hours, and the image
 built with them (#198).
 
+**Later the same day (#239):** LuCI's Passwall2 page showed the core running, with Baidu 1108.64 ms, Google 536.02 ms and
+GitHub 554.06 ms through the node ([screenshot](PASSWALL2.md)). The router's own traffic through Passwall2 (exit
+country `GB`): downloads of 50.3 and 119.9 Mbit/s, upload 16.4 Mbit/s, 15 s each
+([PASSWALL2](PASSWALL2.md#through-passwall2-2026-11-02)).
+

@@ -8,6 +8,10 @@ node, switched on from LuCI ([TESTING 39](TESTING.md#39-tproxy-and-passwall2-on-
 build now ships Passwall2, xray and the modules; that image has not been flashed yet. Installed by hand on the unit, they
 came back on their own after a reboot.
 
+![Passwall2 in LuCI on the X28: core running, Baidu, Google and GitHub reached through the node](images/x28-passwall2-luci.png)
+
+*LuCI over HTTPS on the unit, 2026-11-02: Passwall2's core running, its connection checks answered through the UK node.*
+
 ## How it fits this kernel
 
 | Need | How it's met |
@@ -44,6 +48,22 @@ To turn it off: the switch in LuCI, or `ssh x28 'uci set passwall2.@global[0].en
 WireGuard, which `x28-kmods` loads too).
 
 ## Tunnel speed results
+
+### Through Passwall2 (2026-11-02)
+
+The router's own traffic through Passwall2 (TPROXY, `localhost_proxy=1`), no separate xray. `ipinfo.io/country` answered
+`GB`, the node's country. Single runs of 15 s over cellular:
+
+| Test | Speed |
+|---|---|
+| Download, 1 stream (cachefly 100 MB), run 1 | 50.3 Mbit/s |
+| Download, 1 stream, run 2 | 119.9 Mbit/s |
+| Upload, 1 stream (`speed.cloudflare.com/__up`, 30.9 MB sent) | 16.4 Mbit/s |
+
+SoC 43.7 °C afterwards. The two downloads differ by more than 2x, so cellular and the server vary more than the tunnel;
+these are not a top speed. A LAN client's speed test through it is still to be recorded.
+
+### Through a separate xray
 
 Method: a separate xray in `/tmp` using the node's generated config, with a SOCKS port on `127.0.0.1`. No firewall or
 Passwall2 change. `curl` ran on the router and its CPU use is included. Single runs of 15 s or less, over cellular, so
