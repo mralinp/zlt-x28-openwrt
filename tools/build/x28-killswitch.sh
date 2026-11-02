@@ -12,6 +12,17 @@ for family in iptables ip6tables; do
 		if ! "$family" -C x28_killswitch -o ccmni+ ! -p "$protocol" -j REJECT >/dev/null 2>&1; then
 			"$family" -A x28_killswitch -o ccmni+ ! -p "$protocol" -j REJECT
 		fi
+		# Destinations Passwall2 itself sends direct (Direct shunt rules, the node, its whitelist) may leave by the WAN:
+		# mirror every set its PSW2 chain returns on, ports ignored. Passwall2's init runs this again after it starts.
+		direct="$("$family" -t mangle -S PSW2 2>/dev/null | sed -n 's/.*--match-set \([^ ]*\) dst.* -j RETURN$/\1/p' | sort -u)"
+		for set in $("$family" -S x28_killswitch | sed -n 's/^-A x28_killswitch -m set --match-set \([^ ]*\) dst -j RETURN$/\1/p'); do
+			echo "$direct" | grep -qx "$set" || "$family" -D x28_killswitch -m set --match-set "$set" dst -j RETURN
+		done
+		for set in $direct; do
+			if ! "$family" -C x28_killswitch -m set --match-set "$set" dst -j RETURN >/dev/null 2>&1; then
+				"$family" -I x28_killswitch -m set --match-set "$set" dst -j RETURN
+			fi
+		done
 	else
 		"$family" -F x28_killswitch
 	fi

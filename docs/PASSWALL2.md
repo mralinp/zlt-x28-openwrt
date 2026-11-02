@@ -38,7 +38,10 @@ in the rootfs and hooks Passwall2 start/stop/restart. fw3 reapplies the guard wh
 including at boot. Passwall2 itself remains **disabled by default** until the owner configures a node.
 While Passwall2 is enabled in UCI, direct forwarded cellular traffic is rejected for both IPv4 and IPv6,
 including LAN and guest traffic. ICMP is exempt: ping and path-MTU errors travel **directly**, not through Xray.
-Other configured proxy bypasses are blocked; this is stricter than an ordinary Linksys Passwall2 setup.
+Destinations Passwall2 itself sends direct still go direct (#255): shunt rules set to **Direct** (for example an
+`IR` rule), the node, and Passwall2's direct whitelist. The script mirrors every destination set Passwall2's
+`PSW2` chain returns on, ignoring ports, and the init runs it again after Passwall2 starts, so the exceptions follow
+the current rules. Access-control rules that send a whole device direct have no destination set and stay blocked.
 Router-originated traffic is outside this forwarding-only guard.
 
 Disabling Passwall2 through LuCI removes the guard when its service restarts. Stopping the service without
