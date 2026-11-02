@@ -51,6 +51,7 @@ Conventions:
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
 | 36 | X28 opkg feed on the unit (live on 190b, then a clean flash of 219) | 2026-11-02 | ✅ see [section 36](#36-x28-opkg-feed-on-the-unit-2026-11-02); ipset set types and running features not tested |
+| 37 | Cellular speed from the router, image 219 | 2026-11-02 | ✅ 180–213 Mbit/s down on one stream, 376 on four, 30–38 up: [section 37](#37-cellular-speed-from-the-router-2026-11-02) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -363,3 +364,26 @@ in uninterruptible sleep in every sample, which counts as 3 of load on a CPU tha
 **Not verified:** creating ipset sets or the kernel features behind any stub, a Passwall2 run on this image, and the UART
 shell's transmit line. Restoring a saved overlay as a whole would hide the new `opkg` state, so settings were restored file
 by file.
+
+## 37. Cellular speed from the router (2026-11-02)
+
+- **Question**: how fast is the cellular link on the native image, measured on the router itself?
+- **Setup**: image 219, slot A, vendor kernel 4.19.205, `curl` on the router, about 00:30 UTC. Single sample, one location,
+  one carrier. About 1.2 GB of data.
+
+| Test | Result | CPU (4 cores) |
+|---|---|---|
+| Download, IPv4, 1 stream, 100 MB, 3 runs | 180 / 180 / 213 Mbit/s | 17–19% |
+| Download, IPv4, 4 parallel streams, 100 MB each | 376 Mbit/s total | 37% |
+| Download, IPv6, 1 stream, 50 MB, 1 run | 104 Mbit/s | not measured |
+| Upload, IPv4, 1 stream, 25 MB, 3 runs | 30 / 38 / 38 Mbit/s | not measured |
+| Ping, 15 packets, IPv4 and IPv6 | 119 ms average, 87–250 ms range, no loss | |
+
+SoC temperature stayed at 44–45 °C.
+
+Servers: CacheFly for IPv4 download, Cloudflare for upload and IPv6 download. Cloudflare returned `403` to most download
+requests, probably rate limiting, so the IPv6 figure is one run against a different server and doesn't show that IPv6 is
+slower.
+
+**Not verified:** Wi-Fi or a LAN client through NAT ([#150](https://github.com/mralinp/zlt-x28-openwrt/issues/150)), other
+times of day, and sustained load.
