@@ -105,6 +105,16 @@ Ideas in order of how cheap they are to try. Only the first is measured here; th
 - **WireGuard where the network allows it.** It runs in the kernel on all four cores and carried 715 Mbit/s at under
   60% CPU ([TESTING 37](TESTING.md#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02)).
 
+### Torrents fill the RAM
+
+Don't run BitTorrent through Passwall2 on this router. Each tracker, DHT and peer UDP flow becomes its own xray
+session, and xray holds each one for its default 300 s idle timeout. On the test unit (2026-11-02), one LAN client's
+torrent client left xray with 3,597 UDP sockets and 288 MB within 30 minutes, about 8 MB of RAM was still free, and
+LuCI and SSH hung. Stopping the client was not enough: xray was too starved to clean up. `/etc/init.d/passwall2 restart`
+recovered it. This is upstream behaviour with a 640 MB router, not a bug, so the image leaves it alone (#257). To find
+the device, look in the Passwall2 log (`/tmp/etc/passwall2/acl/acl_default.log`) for one source sending to ports such
+as 1337 or 6969. Many VPS providers also suspend accounts over torrent traffic.
+
 ### Measure it on your unit
 
 Uses mobile data: up to 400 MB per 8-stream run. Divide the CPU used by the speed to get the cost; the speed alone
