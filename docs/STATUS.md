@@ -17,7 +17,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
 **Working on that unit**
 - 5G data through the `x28_mipc` netifd protocol (IPv4, IPv6, IPv4v6, APN from the SIM) and its LuCI page.
-- LuCI, a four-socket LAN bridge, `dnsmasq` DHCP and DNS, IPv6 on the LAN, firewall and NAT.
+- LuCI over HTTPS (self-signed certificate made on first boot, HTTP redirected), a four-socket LAN bridge, `dnsmasq` DHCP and DNS, IPv6 on the LAN, firewall and NAT.
 - Wi-Fi on the MT7915 dual band through the vendor `mt_wifi` driver (both radios up, WPA2).
 - Front panel LEDs from radio, signal and WAN state.
 - The modem stack, services and Wi-Fi defaults start at boot; settings, host keys and the root password survive reboots.
@@ -26,6 +26,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed. OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
+- Passwall2 runs on TPROXY and socket modules built the same way: the router's own TCP and UDP go through the node with no
+  warnings ([PASSWALL2](PASSWALL2.md)). The image build ships it; LAN clients through it are untested.
 
 **Open or unproven**
 - Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.

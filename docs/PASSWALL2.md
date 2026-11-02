@@ -1,54 +1,47 @@
 # Passwall2 on the native image
 
-Issue: [#198](https://github.com/mralinp/zlt-x28-openwrt/issues/198). Tested on one unit, 2026-11-01.
+Issue: [#198](https://github.com/mralinp/zlt-x28-openwrt/issues/198). Tested on one unit, 2026-11-01 and 2026-11-02.
 
-**Status: on hold until the kernel and package manager are fixed.** Passwall2 is installed and configured on the test
-unit but disabled, and has never been enabled there. The tunnel itself works: xray reached 162 Mbit/s with CPU to spare.
-Transparent proxying for LAN clients is untested.
+**Status: works on the unit for the whole LAN.** With TPROXY and socket modules we build for the vendor kernel,
+Passwall2 starts with no warnings and carries the router's own traffic and LAN clients' TCP, UDP and IPv6 through the
+node, switched on from LuCI ([TESTING 39](TESTING.md#39-tproxy-and-passwall2-on-the-unit-2026-11-02)). The image
+build now ships Passwall2, xray and the modules; that image has not been flashed yet. Installed by hand on the unit, they
+came back on their own after a reboot.
 
-## What blocks it
+## How it fits this kernel
 
-| Blocker | Evidence | Effect |
-|---|---|---|
-| No `TPROXY` or `xt_socket` in the vendor kernel | `CONFIG_NETFILTER_XT_TARGET_TPROXY`, `CONFIG_NF_TPROXY_*` and `CONFIG_NETFILTER_XT_MATCH_SOCKET` are not set | UDP can't be proxied transparently; TCP has to use `redirect` |
-| No nftables in the vendor kernel | No `nf_tables`; the image uses fw3 and iptables-legacy | Passwall2 has to use its iptables path |
-| Feed kmods don't match the kernel | Feed `kmod-*` packages need `kernel` 5.15.167; the unit runs 4.19.205 | Plain `opkg install` can't resolve kmod dependencies, so packages such as `ipset` need `--nodeps` |
-| `dnsmasq` has no ipset support | `dnsmasq --version` lists `no-ipset no-nftset`; `dnsmasq --test` rejects an `ipset=` line with "recompile with HAVE_IPSET defined" | Passwall2 instances given an `ipset=` line can't start |
-| Passwall2 misreads that `dnsmasq` | `app.sh` runs `grep -qw ipset`, which also matches `no-ipset`, and logs `dnsmasq_ipset:1` | No warning about the row above |
+| Need | How it's met |
+|---|---|
+| `TPROXY` and `xt_socket` (not in the vendor kernel) | `nf_socket_ipv4/6`, `nf_tproxy_ipv4/6`, `xt_socket`, `xt_TPROXY` built from the SDK tree without symbol versions, like WireGuard ([#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227)); `x28_udp_lookup` supplies `udp4_lib_lookup` and `udp6_lib_lookup`, which the stock kernel never exported. Why this loads despite the CRCs: [kernel-module-crc](research/kernel-module-crc.md) |
+| Loading them safely | `x28-kmods` (`package/x28-kmods`, S97) loads them after `x28-bootok` resets the boot tries, with a crash marker so a bad load can't become a boot loop, then starts Passwall2 if it is enabled, in case Passwall2's own delayed boot start ran before `xt_TPROXY` was in. Passwall2 keeps its boot link: LuCI's apply only restarts enabled services |
+| No nftables | Passwall2's iptables path; the image sets `prefer_nft=0` and `tcp_proxy_way=tproxy` |
+| ipset in `dnsmasq` | Our `dnsmasq-full` has `ipset no-nftset` (#203), and the vendor `ip_set` modules are in the image |
+| `opkg` dependencies | `kmod-ipt-tproxy` and `kmod-ipt-socket` records at the kernel's version, so `iptables-mod-tproxy` and `-socket` resolve. `iptables-mod-extra` still wants `kmod-ipt-extra`, which has no stub yet |
 
-The 23.05.5 `dnsmasq-full` probably doesn't help: its published dependencies include `nftables-json` but not
-`kmod-ipt-ipset`, which suggests it was built with nftset and without ipset. This comes from the package metadata; the
-binary was not checked.
+The modules are built from the private SDK tree, so they never enter Git, CI or a feed. Build them as in
+[TESTING 39](TESTING.md#39-tproxy-and-passwall2-on-the-unit-2026-11-02), strip debug info and pass the directory to
+`first_boot.py --tproxy-modules` ([BUILD](BUILD.md#vpn-set-and-wireguard-in-the-image-230)).
 
-## When to come back to this
-
-1. Add TPROXY support. Modules built from the SDK can't load on the stock kernel
-   ([result](research/kernel-module-crc.md)), so this needs the exact source or a route without those modules.
-   Make `opkg` resolve kmod dependencies against a feed that matches the kernel.
-2. Build `dnsmasq-full` with ipset on and nftset off, in `tools/build/sdk_packages.sh`, or carry a suitable build in
-   the feed.
-3. Undo the workarounds below, then enable Passwall2 and finish the steps in #198.
+Passwall2's `localhost_proxy` sends the router's own traffic through the node, including `opkg` and NTP. Behind a router
+that already tunnels to the same node, `client_proxy` would tunnel that router's traffic twice; use Passwall2's access
+control to pick clients instead.
 
 ## State of the test unit
 
-Reversible, and off while `enabled='0'`:
+Installed by hand the way the image will have it, not yet from an image:
 
-- `ipset` and `libipset13` 7.17-1 installed with `--nodeps`. `hash:net` create, add, test and destroy all work. Each
-  `ipset` command warns that the kernel supports protocol 6 only.
-- The owner's UK node (VLESS over XHTTP with TLS, port 443) copied from their Linksys MX5300. Its address is an IPv6
-  literal, so it depends on the WAN's IPv6 ([#50](https://github.com/mralinp/zlt-x28-openwrt/issues/50)).
-- `/etc/config/passwall2` workarounds for this kernel and `dnsmasq`: `rulenode.default_node` set to that node,
-  `rulenode.write_ipset_direct='0'`, `examplenode` deleted, `udp_no_redir_ports='1:65535'`, `localhost_proxy='0'`.
-- Backups in `/root/backup-198` on the unit.
+- The 7 modules in `/lib/modules/4.19.205`, loaded by `x28-kmods` (S97), which replaced `x28-wireguard` and also loads
+  WireGuard. `ucitrack` (S80) started and enabled, so LuCI's Save & Apply restarts Passwall2 (its `reload` is a restart).
+- `iptables-mod-tproxy`, `-socket` and `-extra` installed with `--nodeps`; `-iprange`, `-conntrack-extra` and the
+  `kmod-ipt-nat` stub installed normally. No `kmod-ipt-tproxy`/`-socket` records yet.
+- `/etc/config/passwall2`: `enabled=1`, `client_proxy=1`, `localhost_proxy=1`, `tcp_proxy_way=tproxy`, `ipv6_tproxy=1`,
+  `prefer_nft=0`, node the owner's UK node (VLESS over XHTTP with TLS, an IPv6 literal, so it needs the WAN's IPv6, #50).
+- LuCI over HTTPS with a self-signed certificate (`px5g-mbedtls`, `redirect_https=1`).
+- Backups in `/root/backup-lan` (configs and the old loader), `/root/backup-tpx` and `/root/backup-198`.
 
-To undo:
-
-```sh
-ssh x28 'cp /root/backup-198/passwall2 /etc/config/passwall2 && opkg remove ipset libipset13'
-```
-
-Hostname nodes are not safe with this `dnsmasq`: Passwall2 writes an `ipset=` line for them, which brings the startup
-failure back.
+To turn it off: the switch in LuCI, or `ssh x28 'uci set passwall2.@global[0].enabled=0; uci commit passwall2;
+/etc/init.d/passwall2 stop'`. To remove the modules from boot: `ssh x28 '/etc/init.d/x28-kmods disable;
+/etc/init.d/x28-wireguard enable'`.
 
 ## Tunnel speed results
 
@@ -108,9 +101,6 @@ line in the background once per stream. For CPU, compare `/proc/stat` before and
 
 ## Not proven
 
-- Passwall2 starting on this unit, or how its scripts behave when the `-m socket` rules fail.
-- Transparent proxying for LAN clients, and the cost of LAN forwarding.
-- That the UDP exclusion and leak handling work. QUIC and client IPv6 would bypass the proxy until blocked.
+- Throughput and CPU through the LAN path; the estimate above is for the router's own traffic.
+- The modules over hours, and the image that ships them.
 - Any tunnel speed above 162 Mbit/s, and sustained heat under load.
-- xray's `tun` inbound for UDP: `xray run -test` accepts it, but it has not been run. The installed Passwall2's sing-box
-  generator has no XHTTP support, so sing-box can't use this node as it stands.

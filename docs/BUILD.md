@@ -62,8 +62,8 @@ On an Apple Silicon Mac, in an emulated x86_64 container. `WORK` must stay insid
 Mac's APFS volume is case-insensitive; only the output goes to `private/build/out`:
 
 ```bash
-docker run --rm --platform linux/amd64 -e WORK=/tmp/work -v "$PWD/tools/build:/src:ro" -v "$PWD/private/build:/b" ubuntu:22.04 \
-  bash -c 'apt-get update && apt-get install -y build-essential libncurses-dev zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 python3-distutils file xz-utils zstd curl ca-certificates && /src/userspace.sh /b/out'
+docker run --rm --platform linux/amd64 -e WORK=/tmp/work -v "$PWD:/repo:ro" -v "$PWD/private/build:/b" ubuntu:22.04 \
+  bash -c 'apt-get update && apt-get install -y build-essential libncurses-dev zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 python3-distutils file xz-utils zstd curl ca-certificates && /repo/tools/build/userspace.sh /b/out'
 ```
 
 ## Native-image readiness (2026-10-29, #74)
@@ -530,14 +530,27 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
 ```sh
 python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
   --stock private/firmware/20261021/rootfs-b-system.tar.gz --output OUT \
-  --wireguard-module private/research/wg-crc/src/src/wireguard.ko
+  --wireguard-module private/research/wg-crc/src/src/wireguard.ko \
+  --tproxy-modules private/research/tproxy-kmod/ko
 ```
 
   It adds the module, a `kmod-wireguard` record at the kernel's version (so `wireguard-tools` resolves), and
-  `x28-wireguard` (`package/x28-wireguard`). That script loads the module 30 s after boot, after `x28-bootok` has reset the
+  `x28-kmods` (`package/x28-kmods`). That script loads our modules 30 s after boot, after `x28-bootok` has reset the
   boot tries, then brings up any WireGuard interfaces. A marker in `/etc` stops a load that crashed the unit from being
   retried, so a crash cannot become a boot loop. Without `--wireguard-module` the image has the tools but no kernel support.
   The module loads with no symbol version check; see [#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227).
+- **HTTPS for LuCI:** `libustream-mbedtls` and `px5g-mbedtls`; `first_boot.py` sets `redirect_https` and the certificate
+  name `x28`. uhttpd makes a self-signed EC certificate on its first start, so each unit has its own, and browsers warn
+  about it once.
+- **Passwall2 (#198):** `luci-app-passwall2`, `xray-core` and the `iptables-mod-tproxy`, `-socket`, `-iprange`,
+  `-conntrack-extra` and `-extra` extensions, from the Passwall build feeds (key `0abda65a492b4887`, in
+  `package/x28-feed/files/passwall.pub`). `--tproxy-modules` takes a directory with the 7 TPROXY and socket modules and
+  adds them with `kmod-ipt-tproxy` and `kmod-ipt-socket` records. `first_boot.py` does what Passwall2's `uci-defaults`
+  would (the profile strips them): its config with `prefer_nft=0` and `tcp_proxy_way=tproxy`, the firewall include,
+  `dhcp localuse` and the feeds. Passwall2 keeps its boot link, because LuCI's apply skips disabled services; `x28-kmods`
+  starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
+  LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
+  [PASSWALL2](PASSWALL2.md).
 
-The feed is now [`feed-2`](research/signed-package-feed.md). With all of the above the rootfs is 11.4 of 30 MiB (image
-219 was 7.6). Passwall2 is not built in; it installs from its own feed. Check a built image with `image_feed_test.sh`.
+The feed is now [`feed-2`](research/signed-package-feed.md). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
+was 7.6). Check a built image with `image_feed_test.sh`.

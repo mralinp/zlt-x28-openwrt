@@ -46,13 +46,14 @@ Conventions:
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
 | 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ 162 Mbit/s download at 43 % CPU, limited by the test servers; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
-| 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported, so the modules can't load | [kernel-module-crc](research/kernel-module-crc.md) |
+| 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported; built without CRCs they do load (39) | [kernel-module-crc](research/kernel-module-crc.md) |
 | 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
 | 36 | X28 opkg feed on the unit (live on 190b, then a clean flash of 219) | 2026-11-02 | ✅ see [section 36](#36-x28-opkg-feed-on-the-unit-2026-11-02); ipset set types and running features not tested |
 | 37 | VPN speed and CPU limits, image 219 | 2026-11-02 | ✅ OpenVPN about 100 Mbit/s, limited by one core; WireGuard 715 sending and 330 receiving, CPU not saturated: [section 37](#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02) |
 | 38 | Image with the VPN set on the unit (#230) | 2026-11-02 | ✅ flashed, settings restored, survives a reboot: [section 38](#38-image-with-the-vpn-set-on-the-unit-2026-11-02) |
+| 39 | TPROXY and socket modules, and Passwall2 on them (#198) | 2026-11-02 | ✅ 7 modules loaded; Passwall2 with no warnings carries the router's and a LAN phone's TCP, UDP and IPv6 through the UK node: [section 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -431,3 +432,49 @@ changed key.
 
 **Not verified:** L2TP and PPTP against a server, OpenVPN with a provider, Passwall2 enabled, and WireGuard over hours
 ([#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227)).
+
+## 39. TPROXY and Passwall2 on the unit (2026-11-02)
+
+- **Question**: do TPROXY and socket modules built from the SDK tree load and work on the stock kernel, and does Passwall2
+  then run without errors?
+- **Build**: `nf_socket_ipv4/6`, `nf_tproxy_ipv4/6`, `xt_socket` and `xt_TPROXY` from the `x28-kbuild` tree, plus
+  `x28_udp_lookup`, which supplies the `udp4_lib_lookup` and `udp6_lib_lookup` the stock kernel never exported (upstream
+  bodies on the exported `__udp4/6_lib_lookup`). No `Module.symvers`, as for WireGuard (#227).
+- **Offline**: every needed symbol is exported by the stock kernel or its loaded modules. Of the 15 CRC-differing functions
+  that could be compared, 12 use the same struct offsets; the other 3 only looked different because the scan window
+  ended early, and the stock code makes the same loads further on.
+- **Live**: loaded from `/tmp` after the boot tries were reset, then `iptables-mod-tproxy`, `-socket` and `-extra` with
+  `--nodeps`. Passwall2 with `tcp_proxy_way=tproxy`, `localhost_proxy=1`, `client_proxy=0` and the UK node.
+
+| Check | Result |
+|---|---|
+| `insmod` of the 7 modules | All loaded; no oops or warning in `dmesg`; taint unchanged (4097, from WireGuard) |
+| Passwall2 start | Rules loaded; 0 warnings and 0 errors in its log once `prefer_nft=0` |
+| TCP from the router | Through `socket --transparent` and TPROXY; exit `GB` |
+| UDP from the router | NTP to `162.159.200.1` answered with about 200 ms delay; the TPROXY UDP counter rose |
+| DNS | Through Passwall2's dnsmasq and xray |
+| SoC | 41 °C |
+
+**LAN round**, with `client_proxy=1` and `ipv6_tproxy=1`, a 15-minute auto-rollback armed, and the owner switching it on in
+LuCI:
+
+| Check | Result |
+|---|---|
+| Switch in LuCI | Saved but not applied at first: `ucitrack` wasn't running (the image drops its boot link) and Passwall2's init script had been disabled. Fine after starting `ucitrack` |
+| Phone on X28 Wi-Fi | Worked for the owner; 233 xray connections from it |
+| LAN TCP and UDP | 560 TCP and 1,124 UDP packets through the LAN TPROXY rules; about 25 MB through xray's transparent sockets |
+| LAN IPv6 | Through the IPv6 TPROXY rules, 3 xray connections from a LAN IPv6 address |
+| Kernel, SoC | No messages; 40 °C |
+
+The Linksys behind this unit kept its own tunnel to the same node; the X28 passes that connection straight out (`psw2_vps`),
+so it isn't wrapped twice.
+
+**Reboot**, with the modules in `/lib/modules/4.19.205`, `x28-kmods` in place of `x28-wireguard`, and `ucitrack` enabled:
+SSH back after about 60 s; boot tries `00` in all four copies; all 8 modules (WireGuard included) loaded by 66 s and the
+crash marker cleared after 120 s. Passwall2's own delayed start finished at 60 s, and `x28-kmods` restarted it once
+TPROXY was in, with IPv4 and IPv6 LAN rules, no warnings and no kernel messages. `ucitrack` registered the `passwall2`
+reload trigger.
+
+**Not verified:** switching it off from LuCI with `ucitrack` running, LAN throughput, the modules over hours, and the image
+built with them (#198).
+

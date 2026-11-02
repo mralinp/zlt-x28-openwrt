@@ -29,10 +29,10 @@ docs/
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
 ├── THERMAL.md                baseline, fan result and the native image reading, how it was measured
-├── research/kernel-module-crc.md  why TPROXY modules built from the SDK can't load on the stock kernel
+├── research/kernel-module-crc.md  TPROXY module CRCs vs the stock kernel, and how they load anyway
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting
-├── PASSWALL2.md              Passwall2 on hold: what blocks it, tunnel speed results, state of the test unit
+├── PASSWALL2.md              Passwall2 on TPROXY modules for this kernel, unit state, tunnel speed results
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── FIRMWARE-EXTRACTION.md    offline extraction of the stock rootfs
 ├── RECOVERY-BACKUP.md        the verified partition backup and how it is stored

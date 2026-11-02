@@ -9,6 +9,7 @@ on:
     paths:
       - "tools/build/**"
       - "package/iwinfo-mtwifi/**"
+      - "package/x28-feed/**"
       - ".github/workflows/userspace.yml"
 
 permissions:

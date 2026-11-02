@@ -15,9 +15,9 @@ mknod -m 444 $R/dev/urandom c 1 9
 cat > $R/t.sh <<'T'
 set -eu
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
-# Only our WireGuard module may be recorded; the stock kmod records are gone (#202).
-test "$(ls /usr/lib/opkg/info | grep '^kmod-' | grep -vc '^kmod-wireguard\.')" = 0
-test "$(opkg list-installed | grep '^kmod-' | grep -vc '^kmod-wireguard ')" = 0
+# Only our own modules may be recorded; the stock kmod records are gone (#202).
+test "$(ls /usr/lib/opkg/info | grep '^kmod-' | grep -vcE '^kmod-(wireguard|ipt-tproxy|ipt-socket)\.')" = 0
+test "$(opkg list-installed | grep '^kmod-' | grep -vcE '^kmod-(wireguard|ipt-tproxy|ipt-socket) ')" = 0
 opkg list-installed | grep -q '^kernel - 1:4.19.205-x28$'
 opkg update >/tmp/u 2>&1 || { cat /tmp/u; exit 1; }
 ! grep -q 'Signature check failed' /tmp/u
@@ -30,6 +30,10 @@ opkg install tcpdump >/dev/null 2>&1
 opkg install ppp-mod-pptp >/dev/null 2>&1 || { echo 'FAIL: ppp-mod-pptp'; exit 1; }
 if [ -e /usr/lib/opkg/info/kmod-wireguard.control ]; then opkg list-installed | grep -q '^kmod-wireguard - 1:4.19.205-x28$'; opkg install wireguard-tools >/dev/null 2>&1; fi
 opkg list-installed | grep -q '^kernel - 1:4.19.205-x28$'
+if [ -e /usr/lib/opkg/info/kmod-ipt-tproxy.control ]; then
+  opkg list-installed | grep -q '^kmod-ipt-socket - 1:4.19.205-x28$'
+  opkg install iptables-mod-tproxy iptables-mod-socket >/tmp/t 2>&1 || { cat /tmp/t; exit 1; }
+fi
 echo 'IMAGE FEED PASS'
 T
 chroot $R /bin/sh /t.sh

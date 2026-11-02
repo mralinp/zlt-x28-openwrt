@@ -152,8 +152,8 @@ The flash step, its gates and the typed approvals are described in
 | [docs/NATIVE-CELLULAR.md](docs/NATIVE-CELLULAR.md) | The `x28_mipc` cellular protocol |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | CPU, RAM and flash use, the root filesystem tree and the device tree |
 | [docs/THERMAL.md](docs/THERMAL.md) | Heat baseline, the 12 V fan, current readings |
-| [docs/PASSWALL2.md](docs/PASSWALL2.md) | Passwall2 on hold: what blocks it, tunnel speed results |
-| [docs/research/kernel-module-crc.md](docs/research/kernel-module-crc.md) | Why TPROXY modules built from the SDK can't load on the stock kernel |
+| [docs/PASSWALL2.md](docs/PASSWALL2.md) | Passwall2 on TPROXY modules for the vendor kernel, unit state, tunnel speed results |
+| [docs/research/kernel-module-crc.md](docs/research/kernel-module-crc.md) | TPROXY module CRCs vs the stock kernel, and how they load anyway |
 | [docs/research/vendor-ipset-packaging.md](docs/research/vendor-ipset-packaging.md) | ipset packages for the vendor kernel's module subset |
 | [docs/research/signed-package-feed.md](docs/research/signed-package-feed.md) | The signed X28 opkg feed: what's in it, how it's signed and hosted |
 | [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |

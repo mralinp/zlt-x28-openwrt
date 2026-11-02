@@ -22,7 +22,8 @@ from stage_native import digest, load_archive, resolve, validate_parents
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
-ALLOWED_START = {'S00urngd','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S96x28-bootok','S99x28-leds'}
+# S80ucitrack: LuCI's apply restarts non-procd services such as Passwall2 only through its triggers (#198).
+ALLOWED_START = {'S00urngd','S80ucitrack','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S96x28-bootok','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -37,11 +38,15 @@ STORAGE = Path(__file__).resolve().parents[2]/'package/x28-storage/files'
 # ubi-utils for attaching user_data (#183); its writers have no business on a router that must not touch other slots.
 UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubidetach','ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
-WIREGUARD = Path(__file__).resolve().parents[2]/'package/x28-wireguard/files'
+KMODS = Path(__file__).resolve().parents[2]/'package/x28-kmods/files'
 FEED_KEY = Path(__file__).resolve().parents[2]/'package/x28-feed/files/x28-feed.pub'
 FEED_KEY_ID = '7fec994ab0d15b97'
 FEED_LINE = 'src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-2\n'
 KERNEL_VERSION = '1:4.19.205-x28'
+PASSWALL2_DEFAULT = 'usr/share/passwall2/0_default_config'
+PASSWALL_KEY_ID = '0abda65a492b4887'
+PASSWALL_FEEDS = ''.join(f'src/gz {n} https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-23.05/aarch64_generic/{n}\n'
+                         for n in ('passwall2','passwall_packages'))
 # mt_wifi reads these at interface up; the mtwifi handler rewrites only its keys in them (#127).
 # Stock LuCI 23.05 offers WPA only for mac80211/broadcom radios; add the modes the mtwifi handler maps (#127).
 LUCI_WIRELESS = 'www/luci-static/resources/view/network/wireless.js'
@@ -254,7 +259,7 @@ def public_key(text):
     return fields[0]+' '+fields[1]+'\n'
 
 
-def integrate(stage,key,stock_path,output,wireguard_module=None):
+def integrate(stage,key,stock_path,output,wireguard_module=None,tproxy_modules=None):
     key=public_key(key)
     if output.exists():raise FileExistsError(output)
     manifest=json.loads((stage/'manifest.json').read_text());raw=(stage/'rootfs-staging.tar.gz').read_bytes()
@@ -326,6 +331,12 @@ config timeserver 'ntp'
     put('etc/init.d/x28-leds',(LEDS/'x28-leds.init').read_text(),0o755);enable(99,'x28-leds')
     enable(19,'dnsmasq');enable(35,'odhcpd')
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
+    if 'etc/config/uhttpd' in tree:  # HTTPS with a self-signed certificate uhttpd makes on first start (px5g), HTTP redirected
+        config=tree['etc/config/uhttpd'][1].decode()
+        for old,new in ((r"option redirect_https '?0'?","option redirect_https '1'"),(r"option commonname '?OpenWrt'?","option commonname 'x28'")):
+            config,n=re.subn(old,new,config)
+            if n!=1:raise ValueError('unexpected uhttpd config: '+old)
+        put('etc/config/uhttpd',config)
     put('etc/init.d/x28-bootok',(BOOTOK/'x28-bootok.init').read_text(),0o755);enable(96,'x28-bootok')
     put('lib/preinit/79_x28_user_data',(STORAGE/'x28-user-data.preinit').read_text())
     put('etc/config/fstab',(STORAGE/'fstab').read_text())
@@ -384,16 +395,39 @@ config dhcp 'wan'
         put('usr/lib/opkg/info/kernel.control',record.replace('Status: install user installed\n',''))
         put('usr/lib/opkg/info/kernel.list','')
     enable(90,'openvpn')  # starts only the tunnels enabled in its config
-    if wireguard_module:  # built against the private SDK tree, so it comes from the local build, never from the repo (#227)
-        module=Path(wireguard_module).read_bytes()
-        info=tarfile.TarInfo('lib/modules/4.19.205/wireguard.ko');info.mode=0o644;info.uid=info.gid=0;info.size=len(module);tree[info.name]=(info,module)
-        put('etc/init.d/x28-wireguard',(WIREGUARD/'x28-wireguard.init').read_text(),0o755);enable(97,'x28-wireguard')
-        record=f'Package: kmod-wireguard\nVersion: {KERNEL_VERSION}\nDepends: kernel (= {KERNEL_VERSION})\nArchitecture: aarch64_generic\n'
+    # Built against the private SDK tree, so they come from the local build, never from the repo (#227, #198).
+    kmods={}
+    if wireguard_module:kmods['kmod-wireguard']=[Path(wireguard_module)]
+    if tproxy_modules:
+        kmods['kmod-ipt-tproxy']=[Path(tproxy_modules)/(m+'.ko') for m in ('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY')]
+        kmods['kmod-ipt-socket']=[Path(tproxy_modules)/(m+'.ko') for m in ('nf_socket_ipv4','nf_socket_ipv6','xt_socket')]
+    for package,paths in kmods.items():
+        for path in paths:
+            module=path.read_bytes()
+            info=tarfile.TarInfo('lib/modules/4.19.205/'+path.name);info.mode=0o644;info.uid=info.gid=0;info.size=len(module);tree[info.name]=(info,module)
+        extra=', kmod-ipt-tproxy' if package=='kmod-ipt-socket' else ''  # x28_udp_lookup lives in kmod-ipt-tproxy
+        record=f'Package: {package}\nVersion: {KERNEL_VERSION}\nDepends: kernel (= {KERNEL_VERSION}){extra}\nArchitecture: aarch64_generic\n'
         put('usr/lib/opkg/status',tree['usr/lib/opkg/status'][1].decode().rstrip('\n')+'\n\n'+record+'Status: install user installed\n')
-        put('usr/lib/opkg/info/kmod-wireguard.control',record)
-        put('usr/lib/opkg/info/kmod-wireguard.list','/lib/modules/4.19.205/wireguard.ko\n/etc/init.d/x28-wireguard\n')
+        put(f'usr/lib/opkg/info/{package}.control',record)
+        put(f'usr/lib/opkg/info/{package}.list',''.join(f'/lib/modules/4.19.205/{p.name}\n' for p in paths))
+    if kmods:put('etc/init.d/x28-kmods',(KMODS/'x28-kmods.init').read_text(),0o755);enable(97,'x28-kmods')
+    if PASSWALL2_DEFAULT in tree:  # what its uci-defaults would do, which this profile strips
+        config=tree[PASSWALL2_DEFAULT][1].decode()
+        for old,new in (("option prefer_nft '1'","option prefer_nft '0'"),("option tcp_proxy_way 'redirect'","option tcp_proxy_way 'tproxy'")):
+            if old not in config:raise ValueError('unexpected Passwall2 default config: '+old)
+            config=config.replace(old,new)
+        put('etc/config/passwall2',config)
+        put('etc/config/firewall',tree['etc/config/firewall'][1].decode().rstrip('\n')+"\n\nconfig include 'passwall2'\n option type 'script'\n option path '/var/etc/passwall2.include'\n option reload '1'\n")
+        put('etc/config/dhcp',tree['etc/config/dhcp'][1].decode().replace(" option ednspacket_max '1232'\n"," option ednspacket_max '1232'\n option localuse '1'\n",1))
+        if 'etc/config/uhttpd' in tree:
+            put('etc/config/uhttpd',re.sub(r"option max_requests '?\d+'?","option max_requests '50'",tree['etc/config/uhttpd'][1].decode()))
+        put('etc/opkg/keys/'+PASSWALL_KEY_ID,(FEED_KEY.parent/'passwall.pub').read_text())
+        # LuCI's apply (luci-reload) restarts only enabled services. Its boot start waits start_delay (60 s); x28-kmods
+        # loads TPROXY about 30 s after boot and starts it again then, in case the modules came late.
+        enable(99,'passwall2')
     put('etc/opkg/keys/'+FEED_KEY_ID,FEED_KEY.read_text())
-    put('etc/opkg/customfeeds.conf',(tree['etc/opkg/customfeeds.conf'][1].decode() if 'etc/opkg/customfeeds.conf' in tree else '')+FEED_LINE)
+    put('etc/opkg/customfeeds.conf',(tree['etc/opkg/customfeeds.conf'][1].decode() if 'etc/opkg/customfeeds.conf' in tree else '')+FEED_LINE
+        +(PASSWALL_FEEDS if PASSWALL2_DEFAULT in tree else ''))
     # Physical console only (kernel console=ttyS0,921600): needs the board's UART pads, unlike SSH. This is the single
     # way in if switch/network init fails, since failsafe is removed.
     if 'bin/ash' not in tree:raise ValueError('missing /bin/ash for the console shell')
@@ -460,7 +494,8 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--stage',type=Path,required=True)
     ap.add_argument('--public-key',type=Path,required=True);ap.add_argument('--stock',type=Path,required=True);ap.add_argument('--output',type=Path,required=True)
     ap.add_argument('--wireguard-module',type=Path,help='private wireguard.ko built for this kernel; without it the image has no WireGuard kernel support')
-    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.stock,args.output,args.wireguard_module),indent=2))
+    ap.add_argument('--tproxy-modules',type=Path,help='private directory with the TPROXY/socket modules built for this kernel; without it Passwall2 has no transparent proxy')
+    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.stock,args.output,args.wireguard_module,args.tproxy_modules),indent=2))
 
 
 if __name__=='__main__':main()

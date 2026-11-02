@@ -1,0 +1,56 @@
+#!/bin/sh /etc/rc.common
+# Loads the modules we build for the vendor kernel: WireGuard (#227) and TPROXY/socket for Passwall2 (#198). They have no
+# symbol version check, so this waits until x28-bootok (S96) has reset slot A's boot tries, and a load that never
+# finishes is not retried: a crash here must not become a boot loop or cost boot tries.
+
+START=97
+
+DIR=/lib/modules/4.19.205
+# Load order: each module's dependencies first. Missing files are skipped, so an image may carry any subset.
+MODS='wireguard x28_udp_lookup nf_socket_ipv4 nf_socket_ipv6 nf_tproxy_ipv4 nf_tproxy_ipv6 xt_socket xt_TPROXY'
+MARK=/etc/x28-kmods.loading
+
+# Slot A's tries byte in the four misc copies, as in x28-bootok.
+tries_reset() {
+	local dev i
+	grep -q 'bootslot=a' /proc/cmdline || return 1
+	dev=/dev/$(sed -n 's/^\(mtd[0-9]*\): [0-9a-f]* [0-9a-f]* "misc"$/\1/p' /proc/mtd)
+	for i in 0 1 2 3; do
+		[ "$(dd if="$dev" bs=1 skip=$((2057 + 262144 * i)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"')" = 00 ] || return 1
+	done
+}
+
+start() {
+	(
+		todo=
+		for m in $MODS; do
+			[ -e "$DIR/$m.ko" ] && [ ! -d "/sys/module/$m" ] && todo="$todo $m"
+		done
+		[ -n "$todo" ] || exit 0
+		# The marker only protects against a loop if it survives the crash.
+		grep -q ' /overlay ubifs ' /proc/mounts || { logger -t x28-kmods "overlay is not persistent; not loading"; exit 0; }
+		n=0
+		until tries_reset; do
+			n=$((n + 1))
+			[ $n -gt 60 ] && { logger -t x28-kmods "boot tries not reset after 5 min; not loading"; exit 0; }
+			sleep 5
+		done
+		if [ -e "$MARK" ]; then
+			logger -t x28-kmods "previous load did not finish; not loading. Remove $MARK to try again"
+			exit 0
+		fi
+		touch "$MARK"
+		sync
+		for m in $todo; do
+			insmod "$DIR/$m.ko" || { logger -t x28-kmods "insmod $m failed"; rm -f "$MARK"; exit 1; }
+		done
+		for i in $(uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='wireguard'$/\1/p"); do
+			ifup "$i"
+		done
+		# Passwall2's own boot start may have run before xt_TPROXY was in; its rules need it.
+		[ -d /sys/module/xt_TPROXY ] && [ "$(uci -q get passwall2.@global[0].enabled)" = 1 ] && /etc/init.d/passwall2 restart
+		sleep 120
+		rm -f "$MARK"
+		sync
+	) </dev/null >/dev/null 2>&1 &
+}

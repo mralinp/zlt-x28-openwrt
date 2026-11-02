@@ -174,6 +174,44 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn(b'mtd',tree['etc/rc.local'][1])
         self.assertFalse(r['flashable'])
 
+    def test_private_modules_and_passwall2_are_wired_up(self):
+        old=f.load_archive(self.archive)
+        with tarfile.open(self.archive,'w:gz') as t:
+            for name,(info,data) in old.items():t.addfile(info,io.BytesIO(data) if info.isfile() else None)
+            put(t,f.PASSWALL2_DEFAULT,b"config global\n\toption enabled '0'\n\toption prefer_nft '1'\n\toption tcp_proxy_way 'redirect'\n")
+            put(t,'etc/config/firewall',b"config defaults\n");put(t,'etc/config/uhttpd',b"config uhttpd 'main'\n\toption redirect_https '0'\n\toption max_requests '3'\n\nconfig cert 'defaults'\n\toption commonname 'OpenWrt'\n")
+            put(t,'etc/init.d/passwall2',b'passwall2')
+            m=tarfile.TarInfo('etc/rc.d/S99passwall2');m.type=tarfile.SYMTYPE;m.linkname='../init.d/passwall2';t.addfile(m)
+            put(t,'etc/init.d/ucitrack',b'ucitrack')
+            m=tarfile.TarInfo('etc/rc.d/S80ucitrack');m.type=tarfile.SYMTYPE;m.linkname='../init.d/ucitrack';t.addfile(m)
+        (self.stage/'manifest.json').write_text(json.dumps({'flashable':False,'archive_sha256':f.digest(self.archive.read_bytes())}))
+        mods=self.root/'mods';mods.mkdir();wg=self.root/'wireguard.ko';wg.write_bytes(b'wg')
+        for m in ('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY','nf_socket_ipv4','nf_socket_ipv6','xt_socket'):(mods/(m+'.ko')).write_bytes(m.encode())
+        f.integrate(self.stage,self.key,self.stock,self.output,wg,mods)
+        tree=f.load_archive(self.output/'rootfs-management.tar.gz')
+        self.assertEqual(tree['lib/modules/4.19.205/xt_TPROXY.ko'][1],b'xt_TPROXY');self.assertEqual(tree['lib/modules/4.19.205/wireguard.ko'][1],b'wg')
+        status=tree['usr/lib/opkg/status'][1].decode()
+        for package in ('kmod-wireguard','kmod-ipt-tproxy','kmod-ipt-socket'):self.assertIn(f'Package: {package}\nVersion: 1:4.19.205-x28\n',status)
+        self.assertIn('Depends: kernel (= 1:4.19.205-x28), kmod-ipt-tproxy\n',tree['usr/lib/opkg/info/kmod-ipt-socket.control'][1].decode())
+        self.assertEqual(tree['usr/lib/opkg/info/kmod-ipt-socket.list'][1].decode().split(),['/lib/modules/4.19.205/'+m+'.ko' for m in ('nf_socket_ipv4','nf_socket_ipv6','xt_socket')])
+        loader=tree['etc/init.d/x28-kmods'][1].decode()
+        self.assertEqual(tree['etc/rc.d/S97x28-kmods'][0].linkname,'../init.d/x28-kmods')
+        # dependencies before their users, every packaged module in the list
+        order=loader.split("MODS='")[1].split("'")[0].split()
+        self.assertLess(order.index('x28_udp_lookup'),order.index('nf_socket_ipv4'));self.assertLess(order.index('nf_tproxy_ipv6'),order.index('xt_TPROXY'))
+        self.assertEqual(sorted(order),sorted(n.split('/')[-1][:-3] for n in tree if n.startswith('lib/modules/4.19.205/')))
+        self.assertEqual(tree['etc/rc.d/S99passwall2'][0].linkname,'../init.d/passwall2')  # luci-reload skips disabled services
+        self.assertEqual(tree['etc/rc.d/S80ucitrack'][0].linkname,'../init.d/ucitrack')  # or LuCI's apply never restarts it
+        config=tree['etc/config/passwall2'][1].decode()
+        self.assertIn("option prefer_nft '0'",config);self.assertIn("option tcp_proxy_way 'tproxy'",config);self.assertIn("option enabled '0'",config)
+        self.assertIn("config include 'passwall2'\n option type 'script'\n option path '/var/etc/passwall2.include'",tree['etc/config/firewall'][1].decode())
+        self.assertIn(" option localuse '1'\n",tree['etc/config/dhcp'][1].decode())
+        uhttpd=tree['etc/config/uhttpd'][1].decode()
+        for line in ("option max_requests '50'","option redirect_https '1'","option commonname 'x28'"):self.assertIn(line,uhttpd)
+        self.assertEqual(tree['etc/opkg/customfeeds.conf'][1].decode(),'# custom\n'+f.FEED_LINE+f.PASSWALL_FEEDS)
+        key=base64.b64decode(tree['etc/opkg/keys/'+f.PASSWALL_KEY_ID][1].split(b'\n')[1])  # usign: 'Ed', key number, key
+        self.assertEqual(key[2:10].hex(),f.PASSWALL_KEY_ID)
+
     def test_switch_profile_ships_swconfig_table_and_single_early_owner(self):
         r=self.integrate_ok()
         tree=r[0]

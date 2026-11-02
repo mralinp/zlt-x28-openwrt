@@ -1,7 +1,13 @@
 # Building TPROXY modules for the stock kernel: CRC result (#201)
 
-**Result: no-go.** Modules built from the source we have can't load on the running kernel. Of the 35 symbols they need
-from it, 19 have different CRCs and 2 aren't exported. Tested offline on 2026-11-01; nothing touched the router.
+**Result: no-go with CRCs; superseded.** Modules built *with* symbol versions from the source we have would be refused:
+of the 35 symbols they need, 19 have different CRCs and 2 aren't exported. Tested offline on 2026-11-01.
+
+**Update, 2026-11-02:** built without `Module.symvers`, as WireGuard was (#227), the modules have no CRCs to check and the
+kernel loads them. A small `x28_udp_lookup` module supplies the 2 missing exports, and an offset comparison found no layout
+difference in the functions they call. They loaded and carried Passwall2's TCP and UDP traffic on the unit
+([TESTING 39](../TESTING.md#39-tproxy-and-passwall2-on-the-unit-2026-11-02), #198). That loses the kernel's own safety
+check, so matching offsets and a clean run are the only evidence, as for WireGuard.
 
 The feed in [#200](https://github.com/mralinp/zlt-x28-openwrt/issues/200) and the `dnsmasq` build in
 [#203](https://github.com/mralinp/zlt-x28-openwrt/issues/203) don't depend on this. The load test in

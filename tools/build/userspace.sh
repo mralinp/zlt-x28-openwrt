@@ -18,9 +18,15 @@ PACKAGES="-firewall4 -nftables -kmod-nft-offload
   luci-base luci-mod-admin-full luci-theme-bootstrap luci-app-opkg
   luci-app-firewall luci-proto-ipv6 luci-proto-ppp
   iwinfo rpcd-mod-iwinfo block-mount ubi-utils
-  uhttpd uhttpd-mod-ubus rpcd-mod-luci
+  uhttpd uhttpd-mod-ubus rpcd-mod-luci libustream-mbedtls px5g-mbedtls
   -dnsmasq dnsmasq-full
-  openvpn-openssl luci-app-openvpn xl2tpd ppp-mod-pptp wireguard-tools luci-proto-wireguard"
+  openvpn-openssl luci-app-openvpn xl2tpd ppp-mod-pptp wireguard-tools luci-proto-wireguard
+  luci-app-passwall2 xray-core iptables-mod-tproxy iptables-mod-socket iptables-mod-iprange
+  iptables-mod-conntrack-extra iptables-mod-extra"
+
+# Passwall2 and xray come from the Passwall build feeds, signed with the key in package/x28-feed (#198).
+PASSWALL=https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-23.05/aarch64_generic
+PASSWALL_KEY=0abda65a492b4887
 
 OUT=$(mkdir -p "${1:-out}" && cd "${1:-out}" && pwd)
 WORK=${WORK:-work}
@@ -28,6 +34,10 @@ mkdir -p "$WORK"
 [ -f "$WORK/$IB.tar.xz" ] || curl -fL --retry 3 -o "$WORK/$IB.tar.xz" "$URL"
 echo "$IB_SHA256  $WORK/$IB.tar.xz" | sha256sum -c -
 [ -d "$WORK/$IB" ] || tar -C "$WORK" -xJf "$WORK/$IB.tar.xz"
+grep -q '^src/gz passwall2 ' "$WORK/$IB/repositories.conf" ||
+  sed -i "/^## This is the local package repository/i src/gz passwall2 $PASSWALL/passwall2\nsrc/gz passwall_packages $PASSWALL/passwall_packages\n" \
+    "$WORK/$IB/repositories.conf"
+cp "$(dirname "$0")/../../package/x28-feed/files/passwall.pub" "$WORK/$IB/keys/$PASSWALL_KEY"
 
 # libiwinfo with the mtwifi backend (#165) and ubi-utils (#183): ImageBuilder installs local packages/ and prefers release 2.
 "$(dirname "$0")/sdk_packages.sh" "$WORK/sdk"
@@ -45,6 +55,8 @@ grep -q '^ubi-utils - ' "$OUT"/*.manifest && grep -q '^block-mount - 2023-02-28-
   { echo "the image lacks ubi-utils or the expected block-mount" >&2; exit 1; }
 # Our dnsmasq-full has ipset and no nftset (#203): the feed's build would pull nftables-json in.
 grep -q '^dnsmasq-full - .*-x28$' "$OUT"/*.manifest || { echo "the image did not take our dnsmasq-full" >&2; exit 1; }
+grep -q '^luci-app-passwall2 - ' "$OUT"/*.manifest && grep -q '^xray-core - ' "$OUT"/*.manifest ||
+  { echo "the image lacks Passwall2 or xray" >&2; exit 1; }
 if grep -qE '^(firewall4|nftables[a-z-]*) ' "$OUT"/*.manifest; then
   echo "firewall4/nftables ended up in the image" >&2
   exit 1
