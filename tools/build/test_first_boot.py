@@ -185,13 +185,24 @@ class PolicyTests(unittest.TestCase):
             put(t,'etc/init.d/ucitrack',b'ucitrack');put(t,'etc/config/ucitrack',b"config network\n\toption init 'network'\n")
             m=tarfile.TarInfo('etc/rc.d/S80ucitrack');m.type=tarfile.SYMTYPE;m.linkname='../init.d/ucitrack';t.addfile(m)
         (self.stage/'manifest.json').write_text(json.dumps({'flashable':False,'archive_sha256':f.digest(self.archive.read_bytes())}))
-        mods=self.root/'mods';mods.mkdir();wg=self.root/'wireguard.ko';wg.write_bytes(b'wg')
+        mods=self.root/'mods';mods.mkdir();(mods/'wireguard.ko').write_bytes(b'wg')
         for m in ('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY','nf_socket_ipv4','nf_socket_ipv6','xt_socket'):(mods/(m+'.ko')).write_bytes(m.encode())
-        f.integrate(self.stage,self.key,self.stock,self.output,wg,mods)
+        def tgz(members):
+            buf=io.BytesIO()
+            with tarfile.open(fileobj=buf,mode='w:gz') as t:
+                for name,data in members:put(t,name,data)
+            return buf.getvalue()
+        ipk=self.root/'ipset.ipk'  # needs kmod-tun, which the stub list has, and libfoo, which it doesn't
+        ipk.write_bytes(tgz([('./debian-binary',b'2.0\n'),('./data.tar.gz',tgz([('./usr/sbin/ipset',b'ELF')])),
+            ('./control.tar.gz',tgz([('./control',b'Package: ipset\nVersion: 1\nDepends: libc, kmod-tun, libfoo\n')]))]))
+        f.integrate(self.stage,self.key,self.stock,self.output,mods,[ipk])
         tree=f.load_archive(self.output/'rootfs-management.tar.gz')
         self.assertEqual(tree['lib/modules/x28/xt_TPROXY.ko'][1],b'xt_TPROXY');self.assertEqual(tree['lib/modules/x28/wireguard.ko'][1],b'wg')
         status=tree['usr/lib/opkg/status'][1].decode()
-        for package in ('kmod-wireguard','kmod-ipt-tproxy','kmod-ipt-socket'):self.assertIn(f'Package: {package}\nVersion: 1:4.19.205-x28\n',status)
+        for package in ('kmod-wireguard','kmod-ipt-tproxy','kmod-ipt-socket','kmod-tun'):self.assertIn(f'Package: {package}\nVersion: 1:4.19.205-x28\n',status)
+        self.assertNotIn('Package: libfoo',status)  # only what the vendor kernel provides
+        self.assertEqual(tree['usr/sbin/ipset'][1],b'ELF');self.assertIn('Package: ipset\nVersion: 1\n',status)
+        self.assertEqual(tree['usr/lib/opkg/info/ipset.list'][1],b'/usr/sbin/ipset\n')
         self.assertIn('Depends: kernel (= 1:4.19.205-x28), kmod-ipt-tproxy\n',tree['usr/lib/opkg/info/kmod-ipt-socket.control'][1].decode())
         self.assertEqual(tree['usr/lib/opkg/info/kmod-ipt-socket.list'][1].decode().split(),['/lib/modules/x28/'+m+'.ko' for m in ('nf_socket_ipv4','nf_socket_ipv6','xt_socket')])
         loader=tree['etc/init.d/x28-kmods'][1].decode()

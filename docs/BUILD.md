@@ -149,8 +149,14 @@ python3 tools/build/first_boot.py \
   --stage private/build/native-stage-76-final \
   --public-key ~/.ssh/router.pub \
   --stock private/firmware/20261021/rootfs-b-system.tar.gz \
-  --output private/build/native-management-NEW
+  --output private/build/native-management-NEW \
+  --kmods private/kmods \
+  --ipk private/feed-2/x28-ipset-kernel_4.19.205-x28_all.ipk private/feed-2/libipset13_7.17-1-x28-1_aarch64_generic.ipk \
+        private/feed-2/ipset_7.17-1-x28-1_aarch64_generic.ipk
 ```
+
+`--kmods` and `--ipk` are required, so every image ships WireGuard, Passwall2's TPROXY modules and `ipset` (#248); see
+[the VPN set](#vpn-set-and-wireguard-in-the-image-230) for where they come from.
 
 The public key is parsed as one plain Ed25519 or RSA key (RSA at least 2048 bits); options, private
 keys, multiple lines and malformed blobs are refused. Comments are discarded. No private key or
@@ -526,27 +532,30 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
 - **L2TP and PPTP:** clients only, configured as LuCI interfaces. PPTP needs the `kmod-mppe` stub in `feed-2`.
 - **WireGuard:** the vendor kernel has no WireGuard. Our module and the TPROXY set are built from the sources in
   [`package/x28-kmods`](../package/x28-kmods/README.md) against the private SDK tree, so the built modules never enter
-  this repository, CI or a feed. Build them into `private/kmods` as that README shows, then pass them to `first_boot.py`:
-
-```sh
-python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
-  --stock private/firmware/20261021/rootfs-b-system.tar.gz --output OUT \
-  --wireguard-module private/kmods/wireguard.ko --tproxy-modules private/kmods
-```
+  this repository, CI or a feed. Build them into `private/kmods` as that README shows; `first_boot.py --kmods
+  private/kmods` requires all eight, so no image goes out without them (#248).
 
   It adds the module, a `kmod-wireguard` record at the kernel's version (so `wireguard-tools` resolves), and
   `x28-kmods` (`package/x28-kmods`). Our modules go in `/lib/modules/x28`, out of reach of the kernel's on-demand `modprobe`.
   That script loads them 30 s after boot, after `x28-bootok` has reset the
   boot tries, then brings up any WireGuard interfaces. A marker in `/etc` stops a load that crashed the unit from being
-  retried, so a crash cannot become a boot loop. Without `--wireguard-module` the image has the tools but no kernel support.
+  retried, so a crash cannot become a boot loop.
   The module loads with no symbol version check; see [#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227).
 - **HTTPS for LuCI:** `libustream-mbedtls` and `px5g-mbedtls`; `first_boot.py` sets `redirect_https` and the certificate
   name `x28`. uhttpd makes a self-signed EC certificate on its first start, so each unit has its own, and browsers warn
   about it once.
 - **Passwall2 (#198):** `luci-app-passwall2`, `xray-core` and the `iptables-mod-tproxy`, `-socket`, `-iprange`,
   `-conntrack-extra` and `-extra` extensions, from the Passwall build feeds (key `0abda65a492b4887`, in
-  `package/x28-feed/files/passwall.pub`). `--tproxy-modules` takes a directory with the 7 TPROXY and socket modules and
-  adds them with `kmod-ipt-tproxy` and `kmod-ipt-socket` records. `first_boot.py` does what Passwall2's `uci-defaults`
+  `package/x28-feed/files/passwall.pub`). `--kmods` adds the 7 TPROXY and socket modules with `kmod-ipt-tproxy` and
+  `kmod-ipt-socket` records. Passwall2's rules need `ipset`, which comes from the X28 feed (the vendor kernel has only part
+  of `kmod-ipt-ipset`, #200): fetch it once with
+  `gh release download feed-2 -D private/feed-2 -p 'ipset_*' -p 'libipset13_*' -p 'x28-ipset-kernel_*'` and pass the three
+  files to `--ipk`, which installs them with their opkg records. `libmnl0` comes from ImageBuilder.
+- **Kernel records:** for every `kmod-*` an installed package depends on and the vendor kernel provides
+  (`package/x28-kmod-stubs/stubs.txt`: `tun`, `ppp`, `pptp`, `mppe`, `pppol2tp`, the iptables and conntrack set),
+  `first_boot.py` writes an empty record, so opkg sees those dependencies met. One stays unmet by design:
+  `iptables-mod-extra` wants `kmod-ipt-extra`, and the kernel has its `owner`, `addrtype`, `pkttype` and `quota` matches
+  but not `cgroup`. `first_boot.py` does what Passwall2's `uci-defaults`
   would (the profile strips them): its config with `prefer_nft=0` and `tcp_proxy_way=tproxy`, the firewall include,
   `dhcp localuse`, its `ucitrack` entry and the feeds. Passwall2 keeps its boot link, because LuCI's apply skips disabled services; `x28-kmods`
   starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
@@ -554,4 +563,4 @@ python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
   [PASSWALL2](PASSWALL2.md).
 
 The feed is now [`feed-2`](research/signed-package-feed.md). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
-was 7.6). Check a built image with `image_feed_test.sh`.
+was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh`.

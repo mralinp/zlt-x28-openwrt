@@ -19,7 +19,7 @@ PACKAGES="-firewall4 -nftables -kmod-nft-offload
   luci-app-firewall luci-proto-ipv6 luci-proto-ppp
   iwinfo rpcd-mod-iwinfo block-mount ubi-utils
   uhttpd uhttpd-mod-ubus rpcd-mod-luci libustream-mbedtls px5g-mbedtls
-  -dnsmasq dnsmasq-full
+  -dnsmasq dnsmasq-full libmnl0
   openvpn-openssl luci-app-openvpn xl2tpd ppp-mod-pptp wireguard-tools luci-proto-wireguard
   luci-app-passwall2 xray-core iptables-mod-tproxy iptables-mod-socket iptables-mod-iprange
   iptables-mod-conntrack-extra iptables-mod-extra"

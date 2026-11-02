@@ -65,7 +65,9 @@ packages**, not a ready-to-flash image: the image is assembled locally from your
 
 ## VPN and Passwall2
 
-These were the main reasons to replace the stock firmware. The image ships all of them preinstalled, configured from
+These were the main reasons to replace the stock firmware. **Every image ships all of them preinstalled, ready to
+configure on a clean flash**, before any of your settings: the build refuses to make an image without the WireGuard and TPROXY modules
+and `ipset`. Configure them from
 stock LuCI pages:
 
 | | How it runs on the vendor 4.19.205 kernel |
@@ -171,7 +173,9 @@ tools/build/userspace.sh out
 
 # 4. Assemble the native image from your backup (details and flags in docs/BUILD.md)
 python3 tools/build/stage_native.py   --stock <stock rootfs.tar.gz> --modern <userspace rootfs.tar.gz> ... --output private/build/native-stage-N
-python3 tools/build/first_boot.py     --stage private/build/native-stage-N --public-key ~/.ssh/router.pub --stock <stock rootfs.tar.gz> --output private/build/native-management-N
+docker run --rm -v x28-kbuild:/k -v "$PWD/package/x28-kmods:/src:ro" -v "$PWD/private/kmods:/out" debian:bookworm bash /src/build.sh
+gh release download feed-2 -D private/feed-2 -p 'ipset_*' -p 'libipset13_*' -p 'x28-ipset-kernel_*'
+python3 tools/build/first_boot.py     --stage private/build/native-stage-N --public-key ~/.ssh/router.pub --stock <stock rootfs.tar.gz> --output private/build/native-management-N --kmods private/kmods --ipk private/feed-2/*.ipk
 docker run ... x28-firmware-tools:ubi python3 /tools/build/package_ubi.py --profile /profile --output /out/native-ubi-N
 
 # 5. Flash slot A with the guarded session tool (dry run first; --write needs approval, UART and a second backup copy)

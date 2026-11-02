@@ -39,6 +39,10 @@ STORAGE = Path(__file__).resolve().parents[2]/'package/x28-storage/files'
 UBI_WRITERS = tuple('usr/sbin/'+n for n in ('ubidetach','ubiformat','ubimkvol','ubirmvol','ubirsvol','ubiupdatevol','ubirename','ubiblock','ubinize','mtdinfo','ubicrc32'))
 MODEM = Path(__file__).resolve().parents[2]/'package/x28-modem/files'
 KMODS = Path(__file__).resolve().parents[2]/'package/x28-kmods/files'
+# The modules package/x28-kmods/build.sh writes, by opkg package. kmod-ipt-socket's x28_udp_lookup is in kmod-ipt-tproxy.
+KMOD_PACKAGES = {'kmod-wireguard':('wireguard',),'kmod-ipt-tproxy':('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY'),
+                 'kmod-ipt-socket':('nf_socket_ipv4','nf_socket_ipv6','xt_socket')}
+STUBS = Path(__file__).resolve().parents[2]/'package/x28-kmod-stubs/stubs.txt'
 FEED_KEY = Path(__file__).resolve().parents[2]/'package/x28-feed/files/x28-feed.pub'
 FEED_KEY_ID = '7fec994ab0d15b97'
 FEED_LINE = 'src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-2\n'
@@ -259,7 +263,7 @@ def public_key(text):
     return fields[0]+' '+fields[1]+'\n'
 
 
-def integrate(stage,key,stock_path,output,wireguard_module=None,tproxy_modules=None):
+def integrate(stage,key,stock_path,output,kmods_dir=None,ipks=()):
     key=public_key(key)
     if output.exists():raise FileExistsError(output)
     manifest=json.loads((stage/'manifest.json').read_text());raw=(stage/'rootfs-staging.tar.gz').read_bytes()
@@ -398,11 +402,7 @@ config dhcp 'wan'
         put('usr/lib/opkg/info/kernel.list','')
     enable(90,'openvpn')  # starts only the tunnels enabled in its config
     # Built against the private SDK tree, so they come from the local build, never from the repo (#227, #198).
-    kmods={}
-    if wireguard_module:kmods['kmod-wireguard']=[Path(wireguard_module)]
-    if tproxy_modules:
-        kmods['kmod-ipt-tproxy']=[Path(tproxy_modules)/(m+'.ko') for m in ('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY')]
-        kmods['kmod-ipt-socket']=[Path(tproxy_modules)/(m+'.ko') for m in ('nf_socket_ipv4','nf_socket_ipv6','xt_socket')]
+    kmods={p:[Path(kmods_dir)/(m+'.ko') for m in ms] for p,ms in KMOD_PACKAGES.items()} if kmods_dir else {}
     if kmods:  # x28-kmods loads them from here; the kernel's modprobe never looks here (see x28-kmods.init)
         info=tarfile.TarInfo('lib/modules/x28');info.type=tarfile.DIRTYPE;info.mode=0o755;info.uid=info.gid=0;tree[info.name]=(info,b'')
     for package,paths in kmods.items():
@@ -415,6 +415,30 @@ config dhcp 'wan'
         put(f'usr/lib/opkg/info/{package}.control',record)
         put(f'usr/lib/opkg/info/{package}.list',''.join(f'/lib/modules/x28/{p.name}\n' for p in paths))
     if kmods:put('etc/init.d/x28-kmods',(KMODS/'x28-kmods.init').read_text(),0o755);enable(97,'x28-kmods')
+    def record(control,files):
+        name=re.search(r'^Package: (.+)$',control,re.M).group(1)
+        put('usr/lib/opkg/status',tree['usr/lib/opkg/status'][1].decode().rstrip('\n')+'\n\n'+control.rstrip('\n')+'\nStatus: install user installed\n')
+        put(f'usr/lib/opkg/info/{name}.control',control);put(f'usr/lib/opkg/info/{name}.list',''.join('/'+n+'\n' for n in files))
+    for ipk in ipks:  # whole packages from the X28 feed, e.g. ipset for Passwall2's rules (#200)
+        with tarfile.open(fileobj=io.BytesIO(Path(ipk).read_bytes()),mode='r:gz') as outer:
+            data=outer.extractfile('./data.tar.gz').read();control=outer.extractfile('./control.tar.gz').read()
+        with tarfile.open(fileobj=io.BytesIO(control),mode='r:gz') as t:control=t.extractfile('./control').read().decode()
+        files=[]
+        with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as t:
+            for m in t.getmembers():
+                name=m.name.lstrip('./')
+                if not name or (m.isdir() and name in tree):continue
+                if not (m.isfile() or m.isdir() or m.issym()):raise ValueError('unexpected member in '+str(ipk)+': '+m.name)
+                info=copy.copy(m);info.name=name;info.uid=info.gid=0;info.uname=info.gname=''
+                tree[name]=(info,t.extractfile(m).read() if m.isfile() else b'')
+                if not m.isdir():files.append(name)
+        record(control,files)
+    # The vendor kernel has these built in or as stock modules; record them so opkg sees every dependency met (#200).
+    status=tree['usr/lib/opkg/status'][1].decode()
+    have=set(re.findall(r'^Package: (.+)$',status,re.M))|{p.strip().split(' ')[0] for v in re.findall(r'^Provides: (.+)$',status,re.M) for p in v.split(',')}
+    wanted={d.strip().split(' ')[0] for v in re.findall(r'^Depends: (.+)$',status,re.M) for d in v.split(',')}
+    for name in sorted((wanted-have)&set(STUBS.read_text().split())):
+        record(f'Package: {name}\nVersion: {KERNEL_VERSION}\nDepends: kernel (= {KERNEL_VERSION})\nArchitecture: all\n',[])
     if PASSWALL2_DEFAULT in tree:  # what its uci-defaults would do, which this profile strips
         config=tree[PASSWALL2_DEFAULT][1].decode()
         for old,new in (("option prefer_nft '1'","option prefer_nft '0'"),("option tcp_proxy_way 'redirect'","option tcp_proxy_way 'tproxy'")):
@@ -497,9 +521,9 @@ config interface 'wan'
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--stage',type=Path,required=True)
     ap.add_argument('--public-key',type=Path,required=True);ap.add_argument('--stock',type=Path,required=True);ap.add_argument('--output',type=Path,required=True)
-    ap.add_argument('--wireguard-module',type=Path,help='private wireguard.ko built for this kernel; without it the image has no WireGuard kernel support')
-    ap.add_argument('--tproxy-modules',type=Path,help='private directory with the TPROXY/socket modules built for this kernel; without it Passwall2 has no transparent proxy')
-    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.stock,args.output,args.wireguard_module,args.tproxy_modules),indent=2))
+    ap.add_argument('--kmods',type=Path,required=True,help='the modules package/x28-kmods/build.sh built for this kernel: WireGuard, TPROXY, socket')
+    ap.add_argument('--ipk',type=Path,nargs='+',required=True,help="the X28 feed's ipset, libipset13 and x28-ipset-kernel, which Passwall2 needs")
+    args=ap.parse_args();print(json.dumps(integrate(args.stage,args.public_key.read_text(),args.stock,args.output,args.kmods,args.ipk),indent=2))
 
 
 if __name__=='__main__':main()
