@@ -10,7 +10,7 @@ came back on their own after a reboot.
 
 ![Passwall2 in LuCI on the X28: core running, Baidu, Google and GitHub reached through the node](images/x28-passwall2-luci.png)
 
-*LuCI over HTTPS on the unit, 2026-11-02: Passwall2's core running, its connection checks answered through the UK node.*
+*LuCI over HTTPS on the unit, 2026-11-02: Passwall2's core running, its connection checks answered through the node.*
 
 ## How it fits this kernel
 
@@ -47,64 +47,41 @@ To turn it off: the switch in LuCI, or `ssh x28 'uci set passwall2.@global[0].en
 /etc/init.d/passwall2 stop'`. To remove the modules from boot: `ssh x28 '/etc/init.d/x28-kmods disable'` (this also drops
 WireGuard, which `x28-kmods` loads too).
 
-## Tunnel speed results
+## What the device can carry
 
-### Through Passwall2 (2026-11-02)
+A speed test through one owner's node mostly measures that node, the carrier and the route, so this page reports what
+the X28 itself can do with this firmware: how much CPU the tunnel costs, and where the ceiling is.
 
-The router's own traffic through Passwall2 (TPROXY, `localhost_proxy=1`), no separate xray. `ipinfo.io/country` answered
-`GB`, the node's country. Single runs of 15 s over cellular:
+**Cost:** xray plus the router's own forwarding used about **0.45 cores per 100 Mbit/s** of tunnelled download (1.73 of
+4 cores in an 8-stream run, xray itself 0.82 core). `cpu0` took the network interrupts, with 19% softirq. The SoC stayed
+at 42.8 °C and xray peaked at 39 MB of memory.
 
-| Test | Speed |
-|---|---|
-| Download, 1 stream (cachefly 100 MB), run 1 | 50.3 Mbit/s |
-| Download, 1 stream, run 2 | 119.9 Mbit/s |
-| Upload, 1 stream (`speed.cloudflare.com/__up`, 30.9 MB sent) | 16.4 Mbit/s |
+**Ceiling, estimated:** at 100% CPU, **300–450 Mbit/s, most likely around 400**; for everyday use plan on about
+300 Mbit/s (75% load). This assumes LAN forwarding costs about what the router's own `curl` did, and it has not been
+reached in a measurement: the links tried so far ran out first.
 
-SoC 43.7 °C afterwards. The two downloads differ by more than 2x, so cellular and the server vary more than the tunnel;
-these are not a top speed. A LAN client's speed test through it is still to be recorded.
+### Pushing it further
 
-### Through a separate xray
+Ideas in order of how cheap they are to try. Only the first is measured here; the rest are untested on this unit.
 
-Method: a separate xray in `/tmp` using the node's generated config, with a SOCKS port on `127.0.0.1`. No firewall or
-Passwall2 change. `curl` ran on the router and its CPU use is included. Single runs of 15 s or less, over cellular, so
-treat these as rough.
+- **More streams.** One TCP stream does not fill the CPU; parallel downloads (browsers, download managers, several
+  clients) use more cores.
+- **A lighter transport.** Every layer costs CPU: TLS inside XHTTP inside xray costs more than plain VLESS over TCP with
+  TLS or REALITY. Pick the lightest one the network allows.
+- **Quiet logs.** Keep Passwall2's node log at `warn` or `error`; debug logging writes per connection.
+- **Spread the interrupts.** All Ethernet interrupts land on `cpu0`, which fills first. OpenWrt's packet steering
+  (`uci set network.globals.packet_steering=1`) spreads receive work across cores.
+- **CPU frequency.** The governor is `schedutil` and the cores reach 2.0 GHz but mostly ran about 1.3 GHz under this
+  load; the `performance` governor trades heat for speed.
+- **Cooling.** No fan, the SoC idles about 40 °C on this firmware; under sustained load a fan keeps it far from the
+  85 °C trip point ([THERMAL](THERMAL.md)).
+- **WireGuard where the network allows it.** It runs in the kernel on all four cores and carried 715 Mbit/s at under
+  60% CPU ([TESTING 37](TESTING.md#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02)).
 
-| Test | Speed | Total CPU (4 cores) | xray |
-|---|---|---|---|
-| Direct download, 1 stream | 169.2 Mbit/s | 16.4% | n/a |
-| Direct upload, 1 stream | 32.3 Mbit/s | 7.4% | n/a |
-| Tunnel download, 1 stream | 126.1 Mbit/s | 35.5% | 0.66 core |
-| Tunnel download, 4 streams | 66.9 Mbit/s | 18.2% | 0.33 core |
-| Tunnel upload, 1 stream | 14.2 Mbit/s | 6.9% | 0.10 core |
-| Direct download, 8 streams (6 worked) | 133.9 Mbit/s | 14.4% | n/a |
-| Tunnel download, 8 streams (6 worked) | 162.4 Mbit/s | 43.2% | 0.82 core |
+### Measure it on your unit
 
-An earlier run measured 30.9 and 42.7 Mbit/s tunnel download, but the server was misconfigured at the time, so those
-figures are left out.
-
-In the 8-stream tunnel run the cores were 49.3%, 42.4%, 41.3% and 40.0% busy, with `cpu0` softirq at 19.2%. Temperature
-was 42.8 °C on `thermal_zone0`, and xray's peak memory was 39 MB. Two of the 8 streams failed because
-`speedtest.tele2.net` was unreachable.
-
-The tunnel beating direct on the same servers means the test servers were limiting, so 162 Mbit/s is not the tunnel's
-top speed.
-
-**Context:** the owner reports over 300 Mbit/s on a speed test site through the same UK server on a Linksys MX5300,
-whose gateway is this X28. So the WAN carries that speed. The Linksys figure was not measured here.
-
-### Estimated top speed
-
-These are estimates, not measurements. At 100% CPU: **300–450 Mbit/s, most likely around 400**. For everyday use, plan
-on about 300 Mbit/s, or about 75% load.
-
-- The whole router used 1.73 cores at 162 Mbit/s, which scales to about 375 Mbit/s on 4 cores. This assumes LAN
-  forwarding costs about what the `curl` processes did.
-- The CPU mostly ran around 1.3 GHz and can reach 2.0 GHz, which could raise the limit.
-- Scaling losses, Wi-Fi, sustained heat with no fan, or `cpu0` filling up first could lower it.
-
-### Reproduce
-
-Uses mobile data: up to 400 MB per 8-stream run.
+Uses mobile data: up to 400 MB per 8-stream run. Divide the CPU used by the speed to get the cost; the speed alone
+mostly reflects your node and carrier.
 
 ```sh
 ssh x28
@@ -121,6 +98,6 @@ line in the background once per stream. For CPU, compare `/proc/stat` before and
 
 ## Not proven
 
-- Throughput and CPU through the LAN path; the estimate above is for the router's own traffic.
+- Throughput and CPU through the LAN path; the cost above is for the router's own traffic.
+- The ceiling itself, the tuning ideas above, and sustained heat under load.
 - The modules over hours, and the image that ships them.
-- Any tunnel speed above 162 Mbit/s, and sustained heat under load.

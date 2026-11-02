@@ -77,21 +77,29 @@ stock LuCI pages:
 
 ![Passwall2 running in LuCI on the X28](docs/images/x28-passwall2-luci.png)
 
-Measured on the unit, 2026-11-02 ([TESTING 37](docs/TESTING.md#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02),
-[PASSWALL2](docs/PASSWALL2.md#tunnel-speed-results)):
+What the X28 can carry with this firmware, measured on the unit on 2026-11-02 ([TESTING 37](docs/TESTING.md#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02),
+[PASSWALL2](docs/PASSWALL2.md#what-the-device-can-carry)). WireGuard and OpenVPN ran `iperf3` between the router and a LAN
+peer, so the carrier and the far server are out of the picture:
 
-| Tunnel | Router sends | Router receives | CPU (4 cores) | Limit |
+| Tunnel | Router sends | Router receives | CPU (4 cores) | What limits it |
 |---|---|---|---|---|
-| None (LAN path, for reference) | 856 Mbit/s | 363 Mbit/s | 9–36% | the test laptop's path |
+| None (reference) | 856 Mbit/s | 363 Mbit/s | 9–36% | the test laptop's path |
 | WireGuard, 4 streams | 715 Mbit/s | 330 Mbit/s | 55–58% | not reached |
 | OpenVPN AES-128-GCM (mbed TLS) | 102 Mbit/s | 58 Mbit/s | 24–27% | one core |
 | OpenVPN AES-256-GCM (OpenSSL, the shipped build) | 74 Mbit/s | 84 Mbit/s | 25–27% | one core |
-| Passwall2 (VLESS to a UK node, over 5G) | 16 Mbit/s up | 50–120 Mbit/s down | | cellular and the servers |
-| xray, 8 streams (same node, over 5G) | | 162 Mbit/s | 43% | the test servers |
+| Passwall2 / xray | | about 400 Mbit/s, estimated | 0.45 cores per 100 Mbit/s | CPU |
 
-WireGuard and OpenVPN were measured with `iperf3` between the router and a LAN peer, without cellular, so they show what
-the router can do, not what a carrier gives. Passwall2 and xray ran over the real 5G link. Not yet measured: LAN clients
-forwarded through each tunnel, L2TP and PPTP against a server, and WireGuard over hours.
+**Pushing it further** ([details](docs/PASSWALL2.md#pushing-it-further)):
+
+- **WireGuard** for raw speed: it runs in the kernel on all four cores and had headroom at 715 Mbit/s.
+- **OpenVPN** is single-threaded at about 100 Mbit/s per tunnel: use UDP and AES-GCM, or split traffic across tunnels.
+- **Passwall2** scales with streams and cores: pick a light transport (fewer layers than XHTTP over TLS), keep logs at
+  `warn`, and try packet steering, since `cpu0` takes all network interrupts.
+- **Heat** is not the limit so far: the SoC idles about 40 °C on this firmware and stayed under 48 °C in these tests.
+  A fan or the `performance` CPU governor buys more for sustained loads.
+
+Not yet measured: LAN clients forwarded through each tunnel, L2TP and PPTP against a server, the Passwall2 ceiling
+itself, the tuning ideas, and WireGuard over hours.
 
 ## Roadmap to a stable release
 

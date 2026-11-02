@@ -45,7 +45,7 @@ Conventions:
 | 28 | Download-agent block write to `misc` | 2026-10-29 | ❌ the first block write was not acknowledged, twice; `misc` stayed intact and was verified | this page |
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
-| 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ 162 Mbit/s download at 43 % CPU, limited by the test servers; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
+| 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ about 0.45 cores per 100 Mbit/s, so an estimated 300–450 Mbit/s ceiling on 4 cores; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
 | 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported; built without CRCs they do load (39) | [kernel-module-crc](research/kernel-module-crc.md) |
 | 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
@@ -482,8 +482,6 @@ The modules were then moved to `/lib/modules/x28` (a safety review found that th
 **Not verified:** switching it off from LuCI with `ucitrack` running, LAN throughput, the modules over hours, and the image
 built with them (#198).
 
-**Later the same day (#239):** LuCI's Passwall2 page showed the core running, with Baidu 1108.64 ms, Google 536.02 ms and
-GitHub 554.06 ms through the node ([screenshot](PASSWALL2.md)). The router's own traffic through Passwall2 (exit
-country `GB`): downloads of 50.3 and 119.9 Mbit/s, upload 16.4 Mbit/s, 15 s each
-([PASSWALL2](PASSWALL2.md#through-passwall2-2026-11-02)).
+**Later the same day (#239):** LuCI's Passwall2 page showed the core running and its Baidu, Google and GitHub checks
+answered through the node ([screenshot](PASSWALL2.md)); `ipinfo.io/country` on the router answered the node's country.
 
