@@ -541,4 +541,3 @@ python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
 
 The feed is now [`feed-2`](research/signed-package-feed.md). With all of the above the rootfs is 11.4 of 30 MiB (image
 219 was 7.6). Passwall2 is not built in; it installs from its own feed. Check a built image with `image_feed_test.sh`.
-
