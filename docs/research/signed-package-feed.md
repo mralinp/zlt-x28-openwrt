@@ -61,6 +61,9 @@ No key bytes were printed. Current staged bundle: `private/research/200-signed-f
 
 ## Hosting
 
+**`feed-2`** (2026-11-02, 189 assets) adds `kmod-mppe` and `kmod-crypto-arc4` stubs, so PPTP installs (#228). Images
+from #230 use it. `feed-1` stays published for older images.
+
 The feed is the separate pre-release [`feed-1`](https://github.com/mralinp/zlt-x28-openwrt/releases/tag/feed-1), with
 187 assets, published 2026-11-01. It can't share an automatic `vX.Y.Z` release because those already have a `SHA256SUMS`
 asset, and `scripts/release.py` only reads `v*` tags, so `feed-*` tags don't affect versions. A changed feed gets a new
@@ -70,6 +73,8 @@ the assets timed out.
 ```text
 src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-1
 ```
+
+For `feed-2`, replace `feed-1` with `feed-2` in that line.
 
 The public files were downloaded and compared byte for byte, and the image's real opkg updated, verified and installed
 from that URL in a container. An encrypted copy of the private key is on the owner's USB drive, and its passphrase is

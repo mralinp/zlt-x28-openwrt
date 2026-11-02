@@ -24,6 +24,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - SSH is key-only on port 22 (LAN only); root has an empty password until the owner sets one, like stock OpenWrt.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
+- `opkg` works through our signed feed. OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
+  built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
 
 **Open or unproven**
 - Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.

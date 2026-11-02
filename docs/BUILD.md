@@ -11,7 +11,7 @@ The X28 image has two halves, built in different places because of licensing:
 > `stage_native.py` → `first_boot.py` → `package_ubi.py` (offline container) → a guarded `slot_entry.py` flash to slot A
 > ([RECOVERY](RECOVERY.md)). The sections below are in the order the pieces were built and keep their dated notes;
 > older statements such as "no WAN interface, DHCP server or web service" describe that day's profile, not today's. The
-> image now ships: the `x28-*` packages, LuCI, `dnsmasq`, the firewall, Wi-Fi, LEDs, the modem stack at boot,
+> image now ships: the `x28-*` packages, LuCI, `dnsmasq` (`dnsmasq-full` with ipset since #230), the firewall, Wi-Fi, LEDs, the modem stack at boot,
 > `S95done` (overlay persistence), an empty root password (SSH key-only on port 22) and `x28-bootok`. Sections
 > [#122](#live-lan-dhcp-and-front-leds-on-slot-a-122), [#143](#root-password-and-overlay-persistence-143) and
 > [#145](#boot-tries-reset-and-ssh-on-port-22-145) are the most recent.
@@ -512,4 +512,33 @@ unavailable. This is a locally tested candidate, not a hosted feed or installed 
 
 The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed 182-package feed
 (stubs and vendor ipset), signs and verifies it locally, and stages an allowlisted release bundle. Its public
-key is checked in; its private key stays outside Git. It is hosted on the pre-release `feed-1`, and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
+key is checked in; its private key stays outside Git. It is hosted on the pre-releases `feed-1` and `feed-2`, and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
+
+## VPN set and WireGuard in the image (#230)
+
+The userspace adds `openvpn-openssl`, `luci-app-openvpn`, `xl2tpd`, `ppp-mod-pptp`, `wireguard-tools` and
+`luci-proto-wireguard`. `dnsmasq` becomes `dnsmasq-full`, built by `sdk_packages.sh` with ipset on and nftset off (#203),
+because the feed's build needs nftables. Its `kmod-ipt-ipset` dependency is dropped; the `ipset` utility comes from the
+X28 feed. `userspace.sh` fails if the image did not take this build.
+
+- **OpenVPN:** `S90openvpn` is enabled; it starts only the tunnels enabled in `/etc/config/openvpn`. The OpenSSL build was
+  chosen over mbed TLS for its download speed ([TESTING 37](TESTING.md)).
+- **L2TP and PPTP:** clients only, configured as LuCI interfaces. PPTP needs the `kmod-mppe` stub in `feed-2`.
+- **WireGuard:** the vendor kernel has no WireGuard, and our module is built from `wireguard-linux-compat` against the
+  private SDK tree, so it never enters this repository, CI or a feed. Pass it to `first_boot.py`:
+
+```sh
+python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
+  --stock private/firmware/20261021/rootfs-b-system.tar.gz --output OUT \
+  --wireguard-module private/research/wg-crc/src/src/wireguard.ko
+```
+
+  It adds the module, a `kmod-wireguard` record at the kernel's version (so `wireguard-tools` resolves), and
+  `x28-wireguard` (`package/x28-wireguard`). That script loads the module 30 s after boot, after `x28-bootok` has reset the
+  boot tries, then brings up any WireGuard interfaces. A marker in `/etc` stops a load that crashed the unit from being
+  retried, so a crash cannot become a boot loop. Without `--wireguard-module` the image has the tools but no kernel support.
+  The module loads with no symbol version check; see [#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227).
+
+The feed is now [`feed-2`](research/signed-package-feed.md). With all of the above the rootfs is 11.4 of 30 MiB (image
+219 was 7.6). Passwall2 is not built in; it installs from its own feed. Check a built image with `image_feed_test.sh`.
+
