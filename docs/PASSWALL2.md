@@ -13,7 +13,7 @@ came back on their own after a reboot.
 | Need | How it's met |
 |---|---|
 | `TPROXY` and `xt_socket` (not in the vendor kernel) | `nf_socket_ipv4/6`, `nf_tproxy_ipv4/6`, `xt_socket`, `xt_TPROXY` built from the SDK tree without symbol versions, like WireGuard ([#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227)); `x28_udp_lookup` supplies `udp4_lib_lookup` and `udp6_lib_lookup`, which the stock kernel never exported. Why this loads despite the CRCs: [kernel-module-crc](research/kernel-module-crc.md) |
-| Loading them safely | `x28-kmods` (`package/x28-kmods`, S97) loads them after `x28-bootok` resets the boot tries, with a crash marker so a bad load can't become a boot loop, then starts Passwall2 if it is enabled, in case Passwall2's own delayed boot start ran before `xt_TPROXY` was in. Passwall2 keeps its boot link: LuCI's apply only restarts enabled services |
+| Loading them safely | They live in `/lib/modules/x28`, not `/lib/modules/4.19.205`: there the kernel's `modprobe` would load them by itself for the first TPROXY rule, before the boot tries are reset and past the crash marker. `x28-kmods` (`package/x28-kmods`, S97) loads them after `x28-bootok` resets the boot tries, with a crash marker so a bad load can't become a boot loop, then starts Passwall2 if it is enabled, in case Passwall2's own delayed boot start ran before `xt_TPROXY` was in. Passwall2 keeps its boot link: LuCI's apply only restarts enabled services |
 | No nftables | Passwall2's iptables path; the image sets `prefer_nft=0` and `tcp_proxy_way=tproxy` |
 | ipset in `dnsmasq` | Our `dnsmasq-full` has `ipset no-nftset` (#203), and the vendor `ip_set` modules are in the image |
 | `opkg` dependencies | `kmod-ipt-tproxy` and `kmod-ipt-socket` records at the kernel's version, so `iptables-mod-tproxy` and `-socket` resolve. `iptables-mod-extra` still wants `kmod-ipt-extra`, which has no stub yet |
@@ -30,8 +30,8 @@ control to pick clients instead.
 
 Installed by hand the way the image will have it, not yet from an image:
 
-- The 7 modules in `/lib/modules/4.19.205`, loaded by `x28-kmods` (S97), which replaced `x28-wireguard` and also loads
-  WireGuard. `ucitrack` (S80) started and enabled, so LuCI's Save & Apply restarts Passwall2 (its `reload` is a restart).
+- The 7 modules and WireGuard in `/lib/modules/x28`, where the kernel's `modprobe` can't load them on demand, loaded by
+  `x28-kmods` (S97), which replaced `x28-wireguard`. Not yet rebooted from that directory. `ucitrack` (S80) started and enabled, so LuCI's Save & Apply restarts Passwall2 (its `reload` is a restart).
 - `iptables-mod-tproxy`, `-socket` and `-extra` installed with `--nodeps`; `-iprange`, `-conntrack-extra` and the
   `kmod-ipt-nat` stub installed normally. No `kmod-ipt-tproxy`/`-socket` records yet.
 - `/etc/config/passwall2`: `enabled=1`, `client_proxy=1`, `localhost_proxy=1`, `tcp_proxy_way=tproxy`, `ipv6_tproxy=1`,

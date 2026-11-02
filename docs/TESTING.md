@@ -475,6 +475,9 @@ crash marker cleared after 120 s. Passwall2's own delayed start finished at 60 s
 TPROXY was in, with IPv4 and IPv6 LAN rules, no warnings and no kernel messages. `ucitrack` registered the `passwall2`
 reload trigger.
 
+The modules were then moved to `/lib/modules/x28` (a safety review found that the kernel's `modprobe` could load them from
+`/lib/modules/4.19.205` on its own, bypassing the crash marker); booting from there is not yet tested.
+
 **Not verified:** switching it off from LuCI with `ucitrack` running, LAN throughput, the modules over hours, and the image
 built with them (#198).
 

@@ -401,15 +401,17 @@ config dhcp 'wan'
     if tproxy_modules:
         kmods['kmod-ipt-tproxy']=[Path(tproxy_modules)/(m+'.ko') for m in ('x28_udp_lookup','nf_tproxy_ipv4','nf_tproxy_ipv6','xt_TPROXY')]
         kmods['kmod-ipt-socket']=[Path(tproxy_modules)/(m+'.ko') for m in ('nf_socket_ipv4','nf_socket_ipv6','xt_socket')]
+    if kmods:  # x28-kmods loads them from here; the kernel's modprobe never looks here (see x28-kmods.init)
+        info=tarfile.TarInfo('lib/modules/x28');info.type=tarfile.DIRTYPE;info.mode=0o755;info.uid=info.gid=0;tree[info.name]=(info,b'')
     for package,paths in kmods.items():
         for path in paths:
             module=path.read_bytes()
-            info=tarfile.TarInfo('lib/modules/4.19.205/'+path.name);info.mode=0o644;info.uid=info.gid=0;info.size=len(module);tree[info.name]=(info,module)
+            info=tarfile.TarInfo('lib/modules/x28/'+path.name);info.mode=0o644;info.uid=info.gid=0;info.size=len(module);tree[info.name]=(info,module)
         extra=', kmod-ipt-tproxy' if package=='kmod-ipt-socket' else ''  # x28_udp_lookup lives in kmod-ipt-tproxy
         record=f'Package: {package}\nVersion: {KERNEL_VERSION}\nDepends: kernel (= {KERNEL_VERSION}){extra}\nArchitecture: aarch64_generic\n'
         put('usr/lib/opkg/status',tree['usr/lib/opkg/status'][1].decode().rstrip('\n')+'\n\n'+record+'Status: install user installed\n')
         put(f'usr/lib/opkg/info/{package}.control',record)
-        put(f'usr/lib/opkg/info/{package}.list',''.join(f'/lib/modules/4.19.205/{p.name}\n' for p in paths))
+        put(f'usr/lib/opkg/info/{package}.list',''.join(f'/lib/modules/x28/{p.name}\n' for p in paths))
     if kmods:put('etc/init.d/x28-kmods',(KMODS/'x28-kmods.init').read_text(),0o755);enable(97,'x28-kmods')
     if PASSWALL2_DEFAULT in tree:  # what its uci-defaults would do, which this profile strips
         config=tree[PASSWALL2_DEFAULT][1].decode()
@@ -425,6 +427,8 @@ config dhcp 'wan'
         # LuCI's apply (luci-reload) restarts only enabled services. Its boot start waits start_delay (60 s); x28-kmods
         # loads TPROXY about 30 s after boot and starts it again then, in case the modules came late.
         enable(99,'passwall2')
+        if 'etc/config/ucitrack' in tree and "config passwall2\n" not in tree['etc/config/ucitrack'][1].decode():
+            put('etc/config/ucitrack',tree['etc/config/ucitrack'][1].decode().rstrip('\n')+"\n\nconfig passwall2\n\toption init 'passwall2'\n")
     put('etc/opkg/keys/'+FEED_KEY_ID,FEED_KEY.read_text())
     put('etc/opkg/customfeeds.conf',(tree['etc/opkg/customfeeds.conf'][1].decode() if 'etc/opkg/customfeeds.conf' in tree else '')+FEED_LINE
         +(PASSWALL_FEEDS if PASSWALL2_DEFAULT in tree else ''))

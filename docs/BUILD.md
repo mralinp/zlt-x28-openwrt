@@ -535,7 +535,8 @@ python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
 ```
 
   It adds the module, a `kmod-wireguard` record at the kernel's version (so `wireguard-tools` resolves), and
-  `x28-kmods` (`package/x28-kmods`). That script loads our modules 30 s after boot, after `x28-bootok` has reset the
+  `x28-kmods` (`package/x28-kmods`). Our modules go in `/lib/modules/x28`, out of reach of the kernel's on-demand `modprobe`.
+  That script loads them 30 s after boot, after `x28-bootok` has reset the
   boot tries, then brings up any WireGuard interfaces. A marker in `/etc` stops a load that crashed the unit from being
   retried, so a crash cannot become a boot loop. Without `--wireguard-module` the image has the tools but no kernel support.
   The module loads with no symbol version check; see [#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227).
@@ -547,7 +548,7 @@ python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
   `package/x28-feed/files/passwall.pub`). `--tproxy-modules` takes a directory with the 7 TPROXY and socket modules and
   adds them with `kmod-ipt-tproxy` and `kmod-ipt-socket` records. `first_boot.py` does what Passwall2's `uci-defaults`
   would (the profile strips them): its config with `prefer_nft=0` and `tcp_proxy_way=tproxy`, the firewall include,
-  `dhcp localuse` and the feeds. Passwall2 keeps its boot link, because LuCI's apply skips disabled services; `x28-kmods`
+  `dhcp localuse`, its `ucitrack` entry and the feeds. Passwall2 keeps its boot link, because LuCI's apply skips disabled services; `x28-kmods`
   starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
   LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
   [PASSWALL2](PASSWALL2.md).
