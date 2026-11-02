@@ -118,7 +118,7 @@ lines (numbers are line numbers in the raw capture) and was checked for MAC addr
 Read-only, with a 3.3 V USB-serial adapter and a level path that never drives the board:
 
 ```text
-board TX (lower-left hole) -> level shifter (1.8 V side) -> adapter RX      GND (middle hole) common      adapter TX left unconnected
+board TX (right hole) -> level shifter (1.8 V side) -> adapter RX      GND (middle hole) common      adapter TX left unconnected
 ```
 
 A stdlib-only capture (opens the port read-only, so nothing can be written; macOS, adjust the device path):

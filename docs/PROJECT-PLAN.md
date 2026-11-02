@@ -46,7 +46,7 @@ Migrate in stages so the box stays usable after every stage.
 
 ### Phase 0: safety (must come first, nothing flashed)
 1. Full dump of every mtd partition (`nanddump`, keep checksums) plus `user_data`. Store off the device.
-2. UART access: find the pads, clip a TTL adapter, capture the boot log (921600 8N1), find the LK/bootloader prompt. *(done)* 1.8 V logic on the 3-hole footprint: TX, GND, RX ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)); never drive board RX from a 3.3 V adapter's TX.
+2. UART access: find the pads, clip a TTL adapter, capture the boot log (921600 8N1), find the LK/bootloader prompt. *(done)* 1.8 V logic on the 3-hole footprint: RX, GND, TX from left to right ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)); never drive board RX from a 3.3 V adapter's TX.
 3. Document recovery: how `lk_a/b` selects a slot, fastboot or MTK download mode, what the `seccfg` lock state is.
 4. Decide on a sacrificial second unit if possible.
 Done when: dumps verified, UART boot log captured, one tested way back to stock.
