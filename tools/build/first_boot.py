@@ -333,7 +333,9 @@ config timeserver 'ntp'
     enable(12,'rpcd');enable(19,'firewall');enable(50,'uhttpd')  # LuCI and NAT (#141)
     if 'etc/config/uhttpd' in tree:  # HTTPS with a self-signed certificate uhttpd makes on first start (px5g), HTTP redirected
         config=tree['etc/config/uhttpd'][1].decode()
-        for old,new in ((r"option redirect_https '?0'?","option redirect_https '1'"),(r"option commonname '?OpenWrt'?","option commonname 'x28'")):
+        edits=[(r"option\s+redirect_https\s+'?0'?","option redirect_https '1'"),(r"option\s+commonname\s+'?OpenWrt'?","option commonname 'x28'")]
+        if PASSWALL2_DEFAULT in tree:edits.append((r"option\s+max_requests\s+'?\d+'?","option max_requests '50'"))  # Passwall2's pages poll a lot
+        for old,new in edits:  # the stock file separates some values with tabs
             config,n=re.subn(old,new,config)
             if n!=1:raise ValueError('unexpected uhttpd config: '+old)
         put('etc/config/uhttpd',config)
@@ -421,8 +423,6 @@ config dhcp 'wan'
         put('etc/config/passwall2',config)
         put('etc/config/firewall',tree['etc/config/firewall'][1].decode().rstrip('\n')+"\n\nconfig include 'passwall2'\n option type 'script'\n option path '/var/etc/passwall2.include'\n option reload '1'\n")
         put('etc/config/dhcp',tree['etc/config/dhcp'][1].decode().replace(" option ednspacket_max '1232'\n"," option ednspacket_max '1232'\n option localuse '1'\n",1))
-        if 'etc/config/uhttpd' in tree:
-            put('etc/config/uhttpd',re.sub(r"option max_requests '?\d+'?","option max_requests '50'",tree['etc/config/uhttpd'][1].decode()))
         put('etc/opkg/keys/'+PASSWALL_KEY_ID,(FEED_KEY.parent/'passwall.pub').read_text())
         # LuCI's apply (luci-reload) restarts only enabled services. Its boot start waits start_delay (60 s); x28-kmods
         # loads TPROXY about 30 s after boot and starts it again then, in case the modules came late.

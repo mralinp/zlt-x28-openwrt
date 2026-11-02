@@ -179,7 +179,7 @@ class PolicyTests(unittest.TestCase):
         with tarfile.open(self.archive,'w:gz') as t:
             for name,(info,data) in old.items():t.addfile(info,io.BytesIO(data) if info.isfile() else None)
             put(t,f.PASSWALL2_DEFAULT,b"config global\n\toption enabled '0'\n\toption prefer_nft '1'\n\toption tcp_proxy_way 'redirect'\n")
-            put(t,'etc/config/firewall',b"config defaults\n");put(t,'etc/config/uhttpd',b"config uhttpd 'main'\n\toption redirect_https '0'\n\toption max_requests '3'\n\nconfig cert 'defaults'\n\toption commonname 'OpenWrt'\n")
+            put(t,'etc/config/firewall',b"config defaults\n");put(t,'etc/config/uhttpd',b"config uhttpd 'main'\n\toption redirect_https\t0\n\toption max_requests 3\n\nconfig cert 'defaults'\n\toption commonname\t'OpenWrt'\n")
             put(t,'etc/init.d/passwall2',b'passwall2')
             m=tarfile.TarInfo('etc/rc.d/S99passwall2');m.type=tarfile.SYMTYPE;m.linkname='../init.d/passwall2';t.addfile(m)
             put(t,'etc/init.d/ucitrack',b'ucitrack');put(t,'etc/config/ucitrack',b"config network\n\toption init 'network'\n")
