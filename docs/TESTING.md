@@ -385,6 +385,19 @@ by file.
 With 4 streams, OpenVPN sent 95–101 Mbit/s with AES and 91 with ChaCha20. SoC temperature stayed at 45–48 °C, with no kernel
 errors in `dmesg` or on UART.
 
+The OpenSSL build of the same OpenVPN version (`openvpn-openssl`, OpenSSL 3.0.18), run from RAM in a later session:
+
+| Test | Router sends | Router receives | Total CPU (4 cores) |
+|---|---|---|---|
+| OpenVPN OpenSSL AES-256-GCM | 74 Mbit/s | 84 Mbit/s | 25–27% |
+| OpenVPN OpenSSL AES-128-GCM | 75 Mbit/s | 82 Mbit/s | 25–27% |
+| OpenVPN OpenSSL ChaCha20-Poly1305 | 75 Mbit/s | 82 Mbit/s | 26–27% |
+| Control: mbed TLS AES-256-GCM, same session | 90 Mbit/s | 52 Mbit/s | 23–26% |
+
+With 4 streams, OpenSSL AES-128-GCM sent 85 Mbit/s. A router-side client download is the "router receives" column, where OpenSSL is
+faster; uploads are slower. All three ciphers run at the same speed under OpenSSL, which suggests encryption is not its limit;
+the single thread moving packets through the tun device is the likely one, but this was not profiled.
+
 **Reading the results:** OpenVPN is limited by one CPU core: 25% of total CPU is one full core, and more streams don't help.
 WireGuard uses all four cores and stayed under 60%, so its limit was not reached. Receive results are capped by the path from
 the laptop, which carries about 365 Mbit/s with no tunnel.
