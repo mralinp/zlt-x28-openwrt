@@ -18,9 +18,9 @@ came back on their own after a reboot.
 | ipset in `dnsmasq` | Our `dnsmasq-full` has `ipset no-nftset` (#203), and the vendor `ip_set` modules are in the image |
 | `opkg` dependencies | `kmod-ipt-tproxy` and `kmod-ipt-socket` records at the kernel's version, so `iptables-mod-tproxy` and `-socket` resolve. `iptables-mod-extra` still wants `kmod-ipt-extra`, which has no stub yet |
 
-The modules are built from the private SDK tree, so they never enter Git, CI or a feed. Build them as in
-[TESTING 39](TESTING.md#39-tproxy-and-passwall2-on-the-unit-2026-11-02), strip debug info and pass the directory to
-`first_boot.py --tproxy-modules` ([BUILD](BUILD.md#vpn-set-and-wireguard-in-the-image-230)).
+The sources are in [`package/x28-kmods`](../package/x28-kmods/README.md); the modules are built against the private SDK
+tree, so the built files never enter Git, CI or a feed. Build them with `package/x28-kmods/build.sh` and pass the directory
+to `first_boot.py --tproxy-modules` ([BUILD](BUILD.md#vpn-set-and-wireguard-in-the-image-230)).
 
 Passwall2's `localhost_proxy` sends the router's own traffic through the node, including `opkg` and NTP. Behind a router
 that already tunnels to the same node, `client_proxy` would tunnel that router's traffic twice; use Passwall2's access

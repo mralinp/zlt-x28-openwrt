@@ -524,14 +524,14 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
 - **OpenVPN:** `S90openvpn` is enabled; it starts only the tunnels enabled in `/etc/config/openvpn`. The OpenSSL build was
   chosen over mbed TLS for its download speed ([TESTING 37](TESTING.md)).
 - **L2TP and PPTP:** clients only, configured as LuCI interfaces. PPTP needs the `kmod-mppe` stub in `feed-2`.
-- **WireGuard:** the vendor kernel has no WireGuard, and our module is built from `wireguard-linux-compat` against the
-  private SDK tree, so it never enters this repository, CI or a feed. Pass it to `first_boot.py`:
+- **WireGuard:** the vendor kernel has no WireGuard. Our module and the TPROXY set are built from the sources in
+  [`package/x28-kmods`](../package/x28-kmods/README.md) against the private SDK tree, so the built modules never enter
+  this repository, CI or a feed. Build them into `private/kmods` as that README shows, then pass them to `first_boot.py`:
 
 ```sh
 python3 tools/build/first_boot.py --stage STAGE --public-key ~/.ssh/router.pub \
   --stock private/firmware/20261021/rootfs-b-system.tar.gz --output OUT \
-  --wireguard-module private/research/wg-crc/src/src/wireguard.ko \
-  --tproxy-modules private/research/tproxy-kmod/ko
+  --wireguard-module private/kmods/wireguard.ko --tproxy-modules private/kmods
 ```
 
   It adds the module, a `kmod-wireguard` record at the kernel's version (so `wireguard-tools` resolves), and
