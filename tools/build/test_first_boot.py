@@ -180,7 +180,7 @@ class PolicyTests(unittest.TestCase):
             for name,(info,data) in old.items():t.addfile(info,io.BytesIO(data) if info.isfile() else None)
             put(t,f.PASSWALL2_DEFAULT,b"config global\n\toption enabled '0'\n\toption prefer_nft '1'\n\toption tcp_proxy_way 'redirect'\n")
             put(t,'etc/config/firewall',b"config defaults\n");put(t,'etc/config/uhttpd',b"config uhttpd 'main'\n\toption redirect_https\t0\n\toption max_requests 3\n\nconfig cert 'defaults'\n\toption commonname\t'OpenWrt'\n")
-            put(t,'etc/init.d/passwall2',b'passwall2')
+            put(t,'etc/init.d/passwall2',b'#!/bin/sh\nstart() {\n\t"$APP_FILE" start "$action" 9>&-\n}\nstop() {\n\t"$APP_FILE" stop "$action" 9>&-\n}\nrestart() {\n\t"$APP_FILE" stop "$action" 9>&-\n\t"$APP_FILE" start "$action" 9>&-\n}\n')
             m=tarfile.TarInfo('etc/rc.d/S99passwall2');m.type=tarfile.SYMTYPE;m.linkname='../init.d/passwall2';t.addfile(m)
             put(t,'etc/init.d/ucitrack',b'ucitrack');put(t,'etc/config/ucitrack',b"config network\n\toption init 'network'\n")
             m=tarfile.TarInfo('etc/rc.d/S80ucitrack');m.type=tarfile.SYMTYPE;m.linkname='../init.d/ucitrack';t.addfile(m)
@@ -214,6 +214,15 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(any(n.startswith('lib/modules/4.19.205/') for n in tree))  # out of modprobe's reach
         self.assertIn("config passwall2\n\toption init 'passwall2'\n",tree['etc/config/ucitrack'][1].decode())
         self.assertEqual(tree['etc/rc.d/S99passwall2'][0].linkname,'../init.d/passwall2')  # luci-reload skips disabled services
+        self.assertEqual(tree['etc/x28-killswitch.sh'][1],Path(f.__file__).with_name('x28-killswitch.sh').read_bytes())
+        self.assertEqual(tree['etc/x28-killswitch.sh'][0].mode,0o755)
+        self.assertIn("config include 'x28_killswitch'",tree['etc/config/firewall'][1].decode())
+        init=tree['etc/init.d/passwall2'][1].decode()
+        hook='\t/etc/x28-killswitch.sh || { unset_lock; return 1; }\n'
+        self.assertEqual(init.count(hook),4)
+        for action in ('start','stop'):
+            self.assertEqual(init.count(hook+'\t"$APP_FILE" '+action+' "$action" 9>&-'),2)
+        self.assertEqual(tree['etc/init.d/passwall2'][0].mode,0o755)
         self.assertEqual(tree['etc/rc.d/S80ucitrack'][0].linkname,'../init.d/ucitrack')  # or LuCI's apply never restarts it
         config=tree['etc/config/passwall2'][1].decode()
         self.assertIn("option prefer_nft '0'",config);self.assertIn("option tcp_proxy_way 'tproxy'",config);self.assertIn("option enabled '0'",config)

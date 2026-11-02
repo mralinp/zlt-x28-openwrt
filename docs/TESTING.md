@@ -485,3 +485,45 @@ built with them (#198).
 **Later the same day (#239):** LuCI's Passwall2 page showed the core running and its Baidu, Google and GitHub checks
 answered through the node ([screenshot](PASSWALL2.md)); `ipinfo.io/country` on the router answered the node's country.
 
+## 40. Passwall2 LAN kill switch with direct ICMP (2026-11-02)
+
+Issue: #251. Owner-approved live deployment on the native OpenWrt 23.05.5 / vendor 4.19.205 unit, plus clean-rootfs
+integration tests. The previous unit-local guard rejected ping. Linksys allowed it directly over its phone uplink,
+not through Xray. The replacement intentionally allows direct ICMP while rejecting other direct cellular forwarding.
+
+| Check | Result |
+|---|---|
+| `python3 tools/build/test_first_boot.py` | 11 tests pass; generated rootfs contains exact script, mode 0755, fw3 include and hooks before all start/stop/restart calls; Passwall2 defaults off |
+| `python3 tools/build/test_killswitch.py` | Stateful fake iptables/ip6tables: enabled, repeated apply, disabled, re-enabled and simulated firewall rebuild; no duplicate rules or enabled-chain flush |
+| `sh -n tools/build/x28-killswitch.sh`; `git diff --check` | Pass |
+| Live `/etc/x28-killswitch.sh` applied twice | One jump and one non-ICMP `ccmni+` reject per IP family; no service restart |
+| Live Passwall2 | `enabled=1`, Xray process remains running |
+| Laptop via `192.168.70.1`: `ping -c 3 google.com` | 3/3 replies, no loss; ICMP intentionally direct |
+| Laptop: `curl -I https://www.google.com` | HTTP/2 200 with guard active; this alone does not prove the proxy exit |
+
+Before deployment, config, script, init script and both firewall rule snapshots were backed up under
+`/root/killswitch-251-20261102-163502` and each checked non-empty. No firmware write, reboot, modem command,
+LAN change or network/firewall/Passwall2 restart was performed. Clean-image integration is in `first_boot.py`;
+this is not evidence of booting a newly flashed image.
+
+**Rollback on this unit** (returns to the prior disabled extra guard without a networking restart):
+
+```sh
+iptables -F x28_killswitch
+ip6tables -F x28_killswitch
+b=/root/killswitch-251-20261102-163502
+cp -p "$b/firewall" /etc/config/firewall
+cp -p "$b/x28-killswitch.sh" /etc/x28-killswitch.sh
+cp -p "$b/passwall2" /etc/init.d/passwall2
+```
+
+**Safety review:** shell and router-safety checklists reviewed: only the filter FORWARD custom chain is hooked;
+LAN addressing, SSH/authentication, INPUT/OUTPUT rules and boot partitions are untouched. The guard runs before
+Passwall2 tears down its rules and stays active if the service stops while UCI still says enabled. Both families
+must apply successfully or the script returns an error. ICMP and router-originated traffic remain explicit bypasses.
+Passwall2 upgrades can overwrite the init hooks; see [PASSWALL2](PASSWALL2.md#lan-kill-switch).
+
+**Not verified:** actual clean flash/boot, reboot persistence on hardware, real firewall reload or LuCI off/on,
+tunnel-down behavior, end-to-end IPv6 and exhaustive traffic/leak tests. No independent safety-agent run was available;
+the checklists were applied in-session. The kill switch covers the cellular `ccmni+` WAN, not future Ethernet/VPN uplinks.
+

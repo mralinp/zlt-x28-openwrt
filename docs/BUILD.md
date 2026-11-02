@@ -561,6 +561,11 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
   LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
   [PASSWALL2](PASSWALL2.md).
+- **LAN kill switch (#251):** the clean rootfs contains `/etc/x28-killswitch.sh`, its fw3 include, and Passwall2
+  service hooks. Enabling Passwall2 blocks direct non-ICMP cellular forwarding for IPv4/IPv6 LAN and guest
+  clients; disabling it clears the guard. ICMP (including ping) stays direct, not tunnelled. Router-originated
+  traffic is not guarded. No restored settings are required; Passwall2 is still off until configured. See
+  [behavior and limits](PASSWALL2.md#lan-kill-switch) and [test evidence](TESTING.md#40-passwall2-lan-kill-switch-with-direct-icmp-2026-11-02).
 
 The feed is now [`feed-2`](research/signed-package-feed.md). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
 was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh`.

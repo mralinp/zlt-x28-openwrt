@@ -30,6 +30,26 @@ Passwall2's `localhost_proxy` sends the router's own traffic through the node, i
 that already tunnels to the same node, `client_proxy` would tunnel that router's traffic twice; use Passwall2's access
 control to pick clients instead.
 
+## LAN kill switch
+
+Clean native images include `/etc/x28-killswitch.sh` and its enabled-by-default fw3 include
+`firewall.x28_killswitch`; no saved settings or manual deployment are needed (#251). `first_boot.py` places both
+in the rootfs and hooks Passwall2 start/stop/restart. fw3 reapplies the guard when rebuilding the firewall,
+including at boot. Passwall2 itself remains **disabled by default** until the owner configures a node.
+While Passwall2 is enabled in UCI, direct forwarded cellular traffic is rejected for both IPv4 and IPv6,
+including LAN and guest traffic. ICMP is exempt: ping and path-MTU errors travel **directly**, not through Xray.
+Other configured proxy bypasses are blocked; this is stricter than an ordinary Linksys Passwall2 setup.
+Router-originated traffic is outside this forwarding-only guard.
+
+Disabling Passwall2 through LuCI removes the guard when its service restarts. Stopping the service without
+turning off its UCI setting keeps the guard. A Passwall2 package upgrade can replace the init hooks; after an
+upgrade, recheck toggling or run `/etc/x28-killswitch.sh` after changing the enabled setting.
+This is not a full VPN or an all-protocol privacy guarantee; ICMP and router-originated traffic can bypass it.
+Live results and the untested clean-flash/reboot boundary: [TESTING 40](TESTING.md#40-passwall2-lan-kill-switch-with-direct-icmp-2026-11-02).
+
+To clear the guard after turning Passwall2 off in UCI, run `/etc/x28-killswitch.sh`; no networking restart is
+needed. Disabling only the fw3 include does not opt out: the Passwall2 service hooks still apply it.
+
 ## State of the test unit
 
 Installed by hand the way the image will have it, not yet from an image:

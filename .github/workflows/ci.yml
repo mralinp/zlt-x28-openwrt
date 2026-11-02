@@ -46,6 +46,7 @@ jobs:
       - run: python3 tools/build/test_stage_native.py
       - run: python3 tools/build/test_ab_guard.py
       - run: python3 tools/build/test_first_boot.py
+      - run: python3 tools/build/test_killswitch.py
       - run: python3 tools/build/test_package_ubi.py
       - run: python3 tools/build/test_kmod_stub_feed.py
       - run: python3 tools/build/test_vendor_ipset.py

@@ -445,7 +445,14 @@ config dhcp 'wan'
             if old not in config:raise ValueError('unexpected Passwall2 default config: '+old)
             config=config.replace(old,new)
         put('etc/config/passwall2',config)
-        put('etc/config/firewall',tree['etc/config/firewall'][1].decode().rstrip('\n')+"\n\nconfig include 'passwall2'\n option type 'script'\n option path '/var/etc/passwall2.include'\n option reload '1'\n")
+        put('etc/x28-killswitch.sh',Path(__file__).with_name('x28-killswitch.sh').read_text(),0o755)
+        init=tree['etc/init.d/passwall2'][1].decode()
+        for action in ('start','stop'):
+            anchor='\t"$APP_FILE" '+action+' "$action" 9>&-'
+            if anchor not in init:raise ValueError('unexpected Passwall2 init script: '+action)
+            init=init.replace(anchor,'\t/etc/x28-killswitch.sh || { unset_lock; return 1; }\n'+anchor)
+        put('etc/init.d/passwall2',init,0o755)
+        put('etc/config/firewall',tree['etc/config/firewall'][1].decode().rstrip('\n')+"\n\nconfig include 'passwall2'\n option type 'script'\n option path '/var/etc/passwall2.include'\n option reload '1'\n\nconfig include 'x28_killswitch'\n option type 'script'\n option path '/etc/x28-killswitch.sh'\n option reload '1'\n")
         put('etc/config/dhcp',tree['etc/config/dhcp'][1].decode().replace(" option ednspacket_max '1232'\n"," option ednspacket_max '1232'\n option localuse '1'\n",1))
         put('etc/opkg/keys/'+PASSWALL_KEY_ID,(FEED_KEY.parent/'passwall.pub').read_text())
         # LuCI's apply (luci-reload) restarts only enabled services. Its boot start waits start_delay (60 s); x28-kmods
