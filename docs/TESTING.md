@@ -54,6 +54,7 @@ Conventions:
 | 37 | VPN speed and CPU limits, image 219 | 2026-11-02 | ✅ OpenVPN about 100 Mbit/s, limited by one core; WireGuard 715 sending and 330 receiving, CPU not saturated: [section 37](#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02) |
 | 38 | Image with the VPN set on the unit (#230) | 2026-11-02 | ✅ flashed, settings restored, survives a reboot: [section 38](#38-image-with-the-vpn-set-on-the-unit-2026-11-02) |
 | 39 | TPROXY and socket modules, and Passwall2 on them (#198) | 2026-11-02 | ✅ 7 modules loaded; Passwall2 with no warnings carries the router's and a LAN phone's TCP, UDP and IPv6 through the UK node: [section 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02) |
+| 41 | Passwall2 throughput from a LAN client | 2026-11-02 | ✅ 206 Mbit/s down, 40 up, router CPU at most 56%: [section 41](#41-passwall2-throughput-from-a-lan-client-2026-11-02) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -527,3 +528,21 @@ Passwall2 upgrades can overwrite the init hooks; see [PASSWALL2](PASSWALL2.md#la
 tunnel-down behavior, end-to-end IPv6 and exhaustive traffic/leak tests. No independent safety-agent run was available;
 the checklists were applied in-session. The kill switch covers the cellular `ccmni+` WAN, not future Ethernet/VPN uplinks.
 
+## 41. Passwall2 throughput from a LAN client (2026-11-02)
+
+- **Question**: how fast is Passwall2 for a device on the LAN, and how loaded is the router while it runs?
+- **Setup**: slot A with Passwall2 on (xray, VLESS over XHTTP with TLS, TPROXY), the LAN kill switch of section 40 on.
+  A Mac on Wi-Fi behind a second router, which itself is an X28 LAN client with its own proxy off. Apple's
+  `networkQuality -s` (sequential download then upload, 12 and 16 flows, Apple's London edge). The router's `/proc/stat`
+  and xray's CPU time sampled every 2 s over SSH during the run.
+
+| Direction | Throughput | Router CPU (4 cores), peak | xray, peak |
+|---|---|---|---|
+| Download | 206 Mbit/s | 56% | 1.1 cores |
+| Upload | 40 Mbit/s | | |
+
+The test's exit was the node's (GB), not the ISP's. The SoC was at 44.7 °C right after. At 1.1 cores for about 200 Mbit/s
+this agrees with the 0.45 cores per 100 Mbit/s of section 31, so the router was not the limit; the cellular link, the
+node and the second router's Wi-Fi share what is left.
+
+**Not verified:** a client wired straight to the X28, and a link fast enough to reach the CPU ceiling.

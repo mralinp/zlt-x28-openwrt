@@ -76,6 +76,10 @@ the X28 itself can do with this firmware: how much CPU the tunnel costs, and whe
 4 cores in an 8-stream run, xray itself 0.82 core). `cpu0` took the network interrupts, with 19% softirq. The SoC stayed
 at 42.8 °C and xray peaked at 39 MB of memory.
 
+**Measured from a LAN client:** a Mac behind the X28, with Passwall2 as the only proxy, ran Apple's `networkQuality`
+through the tunnel: **206 Mbit/s down and 40 Mbit/s up**. The router's CPU peaked at 56% of 4 cores and xray at 1.1
+cores, so the router had headroom left; the link ran out first ([TESTING 41](TESTING.md#41-passwall2-throughput-from-a-lan-client-2026-11-02)).
+
 **Ceiling, estimated:** at 100% CPU, **300–450 Mbit/s, most likely around 400**; for everyday use plan on about
 300 Mbit/s (75% load). This assumes LAN forwarding costs about what the router's own `curl` did, and it has not been
 reached in a measurement: the links tried so far ran out first.

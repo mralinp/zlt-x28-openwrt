@@ -89,7 +89,7 @@ peer, so the carrier and the far server are out of the picture:
 | WireGuard, 4 streams | 715 Mbit/s | 330 Mbit/s | 55–58% | not reached |
 | OpenVPN AES-128-GCM (mbed TLS) | 102 Mbit/s | 58 Mbit/s | 24–27% | one core |
 | OpenVPN AES-256-GCM (OpenSSL, the shipped build) | 74 Mbit/s | 84 Mbit/s | 25–27% | one core |
-| Passwall2 / xray | | about 400 Mbit/s, estimated | 0.45 cores per 100 Mbit/s | CPU |
+| Passwall2 / xray, LAN client | 40 Mbit/s | 206 Mbit/s measured, about 400 estimated | 56% peak, xray 1.1 cores | the link, not the router |
 
 **Pushing it further** ([details](docs/PASSWALL2.md#pushing-it-further)):
 
