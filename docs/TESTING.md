@@ -213,7 +213,8 @@ All in [FIRMWARE-INVENTORY](FIRMWARE-INVENTORY.md), each with its reproduce comm
 ## 15. UART
 
 See [RECOVERY: UART](RECOVERY.md#uart-debug-console-2-read-side-confirmed). Shifted RX capture is
-confirmed at **921600 8N1**: board TX at 1.8 V through the 1.8-to-3.3 V shifter to adapter RX,
+confirmed at **921600 8N1**. Pinout on the 3-hole footprint: lower-left board TX, middle GND, upper-right board RX,
+all 1.8 V. Board TX at 1.8 V goes through the 1.8-to-3.3 V shifter to adapter RX,
 with common GND. The #70 run recorded preloader, DA and the verified stock-B return without
 transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's TX directly.**
 

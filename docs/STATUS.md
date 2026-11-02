@@ -26,8 +26,9 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed. OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
-- Passwall2 runs on TPROXY and socket modules built the same way: the router's own TCP and UDP go through the node with no
-  warnings ([PASSWALL2](PASSWALL2.md)). The image build ships it; LAN clients through it are untested.
+- Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
+  IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
+  The image build ships it; that image has not been flashed yet.
 
 **Open or unproven**
 - Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.

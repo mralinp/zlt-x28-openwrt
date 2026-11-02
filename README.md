@@ -109,8 +109,9 @@ flowchart LR
 ## Build and flash overview
 
 Everything is detailed, with expected output, in [docs/BUILD.md](docs/BUILD.md) and
-[docs/TESTING.md](docs/TESTING.md). Hardware: a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work), a UART
-adapter, and a second internet path while the X28 is offline. Tools: Python 3.10+, Docker, `gh`, Homebrew `libusb`
+[docs/TESTING.md](docs/TESTING.md). Hardware: a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work), a **1.8 V**
+UART path (a shifter or 1.8 V adapter on the 3-hole footprint: TX, GND, RX; see
+[RECOVERY](docs/RECOVERY.md#uart-debug-console-2-read-side-confirmed)), and a second internet path while the X28 is offline. Tools: Python 3.10+, Docker, `gh`, Homebrew `libusb`
 on macOS.
 
 ```bash

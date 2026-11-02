@@ -43,7 +43,7 @@ docs/
 ├── research/                 boot-flow, signature, slot-selection and flash-session research and plans
 ├── firmware/                 the stock kernel's embedded config (identical in both slots) and the device tree
 ├── assets/                   logo kit (SVG, icons, social preview) and BRAND.md usage guide
-├── images/                   board photos (UART candidate)
+├── images/                   board photos (UART footprint)
 ├── archive/                  superseded plans, readmes and status snapshots
 └── (stock-firmware overlay, historical) vendor-command-map.md, luci-on-stock.md, luci-fix-notes.md
 ```

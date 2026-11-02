@@ -283,8 +283,22 @@ executed and no device was contacted for this inspection. Keep the physical rest
 
 ### Verified setup (2026-10-28)
 
-Read-only capture works on this unit with: board TX pad (idles at 1.8 V) -> level shifter (1.8 V side to
-3.3 V side) -> USB-TTL dongle RX, with a **common GND** between board, shifter and dongle. Baud is
+The console is the unpopulated **3-hole footprint** in the top-left corner of the back of the board (white outline;
+silkscreen **`TZ7.823.432 X28`**). Logic level is **1.8 V**. Viewed as in the photo below:
+
+| Hole | Signal | Connect to |
+|---|---|---|
+| lower-left | **board TX** (idles at 1.8 V) | adapter RX, through a 1.8-to-3.3 V level shifter |
+| middle | **GND** | adapter GND (and the shifter's GND) |
+| upper-right | **board RX** (1.8 V) | adapter TX, through the shifter; leave it off for read-only capture |
+
+| Back of the board | The footprint |
+|---|---|
+| ![X28 board, back side](images/x28-board-back.jpg) | ![3-hole UART footprint](images/x28-uart-candidate.jpg) |
+
+There is no VCC on the footprint: never connect the adapter's 3.3 V or 5 V pins. Never wire a 3.3 V adapter's TX
+straight to board RX (above the ~2.1 V maximum of a 1.8 V pin); use a shifter, a 1.8 V-capable adapter (CH343 with a
+1.8 V setting, CP2104/CP2102N with VIO fed 1.8 V), or a divider on adapter TX (1 kΩ series, 1.2 kΩ to GND). Baud is
 **921600 8N1** (the kernel command line says so; the unit decoded 100% printable text at that rate). Another X28
 was reported to use 115200; do not assume it, check `console=` in the boot log or the kernel command line.
 
@@ -297,7 +311,7 @@ Symptoms of a wrong setup, all seen while getting here:
 - **Loopback check:** short dongle TX to RX (or run it through the shifter) and send a test string. It tests the
   dongle and shifter only, not the board.
 
-Not yet recorded: which pad of the 3-hole footprint is TX, and the shifter part used.
+Not yet recorded: the shifter part used.
 
 ### Login shell on the UART (2026-10-28)
 
@@ -315,47 +329,10 @@ overlay, so check it survives a firmware restore. A root login on the console ne
 `python3 term.py 921600` (a macOS-safe terminal that sets the speed on the open port; `screen` cannot do 921600).
 
 **2026-10-26: the console was read at 921600 8N1 during a power-cycle** (preloader, LK and kernel are all visible); see
-[research/uart-boot-log.md](research/uart-boot-log.md). The write side (typing to the console) is not wired yet.
-The notes below are the earlier search for the pads and the level rules, kept for the next unit.
+[research/uart-boot-log.md](research/uart-boot-log.md). The write side works through the shifter (above).
 
-The kernel console is on `ttyS0` at **921600 8N1** (`console=ttyS0,921600n1` in the boot
-command line). No labelled header was found. Board silkscreen: **`TZ7.823.432 X28`**.
-
-| Back of the board | Candidate footprint (top-left corner) |
-|---|---|
-| ![X28 board, back side](images/x28-board-back.jpg) | ![3-hole footprint](images/x28-uart-candidate.jpg) |
-
-- **Candidate:** an unpopulated **3-hole footprint** with a white outline in the top-left corner
-  of the back side. A trace runs from it to a small 3–4-pad part next to it (likely series
-  resistors or ESD protection), which is typical of a debug UART.
-- **Measured (2026-10-23):** none of the three holes has continuity to ground. A header can be
-  TX/RX/VCC with GND taken elsewhere, so it is still a candidate. Not confirmed.
-- **The other features are not UART:** the outlined copper-pad grid (bottom left) is the
-  underside of a chip on the other side, the long outline next to the silkscreen is a mounting
-  slot, and the parts on the right are connectors and Ethernet magnetics.
-- **Logic level unknown.** The [mt6890-cpe-recovery](https://github.com/mt6890-cpe-recovery/mt6890-cpe-recovery)
-  project reports **1.8 V** with its `J28` photo, but that photo appears to be a different board
-  (silkscreen "ETON ET866").
-
-Next measurement, with the X28 powered and the multimeter's black probe on a shield or the
-power jack's outer ring, on each hole during the first ~20 s of boot and again when idle:
-
-| Reading | Means |
-|---|---|
-| idles at 1.8 or 3.3 V and **flickers while booting** | **TX** (its idle level is the UART voltage) |
-| steady at the same level | **RX** (pulled up), or a supply |
-| rock-steady and continuous with a regulator or large copper | **VCC**: never connect it to an adapter |
-
-Adapter on hand: an Adafruit **CP2102** (3.3 V logic). **Do not wire it straight to a 1.8 V
-UART.** Its TX would drive 3.3 V into a 1.8 V pin (above the ~2.1 V maximum), and its RX may not
-read 1.8 V highs (it needs about 2.0–2.3 V).
-- If TX idles at 3.3 V: connect GND, adapter RX ← board TX, adapter TX → board RX. Never
-  connect the adapter's 5 V or 3.3 V pins.
-- If it idles at 1.8 V: start read-only (GND plus board TX → adapter RX; it cannot damage
-  anything, though the CP2102 may not decode it). For writing, put a divider on the adapter's
-  TX (1 kΩ series, then 1.2 kΩ to GND, ≈1.8 V; keep the values low at 921600 baud). For reading,
-  use a 1.8 V-capable adapter or level shifter (a CH343 with a 1.8 V setting, a TXB0104, or a
-  CP2104/CP2102N with its VIO pin fed from the board's 1.8 V).
+History: the footprint was first only a candidate. A 2026-10-23 continuity check found no hole connected to ground,
+which was wrong: the owner later confirmed the pinout above on the unit.
 
 ## Device facts
 

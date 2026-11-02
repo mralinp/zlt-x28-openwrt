@@ -31,7 +31,7 @@ plus a recovery slot on B. History: `CHANGELOG.md`.
   `cd router && COPYFILE_DISABLE=1 tar --uid 0 --gid 0 -cf - usr etc | ssh router 'cd / && tar xf -'`
 - After Lua/LuCI changes: `ssh router 'rm -rf /tmp/luci-modulecache /tmp/luci-indexcache'` (module cache otherwise serves old code).
 - Router shell is busybox ash: no `diff`, `paste`, `setsid`, `nohup`, `scp` (no sftp). Use `ssh router 'cat > f' < local`.
-- Access: SSH key auth, `ssh router` (port 22 on the native image, 2222 on older ones; `~/.ssh/config`); LuCI `http://192.168.70.1/cgi-bin/luci` (empty root password until you set one); the native image has no vendor UI.
+- Access: SSH key auth, `ssh x28` (port 22 on the native image, 2222 on older ones; `~/.ssh/config`); LuCI `https://192.168.70.1/cgi-bin/luci` (self-signed; HTTP redirects) (empty root password until you set one); the native image has no vendor UI.
 
 ## Architecture in one paragraph
 **Native image (current):** OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, built by `tools/build/` (`stage_native.py` -> `first_boot.py` -> `package_ubi.py`)

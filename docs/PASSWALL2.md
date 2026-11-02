@@ -40,8 +40,8 @@ Installed by hand the way the image will have it, not yet from an image:
 - Backups in `/root/backup-lan` (configs and the old loader), `/root/backup-tpx` and `/root/backup-198`.
 
 To turn it off: the switch in LuCI, or `ssh x28 'uci set passwall2.@global[0].enabled=0; uci commit passwall2;
-/etc/init.d/passwall2 stop'`. To remove the modules from boot: `ssh x28 '/etc/init.d/x28-kmods disable;
-/etc/init.d/x28-wireguard enable'`.
+/etc/init.d/passwall2 stop'`. To remove the modules from boot: `ssh x28 '/etc/init.d/x28-kmods disable'` (this also drops
+WireGuard, which `x28-kmods` loads too).
 
 ## Tunnel speed results
 
