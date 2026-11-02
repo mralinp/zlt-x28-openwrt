@@ -51,7 +51,7 @@ Conventions:
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |
 | 36 | X28 opkg feed on the unit (live on 190b, then a clean flash of 219) | 2026-11-02 | ✅ see [section 36](#36-x28-opkg-feed-on-the-unit-2026-11-02); ipset set types and running features not tested |
-| 37 | Cellular speed from the router, image 219 | 2026-11-02 | ✅ 180–213 Mbit/s down on one stream, 376 on four, 30–38 up: [section 37](#37-cellular-speed-from-the-router-2026-11-02) |
+| 37 | VPN speed and CPU limits, image 219 | 2026-11-02 | ✅ OpenVPN about 100 Mbit/s, limited by one core; WireGuard 715 sending and 330 receiving, CPU not saturated: [section 37](#37-vpn-speed-and-cpu-limits-on-the-router-2026-11-02) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -365,25 +365,29 @@ in uninterruptible sleep in every sample, which counts as 3 of load on a CPU tha
 shell's transmit line. Restoring a saved overlay as a whole would hide the new `opkg` state, so settings were restored file
 by file.
 
-## 37. Cellular speed from the router (2026-11-02)
+## 37. VPN speed and CPU limits on the router (2026-11-02)
 
-- **Question**: how fast is the cellular link on the native image, measured on the router itself?
-- **Setup**: image 219, slot A, vendor kernel 4.19.205, `curl` on the router, about 00:30 UTC. Single sample, one location,
-  one carrier. About 1.2 GB of data.
+- **Question**: how fast can OpenVPN and WireGuard go on this device, and what limits them?
+- **Setup**: image 219, slot A, UDP. `iperf3` for 20 s per test, once per setup, between the router and a Docker peer on a LAN
+  laptop behind another router. No cellular data. The router's `iperf3` ran from RAM. OpenVPN is the feed's 2.5.8 with mbed TLS.
+  WireGuard is `wireguard-linux-compat` 1.0.20220627 built from the SDK tree and loaded from RAM, with no symbol version
+  check ([#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227)).
 
-| Test | Result | CPU (4 cores) |
-|---|---|---|
-| Download, IPv4, 1 stream, 100 MB, 3 runs | 180 / 180 / 213 Mbit/s | 17–19% |
-| Download, IPv4, 4 parallel streams, 100 MB each | 376 Mbit/s total | 37% |
-| Download, IPv6, 1 stream, 50 MB, 1 run | 104 Mbit/s | not measured |
-| Upload, IPv4, 1 stream, 25 MB, 3 runs | 30 / 38 / 38 Mbit/s | not measured |
-| Ping, 15 packets, IPv4 and IPv6 | 119 ms average, 87–250 ms range, no loss | |
+| Test | Router sends | Router receives | Total CPU (4 cores) |
+|---|---|---|---|
+| No tunnel | 856 Mbit/s | 363 Mbit/s | 9% / 36% |
+| WireGuard | 630 Mbit/s | 268 Mbit/s | 51% |
+| WireGuard, 4 streams | 715 Mbit/s | 330 Mbit/s | 55–58% |
+| OpenVPN AES-128-GCM | 102 Mbit/s | 58 Mbit/s | 24–27% |
+| OpenVPN AES-256-GCM | 98 Mbit/s | 59 Mbit/s | 24–27% |
+| OpenVPN ChaCha20-Poly1305 | 77 Mbit/s | 75 Mbit/s | 26% |
 
-SoC temperature stayed at 44–45 °C.
+With 4 streams, OpenVPN sent 95–101 Mbit/s with AES and 91 with ChaCha20. SoC temperature stayed at 45–48 °C, with no kernel
+errors in `dmesg` or on UART.
 
-Servers: CacheFly for IPv4 download, Cloudflare for upload and IPv6 download. Cloudflare returned `403` to most download
-requests, probably rate limiting, so the IPv6 figure is one run against a different server and doesn't show that IPv6 is
-slower.
+**Reading the results:** OpenVPN is limited by one CPU core: 25% of total CPU is one full core, and more streams don't help.
+WireGuard uses all four cores and stayed under 60%, so its limit was not reached. Receive results are capped by the path from
+the laptop, which carries about 365 Mbit/s with no tunnel.
 
-**Not verified:** Wi-Fi or a LAN client through NAT ([#150](https://github.com/mralinp/zlt-x28-openwrt/issues/150)), other
-times of day, and sustained load.
+**Not verified:** LAN clients forwarded through a tunnel, which adds NAT and routing cost; a tunnel across the carrier; other
+OpenVPN builds; and long-term WireGuard stability.
