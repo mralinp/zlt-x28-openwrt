@@ -15,7 +15,7 @@ import tempfile
 import time
 
 import changed_restore as engine
-from common import DEFAULT_BACKUP, MTK_HOME, MTKCLIENT_COMMIT, PRIVATE, VENDOR_DA, backup_table, sha256_file
+from common import DEFAULT_BACKUP, FROZEN, MTK_HOME, MTKCLIENT_COMMIT, PRIVATE, VENDOR_DA, backup_table, ensure_venv, sha256_file
 from setup_mtkclient import PATCHES
 from write_verify import active_slot
 
@@ -39,6 +39,13 @@ def save(run, receipt):
 
 def host_identity():
     """Pinned mtkclient source plus reviewed patches == the installed XML library; returns that text."""
+    if FROZEN:  # no git or venv in the binary: the build embedded the patched XML library and its hash
+        bundle = Path(sys._MEIPASS)
+        meta = json.loads((bundle / 'identity.json').read_text())
+        text = (bundle / XML).read_text()
+        if meta['commit'] != MTKCLIENT_COMMIT or digest(text.encode()) != meta['xml_lib_sha256']:
+            raise ValueError('bundled XML library does not match the pinned mtkclient build')
+        return text
     src = MTK_HOME / 'src'
     head = subprocess.check_output(['git', '-C', str(src), 'rev-parse', 'HEAD'], text=True).strip()
     if head != MTKCLIENT_COMMIT:
@@ -179,9 +186,7 @@ def main():
     if not args.write:
         print('OFFLINE DRY RUN: no SSH, hardware import, USB command or write; execution gates not checked')
         return
-    venv_python = MTK_HOME / 'venv/bin/python'
-    if os.path.realpath(sys.executable) != os.path.realpath(venv_python):
-        os.execv(venv_python, [str(venv_python), *sys.argv])
+    ensure_venv()
     if not args.backup_copy or not args.uart_log:
         raise ValueError('--write requires --backup-copy and --uart-log')
     copy, uart = args.backup_copy.resolve(strict=True), args.uart_log.resolve(strict=True)

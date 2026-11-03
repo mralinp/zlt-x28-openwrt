@@ -16,7 +16,7 @@ import tempfile
 import time
 
 import slot_session as session
-from common import DEFAULT_BACKUP, MTK_HOME, PRIVATE, VENDOR_DA, backup_table, sha256_file
+from common import DEFAULT_BACKUP, PRIVATE, VENDOR_DA, backup_table, ensure_venv, sha256_file
 from restore_entry import DA_HASH, LAYOUT_HASH, check_uart, check_unit, claim_restore, host_identity, open_da, save
 from write_verify import active_slot
 
@@ -203,9 +203,7 @@ def main():
     if not args.write:
         print('OFFLINE DRY RUN: no SSH, hardware import, USB command or write; execution gates not checked')
         return
-    venv_python = MTK_HOME / 'venv/bin/python'
-    if os.path.realpath(sys.executable) != os.path.realpath(venv_python):
-        os.execv(venv_python, [str(venv_python), *sys.argv])
+    ensure_venv()
     if not args.backup_copy or not args.uart_log:
         raise ValueError('--write requires --backup-copy and --uart-log')
     copy, uart = args.backup_copy.resolve(strict=True), args.uart_log.resolve(strict=True)

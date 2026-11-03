@@ -17,14 +17,10 @@ import re
 import sys
 from pathlib import Path
 
-from common import DEFAULT_BACKUP, MTK, VENDOR_DA, Problems, backup_partition, probe_dir, sha256_file
+from common import DEFAULT_BACKUP, VENDOR_DA, Problems, ensure_venv, backup_partition, probe_dir, sha256_file
 
 # mtkclient lives in the private venv; re-run there if started with another interpreter
-VENV_PY = MTK.with_name("python")
-if os.path.realpath(sys.executable) != os.path.realpath(VENV_PY):
-    if not VENV_PY.exists():
-        sys.exit("mtkclient not installed: run tools/recovery/setup_mtkclient.py")
-    os.execv(VENV_PY, [str(VENV_PY), *sys.argv])
+ensure_venv()
 
 from mtkclient.config.mtk_config import MtkConfig  # noqa: E402
 from mtkclient.Library.DA.mtk_da_handler import DaHandler  # noqa: E402

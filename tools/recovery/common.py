@@ -17,6 +17,18 @@ PRIVATE = REPO / "private"  # git-ignored: dumps, probe logs and chip IDs live h
 MTKCLIENT_COMMIT = "7cb40e727727dfe3faa065eefb29b16ed29bbdf1"
 MTK_HOME = Path(os.environ.get("X28_MTKCLIENT", PRIVATE / f"mtkclient-{MTKCLIENT_COMMIT[:7]}")).resolve()
 MTK = MTK_HOME / "venv" / "bin" / "mtk"
+FROZEN = getattr(sys, "frozen", False)  # the x28-flasher binary: mtkclient is bundled, there is no venv to enter
+
+
+def ensure_venv():
+    """Developer runs re-exec into the private mtkclient venv; a frozen binary already contains mtkclient."""
+    venv_python = MTK_HOME / "venv" / "bin" / "python"
+    if FROZEN or os.path.realpath(sys.executable) == os.path.realpath(venv_python):
+        return
+    if not venv_python.exists():
+        sys.exit("mtkclient not installed: run tools/recovery/setup_mtkclient.py")
+    os.execv(venv_python, [str(venv_python), *sys.argv])
+
 # Quectel T750 download agent from the community X28 package (see docs/RECOVERY.md); mtkclient's bundled one refuses reads
 VENDOR_DA = PRIVATE / "vendor-da" / "20261022-mt6890-cpe-recovery-zlt-x28" / "extracted" / "DA_BR.bin"
 
