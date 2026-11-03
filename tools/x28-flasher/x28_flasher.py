@@ -115,7 +115,17 @@ def cmd_flash(args):
         print(f"UART log: {uart}")
 
 
+def power_off_countdown(seconds=10, ask=input, sleep=time.sleep):
+    """The preloader only answers for ~1 s after power-on and a stuck DA needs a full power-off first."""
+    ask("Unplug the router's power, then press Enter: ")
+    for left in range(seconds, 0, -1):
+        print(f"\r  keep the power off: {left:2d} s ", end="", flush=True)
+        sleep(1)
+    print("\r  off long enough. Starting the tool now; plug the power in as soon as it says it is waiting (no buttons).")
+
+
 def cmd_read(args):
+    power_off_countdown()
     sys.exit(subprocess.call([str(VENV_PY), str(RECOVERY / "read_by_name.py"), args.partition]))
 
 
@@ -143,6 +153,9 @@ def selftest():
     assert cmd[-4:] == ["--base-dir", "B", "--prior-identical", "P"] and "--write" in cmd and "rootfs_a" in cmd
     assert "--base-dir" not in flash_cmd(argparse.Namespace(mode="identical", candidate_dir="C", base_dir=None, prior_identical=None),
                                          Path("u"), Path("b"))
+    asked = []
+    power_off_countdown(2, ask=asked.append, sleep=lambda _: None)
+    assert len(asked) == 1
     print("selftest ok")
 
 
