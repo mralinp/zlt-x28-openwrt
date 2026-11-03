@@ -75,8 +75,8 @@ class Capture(threading.Thread):
 
 
 def start_capture(ask=input):
-    port, desc = pick(list_ports(), "UART port", ask)
-    baud = int(ask("baud rate [115200]: ").strip() or 115200)
+    port = pick([d for d, _ in list_ports()], "UART port", ask)
+    baud = int(ask("baud rate [921600]: ").strip() or 921600)  # the X28 console; 115200 is garbage
     path = PRIVATE / "usb-probe" / f"uart-{time.strftime('%Y%m%d-%H%M%S')}.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     cap = Capture(port, baud, path)
@@ -85,7 +85,7 @@ def start_capture(ask=input):
     print(f"capturing {port} @ {baud} -> {path} ({cap.bytes} bytes so far)")
     if not cap.bytes:
         print("  nothing received yet. A silent line is fine until the router boots, but the tools refuse a log\n"
-              "  that was not updated within the last 60 s, so the baud rate must be right and the router must be sending.")
+              "  that was not updated within the last 60 s, so the baud rate must be right (the X28 console is 921600) and the router must be sending.")
     return cap, path
 
 
