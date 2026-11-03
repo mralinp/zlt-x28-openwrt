@@ -5,6 +5,7 @@ The repository is the source of truth for original packages, tests, plans and ev
 ## Layout
 
 - `package/`: the OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol) and its LuCI page, `x28-modem`, `x28-wifi`, `x28-leds`, `x28-bootok`.
+- `tools/x28-flasher/`: guided front end (UART picker, capture, read, flash) over the guarded recovery tools; no flash logic of its own (#272).
 - `tools/build/`, `tools/recovery/`, `tools/firmware/`: image assembly, guarded flash sessions and firmware analysis, each with host tests.
 - `tests/`, `examples/`: shell tests of the init scripts, mocked protocol tests and a disabled configuration.
 - `docs/PROJECT-PLAN.md`, `TASKS.md`, `STATUS.md`, `TESTING.md`, `../CHANGELOG.md`: plan, progress, evidence and history.
@@ -18,6 +19,7 @@ The repository is the source of truth for original packages, tests, plans and ev
 for t in tests/test_modem.sh tests/test_bootok.sh tests/test_wifi.sh tests/test_wps.sh; do sh $t; done
 python3 -m unittest discover -s tools/build -p 'test_*.py'
 for t in tools/recovery/test_*.py; do python3 $t; done
+python3 tools/x28-flasher/x28_flasher.py --selftest
 node tests/test_luci.cjs
 sh -n package/x28-mipc/files/x28_mipc.sh tests/run-case.sh
 ```
