@@ -15,7 +15,7 @@
 ![SoC](https://img.shields.io/badge/SoC-MediaTek%20MT6890%20(T750)-orange)
 ![Base](https://img.shields.io/badge/userspace-OpenWrt%2023.05.5-00b5e2)
 ![Status](https://img.shields.io/badge/status-beta%20%C2%B7%20pre--release-yellow)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 [Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash-overview) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
 
@@ -234,5 +234,5 @@ vendor kernel. OpenWrt and LuCI belong to their projects.
 
 ## License
 
-[MIT](LICENSE) for the code in this repository. OpenWrt, LuCI, mtkclient and vendor components keep their own
+Copyright (C) 2026 Ali Naderi Parizi. The code in this repository is free software under the [GNU GPL v3](LICENSE) (or any later version): anyone may use, modify and redistribute it, but any distributed derivative must be released under the same licence with its complete source, and must keep this copyright notice and credit the original project. OpenWrt, LuCI, mtkclient and vendor components keep their own
 licences. Vendor firmware is never distributed here.
