@@ -24,6 +24,20 @@ So the guards change. That makes this a `risk/brick` change: router-safety-audit
 5. **The vendor DA is never bundled.** The tool asks for a path (`--loader`, remembered) and checks its SHA-256 against the pinned `DA_HASH`; a wrong file is refused.
 6. **Private inputs.** The per-unit full backup and the second copy are created and verified by the tool's own `dump` flow (a later step); until then they are paths the user passes.
 
+## What the frozen identity check proves (auditor review of step 1)
+It proves the bundle is self-consistent: the XML library copy equals the hash and pinned commit recorded at build time. It does not
+prove source integrity: `identity.json`, the library copy and the pinned commit ship in the same artifact, so the trust root is the
+release checksum (and signing, if added). In a PyInstaller build the executing code comes from the compiled archive while
+`__file__` points at a data copy, so the later loaded-module hash check cannot see a difference between the two.
+
+Hard gates for the PyInstaller PR, before any frozen `--write`:
+- the build asserts that the archive-compiled XML library and every tool source equal the bundled data copies and the recorded hashes;
+- the tool-digest code (`here.parent / 'build'`, `slot_session.py`'s `build` import path) is made to resolve from the bundle root, never from a parent of the temp dir (a planted `/tmp/build/*.py` must not be hashed);
+- prefer a onedir layout over onefile (user-writable extraction dir);
+- `REPO`/`PRIVATE` resolve inside the bundle when frozen, so backup and loader paths are always passed explicitly.
+
+Until those gates and a hand-run read-only test of the frozen binary exist, the frozen binary is for dry-run and read-only use only.
+
 ## CI and release
 A reusable workflow `x28-flasher.yml` (like `userspace.yml`), called from `release.yml`: a matrix job per OS runs the host tests, builds with PyInstaller, runs a smoke test of the frozen binary (`--selftest`, `ports`, and the identity check against the bundled hash), and uploads `x28-flasher-<os>-<arch>[.exe]` plus `.sha256`. The release job attaches them. Windows ships marked experimental until someone tests it on a real host.
 
