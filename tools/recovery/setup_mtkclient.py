@@ -30,14 +30,17 @@ from common import MTK_HOME, MTKCLIENT_COMMIT
 REPO_URL = "https://github.com/bkerler/mtkclient.git"
 
 SLA_CALL = '        data = self.get_sys_property(key="DA.SLA", length=0x200000)\n'
+SLA_EMPTY = '        if not data:  # X28 patch: DA returns no DA.SLA property\n            return False\n'
+SLA_SKIP = ('        if self.mtk.config.target_config.get("sla") is False:  # X28 patch: the preloader says SLA is off; this DA\n'
+            '            return False  # answers DA.SLA with ERR!UNSUPPORTED and then often sends nothing more, hanging the host\n')
 EXT_CALL = "            if self.mtk.daloader.patch:\n                xdata = self.xmlft.patch()\n"
 PATCHES = [  # (file under site-packages/mtkclient, old text, new text, required)
     ("Library/DA/xmlflash/xml_lib.py",
      "                if raw:\n                    self.ack()\n",
      "                # X28 patch: END/START already acknowledge flash upload completion.\n", True),
     ("Library/DA/xmlflash/xml_lib.py", SLA_CALL,
-     SLA_CALL + "        if not data:  # X28 patch: DA returns no DA.SLA property\n"
-                "            return False\n", True),
+     SLA_CALL + SLA_EMPTY, True),
+    ("Library/DA/xmlflash/xml_lib.py", SLA_CALL + SLA_EMPTY, SLA_SKIP + SLA_CALL + SLA_EMPTY, True),
     ("Library/DA/xmlflash/xml_lib.py",
      'int(get_field(data, "page_parity_size"), 16)',
      'int(get_field(data, "page_parity_size") or "0", 16)  # X28 patch: empty on this DA', True),
