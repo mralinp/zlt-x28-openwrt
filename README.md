@@ -204,6 +204,7 @@ The flash step, its gates and the typed approvals are described in
 | [docs/research/kernel-module-crc.md](docs/research/kernel-module-crc.md) | TPROXY module CRCs vs the stock kernel, and how they load anyway |
 | [docs/research/vendor-ipset-packaging.md](docs/research/vendor-ipset-packaging.md) | ipset packages for the vendor kernel's module subset |
 | [docs/research/signed-package-feed.md](docs/research/signed-package-feed.md) | The signed X28 opkg feed: what's in it, how it's signed and hosted |
+| [docs/research/x28-flasher-binary.md](docs/research/x28-flasher-binary.md) | x28-flasher as a single PyInstaller binary: what changes in the guards, identity without git, CI (#272) |
 | [docs/research/rust-flasher-design.md](docs/research/rust-flasher-design.md) | Dropped Rust flasher (#270): kept for its protocol and DA findings |
 | [docs/research/reset-wps-buttons.md](docs/research/reset-wps-buttons.md) | Reset and WPS button pins, records and boot-time behaviour: no layer wipes flash |
 | [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |

@@ -32,6 +32,7 @@ docs/
 ├── research/kernel-module-crc.md  TPROXY module CRCs vs the stock kernel, and how they load anyway
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting
+├── research/x28-flasher-binary.md  x28-flasher as a single binary: guard changes, identity, CI (#272)
 ├── research/rust-flasher-design.md  dropped Rust flasher (#270), kept for protocol and DA findings
 ├── research/reset-wps-buttons.md  reset and WPS button pins, records and boot-time behaviour (no layer wipes flash)
 ├── PASSWALL2.md              Passwall2 on TPROXY modules for this kernel, unit state, tunnel speed results
