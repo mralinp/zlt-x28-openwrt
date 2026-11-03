@@ -33,6 +33,7 @@ docs/
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting
 ├── research/rust-flasher-design.md  x28flash: the single-binary Rust USB tool, its protocol and safety rules
+├── research/reset-wps-buttons.md  reset and WPS button pins, records and boot-time behaviour (no layer wipes flash)
 ├── PASSWALL2.md              Passwall2 on TPROXY modules for this kernel, unit state, tunnel speed results
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── FIRMWARE-EXTRACTION.md    offline extraction of the stock rootfs

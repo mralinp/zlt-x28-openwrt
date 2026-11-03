@@ -205,6 +205,7 @@ The flash step, its gates and the typed approvals are described in
 | [docs/research/vendor-ipset-packaging.md](docs/research/vendor-ipset-packaging.md) | ipset packages for the vendor kernel's module subset |
 | [docs/research/signed-package-feed.md](docs/research/signed-package-feed.md) | The signed X28 opkg feed: what's in it, how it's signed and hosted |
 | [docs/research/rust-flasher-design.md](docs/research/rust-flasher-design.md) | `x28flash`, the single-binary Rust USB tool (read-only so far): protocol, DA source, safety rules |
+| [docs/research/reset-wps-buttons.md](docs/research/reset-wps-buttons.md) | Reset and WPS button pins, records and boot-time behaviour: no layer wipes flash |
 | [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | Issues, branches, commits, automatic releases |
 | [docs/README.md](docs/README.md) | Full documentation tree and code map |
