@@ -37,7 +37,7 @@ Clean native images include `/etc/x28-killswitch.sh` and its enabled-by-default 
 in the rootfs and hooks Passwall2 start/stop/restart. fw3 reapplies the guard when rebuilding the firewall,
 including at boot. Passwall2 itself remains **disabled by default** until the owner configures a node.
 While Passwall2 is enabled in UCI, direct forwarded cellular traffic is rejected for both IPv4 and IPv6,
-including LAN and guest traffic. ICMP is exempt: ping and path-MTU errors travel **directly**, not through Xray.
+including LAN traffic. ICMP is exempt: ping and path-MTU errors travel **directly**, not through Xray.
 Destinations Passwall2 itself sends direct still go direct (#255): shunt rules set to **Direct** (for example an
 `IR` rule), the node, and Passwall2's direct whitelist. The script mirrors every destination set Passwall2's
 `PSW2` chain returns on, ignoring ports, and the init runs it again after Passwall2 starts, so the exceptions follow

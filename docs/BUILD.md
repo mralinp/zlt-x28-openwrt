@@ -387,9 +387,6 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
   LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
-  Two networks per band (#167): the driver creates `ra1`/`rai1` once, at its first open after loading, from `BssidNum` in the
-  profile, so the image ships `BssidNum=2` and the handler always renders it. A second `wifi-iface` on a radio brings the
-  extra interface up; without one it stays down and silent (scanned). The MAC address of `rai0` depends on `BssidNum`.
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
@@ -562,7 +559,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
   [PASSWALL2](PASSWALL2.md).
 - **LAN kill switch (#251):** the clean rootfs contains `/etc/x28-killswitch.sh`, its fw3 include, and Passwall2
-  service hooks. Enabling Passwall2 blocks direct non-ICMP cellular forwarding for IPv4/IPv6 LAN and guest
+  service hooks. Enabling Passwall2 blocks direct non-ICMP cellular forwarding for IPv4/IPv6 LAN
   clients; disabling it clears the guard. ICMP (including ping) stays direct, not tunnelled. Router-originated
   traffic is not guarded. No restored settings are required; Passwall2 is still off until configured. See
   [behavior and limits](PASSWALL2.md#lan-kill-switch) and [test evidence](TESTING.md#40-passwall2-lan-kill-switch-with-direct-icmp-2026-11-02).

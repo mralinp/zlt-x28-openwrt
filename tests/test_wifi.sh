@@ -23,20 +23,4 @@ mtwifi_auth wep-open && exit 1
 [ "$(mtwifi_channel ra0 auto 1 4)" = 1 ] && [ "$(mtwifi_channel ra0 13 1 4)" = 13 ] && [ "$(mtwifi_channel ra0 13 0 13)" = 1 ] && [ "$(mtwifi_channel ra0 '' 0 13)" = 1 ] && [ "$(mtwifi_channel rai0 36 0 99)" = 36 ] || exit 1
 # Every 5 GHz region a country maps to has its channel list.
 for r in $(cut -d' ' -f3 "$MTWIFI_REGIONS" | sort -un); do grep -q "^$r " "$MTWIFI_CHANNELS5" || { echo "no channels for region $r"; exit 1; }; done
-# Two networks collected into the driver's per-BSS lists; netifd's JSON calls replaced with values per network.
-json_select() { :; }
-json_get_values() { eval "$1=\"\$c_maclist\""; }
-json_get_vars() { ssid=$c_ssid encryption=$c_enc key=$c_key hidden=$c_hidden isolate= wmm= dtim_period= macfilter=$c_filter ieee80211w=$c_pmf; }
-logger() { :; }
-wireless_setup_failed() { echo "FAILED $1"; exit 1; }
-vif_count=0 vif_name= vif2_name=
-c_ssid=main c_enc=sae c_key=mainkey123 c_hidden=0 c_filter= c_pmf= c_maclist=
-mtwifi_setup_vif one
-c_ssid=guest c_enc=psk2 c_key=guestkey12 c_hidden=1 c_filter=deny c_pmf=2 c_maclist="aa:bb bb:cc"
-mtwifi_setup_vif two
-c_ssid=third
-mtwifi_setup_vif three
-[ "$vif_count" = 2 ] && [ "$vif_name" = one ] && [ "$vif2_name" = two ] && [ "$vif_ssid" = main ] && [ "$vif2_ssid" = guest ] || exit 1
-[ "$vif_auth" = "WPA3PSK;WPA2PSK" ] && [ "$vif_enc" = "AES;AES" ] && [ "$vif_hidden" = "0;1" ] && [ "$vif_mfpr" = "0;1" ] || exit 1
-[ "$vif_key" = mainkey123 ] && [ "$vif2_key" = guestkey12 ] && [ "$vif2_policy" = 2 ] && [ "$vif2_acl" = "aa:bb;bb:cc" ] && [ "$vif_policy" = 0 ] || exit 1
-echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-network lists"
+echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy and country mapping"
