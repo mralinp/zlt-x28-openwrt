@@ -1,4 +1,7 @@
-# x28flash: a single-binary Rust USB tool (#240)
+# x28flash: a single-binary Rust USB tool (#240), dropped
+
+> **Dropped (#270).** The Rust tool was removed; flashing stays on the maintained, patched mtkclient in `tools/recovery/`.
+> This note is kept only for the protocol and DA findings below.
 
 Design for replacing the Python + patched mtkclient chain in `tools/recovery/` with one downloadable binary.
 Phase 1 (this document plus `tools/x28flash/`) is **read-only**: detect the modem, load the download agent (DA),

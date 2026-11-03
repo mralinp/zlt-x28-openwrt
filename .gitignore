@@ -39,6 +39,4 @@ experiments/oem-ui/x28-luci-network-integration/files/usr/lib/lua/luci/controlle
 # mocked lifecycle test output (tests/test_native.py)
 .test-results/
 
-# x28flash build output and the dumps it writes
-tools/x28flash/target/
 x28-backup-*/
