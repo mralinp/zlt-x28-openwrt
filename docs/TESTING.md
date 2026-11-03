@@ -41,7 +41,7 @@ Conventions:
 | 24 | First boot of slot A, management path | 2026-10-29 | ✅ boots; key-only SSH, LAN, LuCI login | this page |
 | 25 | 5G data on slot A | 2026-10-29 | ✅ `wan` up on `ccmni1` with internet; started at boot by `x28-modem` | [NATIVE-CELLULAR](NATIVE-CELLULAR.md) |
 | 26 | Services at boot and persistence across reboot | 2026-10-29 | ✅ LuCI, DHCP/DNS, NAT, both Wi-Fi radios; host key, Wi-Fi key and root password unchanged after a reboot | this page |
-| 27 | A/B boot counter | 2026-10-29 | ✅ the preloader adds one try per boot (0 → 1 seen); `x28-bootok` writes the byte back to 0 in all four `misc` copies | [BOOT-FLOW](BOOT-FLOW.md) |
+| 27 | A/B boot counter | 2026-10-29 | ✅ the preloader adds one try per `reboot`, not on a power cycle (0 → 1 seen); `x28-bootok` writes the byte back to 0 in all four `misc` copies | [BOOT-FLOW](BOOT-FLOW.md) |
 | 28 | Download-agent block write to `misc` | 2026-10-29 | ❌ the first block write was not acknowledged, twice; `misc` stayed intact and was verified | this page |
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
@@ -299,7 +299,7 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
   `/sys/class/thermal/thermal_zone*/temp`, `top`. The reboot test: record the SSH host key and Wi-Fi key hash, `reboot`,
   compare after.
 - **Boot counter** (27): read the four copies with `dd if=/dev/mtd3 bs=16 skip=$((128+n*16384)) count=1 | hexdump -C`
-  (A priority, tries, success, up-type are bytes 8–11). One try is added per boot; with `x28-bootok` they read 0 again
+  (A priority, tries, success, up-type are bytes 8–11). One try is added per `reboot`; with `x28-bootok` they read 0 again
   once the system is up.
 - **Download-agent write to `misc`** (28): `slot_blocks_entry.py misc-blocks confirm --a-retry N --write ...` stopped at
   the first block, twice (`write_result acknowledged: false`). The restore session showed all four copies unchanged. Not
@@ -308,7 +308,7 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
   `printf '\000' | dd-nand of=/dev/mtd3 seek=<2057 + 262144 × copy> bs=1 count=1`, with the vendor binary copied to `/tmp`.
   An identical-value write came first; after every write all four copies were re-read and the whole 1 MiB compared with a
   dump. Review: router-safety-auditor.
-- **Gotchas found**: the preloader counts every boot; a `reboot` without the reset service left the byte at 1; stock B
+- **Gotchas found**: the preloader counts every `reboot`; a `reboot` without the reset service left the byte at 1; stock B
   repairs (erases) slot A if it ever boots with A's tries above 3; `misc` cannot be rewritten over USB (28); the log
   buffer is flooded by vendor RIL messages, so early boot lines scroll out of `logread`.
 - **Not proven**: Wi-Fi client and throughput behaviour, other SIMs, reconnect after a modem reset on

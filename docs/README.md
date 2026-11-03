@@ -43,7 +43,7 @@ docs/
 ├── DEVELOPMENT.md            repository layout and local checks
 ├── WORKFLOW.md               trunk-based flow, labels, Conventional Commits, release and changelog rules
 ├── COMMUNITY-BRIEF.md        the project's public-facing brief
-├── research/                 boot-flow, signature, slot-selection and flash-session research and plans
+├── research/                 boot-flow, signature, slot-selection and flash-session research and plans; recovery-slot-design.md, preloader-slot-logic.md
 ├── firmware/                 the stock kernel's embedded config (identical in both slots) and the device tree
 ├── assets/                   logo kit (SVG, icons, social preview) and BRAND.md usage guide
 ├── images/                   board photos (UART footprint)
