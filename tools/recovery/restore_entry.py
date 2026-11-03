@@ -42,10 +42,10 @@ def host_identity():
     if FROZEN:  # no git or venv in the binary: the build embedded the patched XML library and its hash
         bundle = Path(sys._MEIPASS)
         meta = json.loads((bundle / 'identity.json').read_text())
-        text = (bundle / XML).read_text()
-        if meta['commit'] != MTKCLIENT_COMMIT or digest(text.encode()) != meta['xml_lib_sha256']:
+        raw = (bundle / XML).read_bytes()  # bytes, as sha256_file hashes them later (no newline translation on Windows)
+        if meta['commit'] != MTKCLIENT_COMMIT or digest(raw) != meta['xml_lib_sha256']:
             raise ValueError('bundled XML library does not match the pinned mtkclient build')
-        return text
+        return raw.decode()
     src = MTK_HOME / 'src'
     head = subprocess.check_output(['git', '-C', str(src), 'rev-parse', 'HEAD'], text=True).strip()
     if head != MTKCLIENT_COMMIT:
