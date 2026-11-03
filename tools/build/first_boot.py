@@ -23,7 +23,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'firmware'))
 from inventory import elf_dynamic
 
 # S80ucitrack: LuCI's apply restarts non-procd services such as Passwall2 only through its triggers (#198).
-ALLOWED_START = {'S00urngd','S80ucitrack','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S96x28-bootok','S99x28-leds'}
+ALLOWED_START = {'S00urngd','S80ucitrack','S10boot','S10system','S11sysctl','S12log','S18x28-switch','S12rpcd','S19firewall','S19x28-modem','S19dropbear','S19dnsmasq','S20network','S35odhcpd','S50uhttpd','S95done','S96x28-bootok','S97x28-wps','S99x28-leds'}
 ALLOWED_STOP = {'K50dropbear','K89log','K90boot','K90network','K90umount'}
 
 LAN = 'br-lan'
@@ -85,7 +85,11 @@ LUCI_MTWIFI_IFACE = ("if(hwtype=='mtwifi'){o=ss.taboption('macfilter',form.ListV
                      "o.datatype='range(1,255)';"
                      "o=ss.taboption('encryption',form.ListValue,'ieee80211w',_('802.11w Management Frame Protection'));"
                      "o.value('',_('Driver default'));o.value('0',_('Disabled'));o.value('1',_('Optional'));o.value('2',_('Required'));"
-                     "['psk2','psk-mixed','sae','sae-mixed'].forEach(function(e){o.depends('encryption',e);});}")
+                     "['psk2','psk-mixed','sae','sae-mixed'].forEach(function(e){o.depends('encryption',e);});"
+                     # The router's WPS button opens a pairing window on networks with this on; WPS cannot give out a WPA3-only key (#262).
+                     "o=ss.taboption('encryption',form.Flag,'wps_pushbutton',_('Enable WPS push button'),"
+                     "_('The router\\'s WPS button opens a two-minute pairing window on this network. Needs WPA2-PSK or WPA2/WPA3 mixed mode.'));"
+                     "['psk2','psk-mixed','sae-mixed'].forEach(function(e){o.depends('encryption',e);});}")
 
 
 # The frequency widget offers "auto", AC and AX only with hostapd (acs/11ac/11ax); mt_wifi does all three itself (#175).
@@ -297,6 +301,8 @@ def integrate(stage,key,stock_path,output,kmods_dir=None,ipks=()):
         link=tarfile.TarInfo(f'etc/rc.d/S{start}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
     put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
+    put('sbin/x28-wps',(WIFI/'x28-wps').read_text(),0o755)
+    put('etc/init.d/x28-wps',(WIFI/'x28-wps.init').read_text(),0o755);enable(97,'x28-wps')
     # The staged boot script runs `wifi config` once when /etc/config/wireless is missing: WPA2 with a random key.
     put('lib/netifd/wireless/mtwifi.sh',(WIFI/'mtwifi.sh').read_text(),0o755)
     put('lib/wifi/mtwifi.sh',(WIFI/'mtwifi.detect').read_text())

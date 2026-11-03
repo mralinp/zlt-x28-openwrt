@@ -387,6 +387,11 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
   LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
+- **WPS push button (#262):** off unless a network has `wps_pushbutton '1'` (a checkbox on the Wireless Security tab, offered for
+  WPA2-PSK and WPA2/WPA3 mixed mode; WPS cannot give out a WPA3-only key). `/sbin/x28-wps` (procd, `S97x28-wps`) reads the Tozed
+  button driver `/dev/tz_gpio_keys` (24-byte records, key id first; key 1 is the WPS button, the other GPIO is reset) and on a press
+  drives `iwpriv` (`WscConfMode=7`, `WscMode=2`, `WscGetConf=1`) for two minutes on each enabled network, then `WscStop`. The stock
+  profiles keep `WscConfMode=0`, so nothing offers WPS between presses. Not verified: pairing with a client (see #262).
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table

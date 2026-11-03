@@ -16,7 +16,7 @@ The repository is the source of truth for original packages, tests, plans and ev
 ## Local checks
 
 ```sh
-for t in tests/test_modem.sh tests/test_bootok.sh tests/test_wifi.sh; do sh $t; done
+for t in tests/test_modem.sh tests/test_bootok.sh tests/test_wifi.sh tests/test_wps.sh; do sh $t; done
 python3 -m unittest discover -s tools/build -p 'test_*.py'
 for t in tools/recovery/test_*.py; do python3 $t; done
 (cd tools/x28flash && cargo test)

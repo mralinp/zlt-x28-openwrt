@@ -120,6 +120,8 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(tree['etc/rc.d/S99x28-leds'][0].linkname,'../init.d/x28-leds')
         self.assertIn('/dev/tz_gpio_leds',tree['sbin/x28-leds'][1].decode())
         self.assertEqual(tree['sbin/x28-leds'][0].mode,0o755)
+        self.assertEqual(tree['etc/rc.d/S97x28-wps'][0].linkname,'../init.d/x28-wps')
+        self.assertIn('/dev/tz_gpio_keys',tree['sbin/x28-wps'][1].decode())
         self.assertEqual(tree['etc/rc.d/S19x28-modem'][0].linkname,'../init.d/x28-modem')
         for service in MODEM_SERVICES:self.assertIn('etc/init.d/'+service,tree)
         for name in ('usr/bin/atcid','usr/bin/nvram_daemon','usr/lib/libmodem.so','usr/bin/mipc_wan_cli','etc/quectel-project-version',

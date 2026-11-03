@@ -59,7 +59,7 @@ docs/
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |
 | `scripts/` | `release.py` (version and PR-title rules), `changelog.py` (regenerates the release list in CHANGELOG.md), `install.sh` (deploys the stock-firmware overlay), label sync |
-| `tests/` | shell tests of the init scripts (`test_modem.sh`, `test_bootok.sh`, `test_wifi.sh`) and the historical protocol and LuCI tests |
+| `tests/` | shell tests of the init scripts (`test_modem.sh`, `test_bootok.sh`, `test_wifi.sh`, `test_wps.sh`) and the historical protocol and LuCI tests |
 | `router/`, `experiments/` | the stock-firmware overlay and OEM UI experiments (historical; not part of the native image) |
 | `.github/workflows/` | `ci.yml`, `userspace.yml`, `release.yml` |
 

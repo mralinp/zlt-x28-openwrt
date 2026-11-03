@@ -1,0 +1,60 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# The router's WPS button opens a two-minute push-button pairing window on every AP network that has wps_pushbutton=1 and a
+# WPA2-PSK mode (#262). The button is key 1 of the Tozed gpio-key driver: /dev/tz_gpio_keys returns 24-byte records, six
+# 32-bit words, key id first. mt_wifi starts WPS only through its private ioctls, so this drives iwpriv. The stock profiles
+# have WscConfMode=0, so no network offers WPS between presses.
+
+INCLUDE_ONLY=1 . "${MTWIFI_SH:-/lib/netifd/wireless/mtwifi.sh}"
+[ -n "$X28_WPS_TEST" ] || . /lib/functions.sh
+
+WPS_SECONDS=${WPS_SECONDS:-120}
+WPS_LOCK=${WPS_LOCK:-/var/run/x28-wps.lock}
+
+# wps_net <wifi-iface section>: prints the interface (ra0/rai0) when this network allows WPS.
+wps_net() {
+	local wps mode disabled enc dev band ifn
+	config_get wps "$1" wps_pushbutton 0
+	config_get mode "$1" mode ap
+	config_get disabled "$1" disabled 0
+	config_get enc "$1" encryption none
+	[ "$wps" = 1 ] && [ "$mode" = ap ] && [ "$disabled" != 1 ] || return 0
+	case "$enc" in psk2*|psk-mixed*|sae-mixed*) ;; *) return 0 ;; esac  # WPS cannot hand out a WPA3-only key
+	config_get dev "$1" device
+	config_get disabled "$dev" disabled 0
+	[ "$disabled" != 1 ] || return 0
+	config_get band "$dev" band
+	ifn="$(mtwifi_band "$band" "$dev" | cut -d' ' -f1)"
+	[ -z "$ifn" ] || echo "$ifn"
+}
+
+wps_open() {
+	local ifns ifn
+	config_load "${WPS_CONFIG:-wireless}"
+	ifns="$(config_foreach wps_net wifi-iface | sort -u)"
+	[ -n "$ifns" ] || { logger -t x28-wps "button pressed, WPS is off on every network"; return 0; }
+	: > "$WPS_LOCK"
+	for ifn in $ifns; do
+		iwpriv "$ifn" set WscConfMode=7
+		iwpriv "$ifn" set WscMode=2
+		iwpriv "$ifn" set WscGetConf=1
+	done
+	logger -t x28-wps "WPS push button open on $ifns for ${WPS_SECONDS}s"
+	sleep "$WPS_SECONDS"
+	for ifn in $ifns; do
+		iwpriv "$ifn" set WscStop=1
+		iwpriv "$ifn" set WscConfMode=0
+	done
+	rm -f "$WPS_LOCK"
+	logger -t x28-wps "WPS push button closed"
+}
+
+[ -z "$X28_WPS_TEST" ] || return 0
+rm -f "$WPS_LOCK"
+while :; do
+	rec="$(dd if=/dev/tz_gpio_keys bs=24 count=1 2>/dev/null | hexdump -v -e '6/4 "%u " "\n"')"
+	[ -n "$rec" ] || { sleep 1; continue; }
+	set -- $rec
+	# ponytail: any press of key 1 counts, whatever its length; presses during an open window are ignored.
+	[ "$1" = 1 ] && [ ! -e "$WPS_LOCK" ] && { wps_open & }
+done

@@ -17,7 +17,7 @@ PACKAGES="-firewall4 -nftables -kmod-nft-offload
   firewall iptables-legacy ip6tables-legacy
   luci-base luci-mod-admin-full luci-theme-bootstrap luci-app-opkg
   luci-app-firewall luci-proto-ipv6 luci-proto-ppp
-  iwinfo rpcd-mod-iwinfo block-mount ubi-utils
+  iwinfo rpcd-mod-iwinfo block-mount ubi-utils wireless-tools
   uhttpd uhttpd-mod-ubus rpcd-mod-luci libustream-mbedtls px5g-mbedtls
   -dnsmasq dnsmasq-full libmnl0
   openvpn-openssl luci-app-openvpn xl2tpd ppp-mod-pptp wireguard-tools luci-proto-wireguard
@@ -51,6 +51,7 @@ ls -l "$OUT"
 grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-3$' "$OUT"/*.manifest ||
   { echo "the image did not take the mtwifi libiwinfo" >&2; exit 1; }
 # The preinit hook relies on this block's extroot behaviour (#183).
+grep -q '^wireless-tools - ' "$OUT"/*.manifest || { echo "the image lacks iwpriv (wireless-tools), which the WPS button needs (#262)" >&2; exit 1; }
 grep -q '^ubi-utils - ' "$OUT"/*.manifest && grep -q '^block-mount - 2023-02-28-bfe882d5-' "$OUT"/*.manifest ||
   { echo "the image lacks ubi-utils or the expected block-mount" >&2; exit 1; }
 # Our dnsmasq-full has ipset and no nftset (#203): the feed's build would pull nftables-json in.
