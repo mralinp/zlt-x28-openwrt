@@ -150,7 +150,7 @@ of little use here.
 | `usb@11201000` | USB (`mediatek,mtu3`) |
 | `serial@11002000`, `@11003000`, `@11004000` | UARTs |
 | `lvts@1100b000`, `thermal-ntc1` to `4`, `thermal-zones` | Temperature sensors |
-| `tz_gpio_keys`, `tz_gpio_leds` | Tozed's button and LED drivers |
+| `tz_gpio_keys`, `tz_gpio_leds` | Tozed's button and LED drivers. `/dev/tz_gpio_keys` returns 12-byte reads of three words, `[event, key, ms]`: event 1 is key-down, 2 key-up; key 1 is reset, 2 is WPS; `ms` is 0 on key-down and the hold time (100 ms steps) on key-up. Seen on a unit (#265); long-hold behaviour not checked. |
 
 A node does not prove a part is wired up. This tree comes from a reference design and still has nodes for parts such as a
 display (`disp_*`) and GPU (`mali@13000000`), which this doc has not checked against the board.

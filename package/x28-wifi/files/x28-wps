@@ -1,9 +1,10 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # The router's WPS button opens a two-minute push-button pairing window on every AP network that has wps_pushbutton=1 and a
-# WPA2-PSK mode (#262). The button is key 1 of the Tozed gpio-key driver: /dev/tz_gpio_keys returns 24-byte records, six
-# 32-bit words, key id first. mt_wifi starts WPS only through its private ioctls, so this drives iwpriv. The stock profiles
-# have WscConfMode=0, so no network offers WPS between presses.
+# WPA2-PSK mode (#262). The button is key 2 of the Tozed gpio-key driver (key 1 is reset): /dev/tz_gpio_keys returns
+# 12-byte reads of three 32-bit words, [event, key, ms]: event 1 is key-down, 2 is key-up (ms = hold time, 0 on key-down).
+# mt_wifi starts WPS only through its private ioctls, so this drives iwpriv. The stock profiles have WscConfMode=0, so no
+# network offers WPS between presses.
 
 INCLUDE_ONLY=1 . "${MTWIFI_SH:-/lib/netifd/wireless/mtwifi.sh}"
 [ -n "$X28_WPS_TEST" ] || . /lib/functions.sh
@@ -27,6 +28,9 @@ wps_net() {
 	ifn="$(mtwifi_band "$band" "$dev" | cut -d' ' -f1)"
 	[ -z "$ifn" ] || echo "$ifn"
 }
+
+# wps_down <event> <key>: true for the key-down of the WPS button, not for its release or for the reset button.
+wps_down() { [ "$1" = 1 ] && [ "$2" = 2 ]; }
 
 wps_open() {
 	local ifns ifn
@@ -55,6 +59,6 @@ while :; do
 	rec="$(dd if=/dev/tz_gpio_keys bs=24 count=1 2>/dev/null | hexdump -v -e '6/4 "%u " "\n"')"
 	[ -n "$rec" ] || { sleep 1; continue; }
 	set -- $rec
-	# ponytail: any press of key 1 counts, whatever its length; presses during an open window are ignored.
-	[ "$1" = 1 ] && [ ! -e "$WPS_LOCK" ] && { wps_open & }
+	# ponytail: any press of the WPS key counts, whatever its length; presses during an open window are ignored.
+	wps_down "$1" "$2" && [ ! -e "$WPS_LOCK" ] && { wps_open & }
 done

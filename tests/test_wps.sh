@@ -18,4 +18,6 @@ c_g_wps_pushbutton=1 c_g_encryption=psk2 c_g_device=radio_2g c_g_mode=sta
 [ -z "$(net c)" ] && [ -z "$(net d)" ] && [ -z "$(net e)" ] && [ -z "$(net g)" ] || exit 1  # WPA3-only, off, disabled, client
 c_radio_5g_disabled=1
 [ -z "$(net b)" ] || exit 1  # its radio is disabled
-echo "PASS: WPS button opens only enabled WPA2-PSK access-point networks"
+# wps_down <event> <key>: only the WPS key-down (the driver also reports key-up, and the reset button as key 1).
+wps_down 1 2 && ! wps_down 2 2 && ! wps_down 1 1 && ! wps_down 2 1 || exit 1
+echo "PASS: WPS button opens only enabled WPA2-PSK access-point networks, on its own key-down"
