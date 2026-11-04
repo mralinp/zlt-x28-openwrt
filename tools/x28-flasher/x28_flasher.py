@@ -19,15 +19,14 @@ import threading
 import time
 from pathlib import Path
 
-RECOVERY = Path(__file__).resolve().parents[1] / "recovery"
+FROZEN = getattr(sys, "frozen", False)
+RECOVERY = (Path(sys._MEIPASS) if FROZEN else Path(__file__).resolve().parents[1]) / "recovery"
 sys.path.insert(0, str(RECOVERY))
-from common import MTK_HOME, PRIVATE, VENDOR_DA  # noqa: E402
+from common import MTK_HOME, PRIVATE, VENDOR_DA, ensure_venv  # noqa: E402
 
 VENV_PY = MTK_HOME / "venv" / "bin" / "python"
-if Path(sys.executable).resolve() != VENV_PY.resolve() and "--selftest" not in sys.argv:
-    if not VENV_PY.exists():
-        sys.exit("mtkclient not installed: run tools/recovery/setup_mtkclient.py")
-    os.execv(VENV_PY, [str(VENV_PY), *sys.argv])
+if "--selftest" not in sys.argv:
+    ensure_venv()
 
 BACKUP_NAME = "x28-backup/complete-captured-partitions.tar"
 NOISE = ("debug-console", "Bluetooth")
@@ -90,7 +89,7 @@ def start_capture(ask=input):
 
 
 def flash_cmd(args, uart, backup_copy):
-    cmd = [str(VENV_PY), str(RECOVERY / "slot_entry.py"), "rootfs_a", args.mode, "--write",
+    cmd = ["rootfs_a", args.mode, "--write", *tool_paths(args),
            "--candidate-dir", args.candidate_dir, "--backup-copy", str(backup_copy), "--uart-log", str(uart)]
     for flag in ("base_dir", "prior_identical"):
         if getattr(args, flag):
@@ -98,9 +97,34 @@ def flash_cmd(args, uart, backup_copy):
     return cmd
 
 
+def run_tool(script, argv):
+    """The guarded tools run in this process when frozen (no second interpreter), else under the mtkclient venv."""
+    if FROZEN:
+        import runpy
+        sys.argv = [script, *argv]
+        try:
+            runpy.run_path(str(RECOVERY / script), run_name="__main__")
+        except SystemExit as done:
+            return done.code or 0
+        return 0
+    return subprocess.call([str(VENV_PY), str(RECOVERY / script), *argv])
+
+
+def tool_paths(args):
+    """--backup/--loader are explicit in a frozen binary: there is no repo with a private/ folder next to it."""
+    out = []
+    for flag in ("backup", "loader"):
+        if getattr(args, flag, None):
+            out += [f"--{flag}", getattr(args, flag)]
+    if FROZEN and len(out) < 4:
+        sys.exit("pass --backup DIR (your verified backup) and --loader FILE (the vendor download agent)")
+    return out
+
+
 def cmd_flash(args):
-    if not VENDOR_DA.is_file():
-        sys.exit(f"download agent missing: {VENDOR_DA}")
+    loader = Path(args.loader) if args.loader else VENDOR_DA
+    if not loader.is_file():
+        sys.exit(f"download agent missing: {loader}")
     copies = find_backup_copies()
     copy = args.backup_copy or (pick(copies, "second backup copy") if copies else None)
     if not copy:
@@ -109,7 +133,7 @@ def cmd_flash(args):
     print("\nNext: the tool shows the exact phrase to type (you type it yourself), then asks you to unplug the\n"
           "router for 10 s or more and plug it back in with no buttons. No retry, no automatic reboot.\n")
     try:
-        sys.exit(subprocess.call(flash_cmd(args, uart, copy)))
+        sys.exit(run_tool("slot_entry.py", flash_cmd(args, uart, copy)))
     finally:
         cap.stop_event.set()
         print(f"UART log: {uart}")
@@ -125,8 +149,9 @@ def power_off_countdown(seconds=10, ask=input, sleep=time.sleep):
 
 
 def cmd_read(args):
+    argv = [args.partition, *tool_paths(args)]  # before the countdown, so missing paths fail at once
     power_off_countdown()
-    sys.exit(subprocess.call([str(VENV_PY), str(RECOVERY / "read_by_name.py"), args.partition]))
+    sys.exit(run_tool("read_by_name.py", argv))
 
 
 def cmd_uart(args):
@@ -139,6 +164,13 @@ def cmd_uart(args):
         print(f"\nstopped, {cap.bytes} bytes in {path}")
 
 
+def cmd_identity(args):
+    """SHA-256 of the XML library the guards bind as 'host'; the build smoke test compares it with a developer install."""
+    import hashlib
+    from restore_entry import host_identity
+    print(hashlib.sha256(host_identity().encode()).hexdigest())
+
+
 def cmd_ports(args):
     for dev, desc in list_ports():
         print(f"{dev}  {desc}")
@@ -148,10 +180,10 @@ def selftest():
     answers = iter(["", "x", "2"])
     assert pick(["a", "b"], "thing", lambda _: next(answers)) == "a"
     assert pick(["a", "b"], "thing", lambda _: next(answers)) == "b"
-    args = argparse.Namespace(mode="write", candidate_dir="C", base_dir="B", prior_identical="P")
+    args = argparse.Namespace(mode="write", candidate_dir="C", base_dir="B", prior_identical="P", backup="Bk", loader="L")
     cmd = flash_cmd(args, Path("u.log"), Path("b.tar"))
     assert cmd[-4:] == ["--base-dir", "B", "--prior-identical", "P"] and "--write" in cmd and "rootfs_a" in cmd
-    assert "--base-dir" not in flash_cmd(argparse.Namespace(mode="identical", candidate_dir="C", base_dir=None, prior_identical=None),
+    assert "--base-dir" not in flash_cmd(argparse.Namespace(mode="identical", candidate_dir="C", base_dir=None, prior_identical=None, backup="Bk", loader="L"),
                                          Path("u"), Path("b"))
     asked = []
     power_off_countdown(2, ask=asked.append, sleep=lambda _: None)
@@ -166,8 +198,11 @@ def main():
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("ports").set_defaults(fn=cmd_ports)
     sub.add_parser("uart").set_defaults(fn=cmd_uart)
+    sub.add_parser("identity").set_defaults(fn=cmd_identity)
     r = sub.add_parser("read")
     r.add_argument("partition", nargs="?", default="lk_b")
+    r.add_argument("--backup")
+    r.add_argument("--loader")
     r.set_defaults(fn=cmd_read)
     f = sub.add_parser("flash")
     f.add_argument("mode", choices=("identical", "write"))
@@ -175,6 +210,8 @@ def main():
     f.add_argument("--base-dir")
     f.add_argument("--prior-identical")
     f.add_argument("--backup-copy")
+    f.add_argument("--backup")
+    f.add_argument("--loader")
     f.set_defaults(fn=cmd_flash)
     args = ap.parse_args()
     if not args.cmd:

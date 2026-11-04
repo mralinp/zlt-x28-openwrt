@@ -12,7 +12,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PRIVATE = REPO / "private"  # git-ignored: dumps, probe logs and chip IDs live here
+# git-ignored: dumps, probe logs and chip IDs live here; a frozen binary has no repo, so it keeps them in the user's home
+PRIVATE = Path(os.environ["X28_PRIVATE"]) if "X28_PRIVATE" in os.environ else (
+    Path.home() / "x28-flasher" if getattr(sys, "frozen", False) else REPO / "private")
 # mtkclient commit that reads this board's NAND (with setup_mtkclient.py's patches); v2.1.4.1 could not
 MTKCLIENT_COMMIT = "7cb40e727727dfe3faa065eefb29b16ed29bbdf1"
 MTK_HOME = Path(os.environ.get("X28_MTKCLIENT", PRIVATE / f"mtkclient-{MTKCLIENT_COMMIT[:7]}")).resolve()
