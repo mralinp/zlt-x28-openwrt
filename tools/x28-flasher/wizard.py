@@ -1,5 +1,6 @@
 """The guided session behind a bare `x28-flasher` (#272): questions instead of flags, then the same guarded tools."""
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -8,6 +9,33 @@ try:
     import questionary
 except ImportError:  # the numbered prompts below work without it
     questionary = None
+
+USE_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+CODES = {"bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33", "cyan": "36"}
+
+
+def paint(text, *styles):
+    if not USE_COLOR:
+        return text
+    return f"\033[{';'.join(CODES[s] for s in styles)}m{text}\033[0m"
+
+
+def good(text):
+    return paint("\u2713 ", "green") + text
+
+
+def bad(text):
+    return paint("\u2717 ", "red") + text
+
+
+def warn(text):
+    return paint("! ", "yellow") + text
+
+
+STYLE = None
+if questionary:
+    STYLE = questionary.Style([("qmark", "fg:cyan bold"), ("question", "bold"), ("pointer", "fg:cyan bold"),
+                               ("highlighted", "fg:cyan bold"), ("answer", "fg:green bold"), ("instruction", "fg:ansibrightblack")])
 
 MENU = [("Set up UART logger", "uart"), ("Backup", "backup"), ("Build", "build"), ("Test (read-only checks)", "test"),
         ("Flash slot A (rehearsal or write)", "flash"), ("Auto pilot", "auto"), ("Read one partition and verify it", "read"), ("Quit", "quit")]
@@ -48,17 +76,17 @@ class Ui:
     def select(self, msg, choices):
         """choices: [(label, value)]"""
         if self.fancy:
-            return self._ask(questionary.select(msg, choices=[questionary.Choice(label, value=value) for label, value in choices]))
+            return self._ask(questionary.select(msg, choices=[questionary.Choice(label, value=value) for label, value in choices], style=STYLE, qmark="\u276f"))
         return dict(choices)[pick([label for label, _ in choices], msg)]
 
     def text(self, msg, default=""):
         if self.fancy:
-            return self._ask(questionary.text(msg, default=default))
+            return self._ask(questionary.text(msg, default=default, style=STYLE, qmark="\u276f"))
         return input(f"{msg} [{default}]: ").strip() or default
 
     def confirm(self, msg, default=True):
         if self.fancy:
-            return self._ask(questionary.confirm(msg, default=default))
+            return self._ask(questionary.confirm(msg, default=default, style=STYLE, qmark="\u276f"))
         return (input(f"{msg} [{'Y/n' if default else 'y/N'}]: ").strip().lower() or ('y' if default else 'n')).startswith('y')
 
 
@@ -87,7 +115,7 @@ def ask_path(ui, cfg, key, msg, default, is_dir):
     while not (value and (Path(value).is_dir() if is_dir else Path(value).is_file())):
         value = ui.text(msg, value).strip()
         if value and not Path(value).exists():
-            print(f"  not found: {value}")
+            print("  " + bad(f"not found: {value}"))
     cfg.set(key, value)
     return value
 
@@ -114,23 +142,26 @@ def image_dirs(build):
 def check_setup(fl, ui, cfg):
     from common import DEFAULT_BACKUP, backup_table, sha256_file
     from restore_entry import DA_HASH, host_identity
+    print(paint("  Setup check", "bold"))
     ports = fl.list_ports()
-    print(f"  UART/serial ports: {', '.join(d for d, _ in ports) or 'none found'}")
-    print(f"  preloader port: {'present (power-cycle the router before using it)' if any('Preloader' in x for _, x in ports) else 'not seen (normal while the router is running)'}")
+    print("  " + (good if ports else bad)(f"serial ports: {', '.join(d for d, _ in ports) or 'none found'}"))
+    pre = any("Preloader" in x for _, x in ports)
+    print("  " + (warn if pre else good)("preloader port present: power-cycle the router before using it" if pre else "no preloader port (normal while the router runs)"))
     backup = Path(cfg.get("backup") or DEFAULT_BACKUP)
     try:
-        print(f"  backup: {backup} ({len(backup_table(backup))} partitions)")
+        print("  " + good(f"backup: {backup} ({len(backup_table(backup))} partitions)"))
     except Exception:
-        print(f"  backup: not found at {backup}")
+        print("  " + bad(f"backup not found at {backup}"))
     loader = Path(cfg.get("loader") or fl.VENDOR_DA)
-    print(f"  download agent: {loader}  {'OK' if loader.is_file() and sha256_file(loader) == DA_HASH else 'missing or not the expected file'}")
+    ok = loader.is_file() and sha256_file(loader) == DA_HASH
+    print("  " + (good if ok else bad)(f"download agent: {loader}" if ok else f"download agent missing or not the expected file: {loader}"))
     try:
         host_identity()
-        print("  mtkclient: matches the pinned, patched build")
+        print("  " + good("mtkclient matches the pinned, patched build"))
     except Exception as err:
-        print(f"  mtkclient: {err}")
+        print("  " + bad(f"mtkclient: {err}"))
     copies = fl.find_backup_copies()
-    print(f"  second backup copy: {copies[0] if copies else 'none found on a connected drive'}")
+    print("  " + (good(f"second backup copy: {copies[0]}") if copies else warn("no second backup copy on a connected drive")))
 
 
 def read_partition(fl, ui, cfg):
@@ -139,7 +170,7 @@ def read_partition(fl, ui, cfg):
     loader = ask_path(ui, cfg, "loader", "Vendor download agent file (DA_BR.bin)", VENDOR_DA, False)
     names = [p["name"] for p in backup_table(Path(backup))]
     part = ui.select("Which partition?", [(n, n) for n in names])
-    print("  Read-only. Nothing is written to the router.")
+    print("  " + paint("Read-only. Nothing is written to the router.", "dim"))
     return fl.cmd_read(__import__("argparse").Namespace(partition=part, backup=backup, loader=loader))
 
 
@@ -150,7 +181,7 @@ def watch_uart(fl, ui, cfg):
 
 def coming(name):
     def action(fl, ui, cfg):
-        print(f"  Not built yet. {COMING[name]}.")
+        print("  " + warn(f"Not built yet. {COMING[name]}."))
         return 0
     return action
 
@@ -171,7 +202,7 @@ def flash(fl, ui, cfg):
     import argparse
     from common import DEFAULT_BACKUP, PRIVATE, VENDOR_DA
     if fl.FROZEN:
-        print("  This build is read-only. Flash from a source checkout until the build-time equality gate exists (#272).")
+        print("  " + warn("This build is read-only. Flash from a source checkout until the build-time equality gate exists (#272)."))
         return 0
     backup = ask_path(ui, cfg, "backup", "Folder with your verified backup", DEFAULT_BACKUP, True)
     loader = ask_path(ui, cfg, "loader", "Vendor download agent file (DA_BR.bin)", VENDOR_DA, False)
@@ -187,7 +218,7 @@ def flash(fl, ui, cfg):
     if mode == "write":
         runs = verified_identicals(PRIVATE / "usb-probe")
         if not runs:
-            print("  No verified rehearsal from the last 24 h. Run the rehearsal first.")
+            print("  " + bad("No verified rehearsal from the last 24 h. Run the rehearsal first."))
             return 1
         prior = ui.select("Rehearsal to build on", [(r.name, str(r)) for r in runs])
     print(f"\n  {mode}: {candidate}" + (f"  base {base}" if base else ""))
@@ -196,7 +227,7 @@ def flash(fl, ui, cfg):
     args = argparse.Namespace(mode=mode, candidate_dir=candidate, base_dir=base, prior_identical=prior,
                               backup_copy=None, backup=backup, loader=loader)
     code = fl.cmd_flash(args, ui)
-    print("  Done." if code == 0 else f"  Stopped (exit {code}). The run folder above keeps the logs; nothing was retried.")
+    print("  " + (good("Done.") if code == 0 else bad(f"Stopped (exit {code}). The run folder above keeps the logs; nothing was retried.")))
     return code
 
 
@@ -207,7 +238,7 @@ ACTIONS = {"test": test_readonly, "read": read_partition, "uart": watch_uart, "f
 def run(fl, ui=None):
     ui = ui or Ui()
     cfg = Config(fl.PRIVATE / "x28-flasher.json")
-    print("\n  x28-flasher: ZLT X28 flash and recovery\n")
+    print("\n  " + paint("x28-flasher", "bold", "cyan") + paint("  ZLT X28 flash and recovery", "dim") + "\n")
     try:
         if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it.", True):
             fl.start_capture(ui)
