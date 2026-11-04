@@ -3,7 +3,7 @@ name: Release
 # Every merge to main is a release (same flow as MQute): CI and the userspace build run,
 # the next SemVer is derived from the Conventional Commits since the last vX.Y.Z tag
 # (scripts/release.py), then the tag and a GitHub release are created. 0.x releases are
-# pre-releases. Assets are the OPEN userspace only: vendor files never enter this public repo.
+# pre-releases. Assets are the OPEN userspace and the x28-flasher tool: vendor files never enter this public repo.
 
 on:
   push:
@@ -23,8 +23,11 @@ jobs:
   userspace:
     uses: ./.github/workflows/userspace.yml
 
+  flasher:
+    uses: ./.github/workflows/x28-flasher.yml
+
   release:
-    needs: [ci, userspace]
+    needs: [ci, userspace, flasher]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -51,6 +54,13 @@ jobs:
           name: x28-userspace-23.05.5
           path: userspace
 
+      - uses: actions/download-artifact@v4
+        if: steps.version.outputs.skip != 'true'
+        with:
+          pattern: x28-flasher-*
+          merge-multiple: true
+          path: flasher
+
       - name: Release assets
         if: steps.version.outputs.skip != 'true'
         env:
@@ -59,6 +69,7 @@ jobs:
           mkdir assets
           cp userspace/*-rootfs.tar.gz "assets/x28-userspace-v${VERSION}-openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
           cp userspace/*.manifest "assets/x28-userspace-v${VERSION}.manifest"
+          for f in flasher/*.tar.gz; do cp "$f" "assets/$(basename "$f" .tar.gz)-v${VERSION}.tar.gz"; done
           (cd assets && sha256sum -- * > SHA256SUMS)
           cat assets/SHA256SUMS
 
@@ -84,7 +95,9 @@ jobs:
           **Beta pre-release.** The attached rootfs is the open OpenWrt 23.05.5 userspace only. It does not boot
           the X28 by itself: the stock kernel, modules and vendor binaries are added locally from your own
           unit's backup. The native image has been flashed to slot A and boots on one tested unit; flashing it
-          is a guarded, owner-approved procedure that needs UART and a verified backup. See docs/BUILD.md,
+          is a guarded, owner-approved procedure that needs UART and a verified backup. The x28-flasher
+          archives (macOS Apple silicon, Linux x86_64) are read-only for now and do not include the vendor
+          download agent. See docs/BUILD.md,
           docs/RECOVERY.md and CHANGELOG.md.
           EOF
           gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag $PRE
