@@ -109,6 +109,7 @@ class InputTests(unittest.TestCase):
     def test_stock_extraction_is_offline_and_read_only(self):
         cmd = images.stock_command(Path("/b/rootfs_b.bin"), Path("/o"), Path("/r"))
         self.assertIn("none", cmd)
+        self.assertIn("*_vol-rootfs.ubifs", cmd[-1])  # not rootfs_data, which also matches *vol-rootfs*
         self.assertIn("/b/rootfs_b.bin:/in/rootfs_b.bin:ro", cmd)
 
 

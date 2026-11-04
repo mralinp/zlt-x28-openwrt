@@ -106,7 +106,7 @@ def fetch_inputs(dest, fetch=get):
 
 def stock_command(rootfs_b, out_dir, repo):
     """Extract the stock rootfs from the backup's rootfs_b image in the tools container (read-only input, no network, Linux so case is kept)."""
-    script = ("cd /w && ubireader_extract_images -o ub /in/rootfs_b.bin >/dev/null && f=$(find ub -name '*vol-rootfs*' | head -n1) && test -n \"$f\" "
+    script = ("cd /w && ubireader_extract_images -o ub /in/rootfs_b.bin >/dev/null && f=$(find ub -name '*_vol-rootfs.ubifs' | head -n1) && test -n \"$f\" "
               "&& { unsquashfs -no-xattrs -d rootfs \"$f\" >/dev/null || true; } && rm -rf rootfs/dev && tar czf /out/rootfs-b-system.tar.gz rootfs")
     return ["docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
             "--tmpfs", "/w:rw,exec,size=1g", "-v", f"{rootfs_b}:/in/rootfs_b.bin:ro", "-v", f"{out_dir}:/out", "x28-firmware-tools:ubi", "sh", "-c", script]
