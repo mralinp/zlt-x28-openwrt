@@ -20,6 +20,27 @@ from common import fmt_eta, image_name, parse_mtd, sha256_file
 
 LAYOUT = Path(__file__).with_name("x28-mtd.txt")
 PARTIAL = "SHA256SUMS.partial"
+CHUNK = 4 << 20  # one 20 MiB READ-FLASH came back at 18 MiB on this DA, twice; small reads also show which piece fails
+
+
+def read_chunked(readflash, part, path, chunk=CHUNK, say=print):
+    """readflash(addr, length, filename) -> bool for one piece; the pieces are joined into path. False at the first bad piece."""
+    tmp = Path(str(path) + ".chunk")
+    with open(path, "wb") as out:
+        for off in range(0, part["size"], chunk):
+            n = min(chunk, part["size"] - off)
+            tmp.unlink(missing_ok=True)
+            ok = readflash(part["offset"] + off, n, str(tmp))
+            got = tmp.stat().st_size if tmp.exists() else 0
+            if not ok or got != n:
+                say(f"\n  piece at +{off:#x} of {part['name']} failed: {got:#x} of {n:#x} bytes")
+                tmp.unlink(missing_ok=True)
+                return False
+            out.write(tmp.read_bytes())
+            say(f"\r  {part['name']}: {off + n >> 20} of {part['size'] >> 20} MiB", end="")
+    tmp.unlink(missing_ok=True)
+    say("")
+    return True
 
 
 def write_backup(out, parts, read, verify=True, say=print):
@@ -89,8 +110,8 @@ def main():
     try:
         def read(p, path):
             problems.attach()
-            return mtk.daloader.readflash(addr=p["offset"], length=p["size"], filename=str(path), parttype=None,
-                                          display=p["size"] >= 4 << 20) is True
+            return read_chunked(lambda addr, n, name: mtk.daloader.readflash(addr=addr, length=n, filename=name, parttype=None, display=False) is True,
+                                p, path, say=lambda m, **kw: print(m, flush=True, **kw))
         sums = write_backup(args.out.resolve(), parts, read, verify=not args.no_verify)
     finally:
         print("cycle the modem's power to boot it normally")

@@ -59,6 +59,24 @@ class BackupTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "short"):
             usb_backup.write_backup(self.out, self.parts, short, say=lambda *_: None)
 
+    def test_chunked_read_joins_pieces_and_names_the_failing_one(self):
+        part = {"name": "big", "offset": 100, "size": 10}
+        data = bytes(range(10))
+
+        def readflash(addr, n, name):
+            Path(name).write_bytes(data[addr - 100:addr - 100 + n])
+            return True
+        out = self.out / "big.bin"
+        self.assertTrue(usb_backup.read_chunked(readflash, part, out, chunk=4, say=lambda *a, **k: None))
+        self.assertEqual(out.read_bytes(), data)
+        said = []
+
+        def failing(addr, n, name):
+            Path(name).write_bytes(data[:2])  # short piece
+            return True
+        self.assertFalse(usb_backup.read_chunked(failing, part, out, chunk=4, say=lambda m, **k: said.append(m)))
+        self.assertIn("piece at +0x0", said[0])
+
     def test_bundled_layout_is_the_pinned_x28_layout(self):
         import restore_entry
         parts = common.parse_mtd(usb_backup.LAYOUT.read_text())
