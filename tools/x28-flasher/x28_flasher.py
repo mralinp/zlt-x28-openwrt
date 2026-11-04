@@ -28,6 +28,8 @@ VENV_PY = MTK_HOME / "venv" / "bin" / "python"
 if "--selftest" not in sys.argv:
     ensure_venv()
 
+from wizard import Ui, pick, printable_share  # noqa: E402
+
 BACKUP_NAME = "x28-backup/complete-captured-partitions.tar"
 NOISE = ("debug-console", "Bluetooth")
 
@@ -35,19 +37,6 @@ NOISE = ("debug-console", "Bluetooth")
 def list_ports():
     from serial.tools import list_ports as lp
     return [(p.device, p.description) for p in lp.comports() if not any(n in p.device for n in NOISE)]
-
-
-def pick(items, what, ask=input):
-    """Numbered choice; returns the chosen item. Enter takes the only/first entry."""
-    if not items:
-        sys.exit(f"no {what} found")
-    for i, item in enumerate(items, 1):
-        print(f"  {i}) {item}")
-    while True:
-        answer = ask(f"{what} [1]: ").strip() or "1"
-        if answer.isdigit() and 1 <= int(answer) <= len(items):
-            return items[int(answer) - 1]
-        print("  enter a number from the list")
 
 
 def find_backup_copies():
@@ -73,9 +62,30 @@ class Capture(threading.Thread):
                     self.bytes += len(data)
 
 
-def start_capture(ask=input):
-    port = pick([d for d, _ in list_ports()], "UART port", ask)
-    baud = int(ask("baud rate [921600]: ").strip() or 921600)  # the X28 console; 115200 is garbage
+def auto_baud(port, rates=(921600, 115200, 57600, 38400, 19200, 9600), listen=2.0):
+    """Listen at each rate; the one whose bytes look like console text wins. None when the line is silent or ambiguous."""
+    import serial
+    best = (0.0, None)
+    for rate in rates:
+        with serial.Serial(port, rate, timeout=0.2) as ser:
+            ser.reset_input_buffer()
+            data, end = b"", time.time() + listen
+            while time.time() < end:
+                data += ser.read(4096)
+        if len(data) >= 20 and printable_share(data) > best[0]:
+            best = (printable_share(data), rate)
+    return best[1] if best[0] >= 0.9 else None
+
+
+def start_capture(ui=None):
+    ui = ui or Ui()
+    port = ui.select("UART adapter", [(f"{d}  {desc}", d) for d, desc in list_ports()])
+    baud = ui.select("Baud rate", [("Auto-detect (the router must be sending output)", 0), ("921600 (the X28 console)", 921600), ("115200", 115200)])
+    if baud == 0:
+        print("  listening at common rates, about 12 s...")
+        baud = auto_baud(port)
+        print(f"  detected {baud}" if baud else "  nothing readable heard (router silent or off); using 921600, the X28 console")
+        baud = baud or 921600
     path = PRIVATE / "usb-probe" / f"uart-{time.strftime('%Y%m%d-%H%M%S')}.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     cap = Capture(port, baud, path)
@@ -121,21 +131,22 @@ def tool_paths(args):
     return out
 
 
-def cmd_flash(args):
+def cmd_flash(args, ui=None):
     if FROZEN:  # auditor gate (#272): lifted by the PR that asserts the compiled library and tool sources equal the bundled copies
         sys.exit("frozen builds are read-only until the build-time equality gate exists (#272); flash from a source checkout")
     loader = Path(args.loader) if args.loader else VENDOR_DA
     if not loader.is_file():
         sys.exit(f"download agent missing: {loader}")
+    ui = ui or Ui()
     copies = find_backup_copies()
-    copy = args.backup_copy or (pick(copies, "second backup copy") if copies else None)
+    copy = args.backup_copy or (ui.select("Second backup copy (on a different drive)", [(c, c) for c in copies]) if copies else None)
     if not copy:
         sys.exit(f"no second backup copy found (looked for */{BACKUP_NAME}); pass --backup-copy")
-    cap, uart = start_capture()
+    cap, uart = start_capture(ui)
     print("\nNext: the tool shows the exact phrase to type (you type it yourself), then asks you to unplug the\n"
           "router for 10 s or more and plug it back in with no buttons. No retry, no automatic reboot.\n")
     try:
-        sys.exit(run_tool("slot_entry.py", flash_cmd(args, uart, copy)))
+        return run_tool("slot_entry.py", flash_cmd(args, uart, copy))
     finally:
         cap.stop_event.set()
         print(f"UART log: {uart}")
@@ -153,17 +164,18 @@ def power_off_countdown(seconds=10, ask=input, sleep=time.sleep):
 def cmd_read(args):
     argv = [args.partition, *tool_paths(args)]  # before the countdown, so missing paths fail at once
     power_off_countdown()
-    sys.exit(run_tool("read_by_name.py", argv))
+    return run_tool("read_by_name.py", argv)
 
 
-def cmd_uart(args):
-    cap, path = start_capture()
+def cmd_uart(args, ui=None):
+    cap, path = start_capture(ui)
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         cap.stop_event.set()
         print(f"\nstopped, {cap.bytes} bytes in {path}")
+    return 0
 
 
 def cmd_identity(args):
@@ -217,11 +229,9 @@ def main():
     f.set_defaults(fn=cmd_flash)
     args = ap.parse_args()
     if not args.cmd:
-        choice = pick(["ports", "uart", "read", "flash identical", "flash write"], "action")
-        if choice.startswith("flash"):
-            sys.exit("run: x28_flasher.py flash <identical|write> --candidate-dir DIR [--base-dir DIR]")
-        args = ap.parse_args([choice])
-    args.fn(args)
+        import wizard
+        sys.exit(wizard.run(sys.modules[__name__]))
+    sys.exit(args.fn(args) or 0)
 
 
 if __name__ == "__main__":

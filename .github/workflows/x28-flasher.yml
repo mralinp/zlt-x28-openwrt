@@ -47,7 +47,7 @@ jobs:
           git -C bh/src fetch -q --depth 1 https://github.com/bkerler/mtkclient.git "$COMMIT"
           git -C bh/src -c advice.detachedHead=false checkout -q FETCH_HEAD
           python3 -m venv bh/venv
-          bh/venv/bin/pip install -q pycryptodome pycryptodomex pyserial pyusb colorama pyinstaller
+          bh/venv/bin/pip install -q pycryptodome pycryptodomex pyserial pyusb colorama questionary pyinstaller
 
       - name: Build
         run: bh/venv/bin/python tools/x28-flasher/build_binary.py --home bh --out dist
