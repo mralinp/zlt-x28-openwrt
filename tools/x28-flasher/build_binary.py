@@ -81,6 +81,7 @@ def main():
                                                     "python": sys.version.split()[0], "build_tools": tools}, indent=1))
     data = [(work / "identity.json", "."), (pkg.parent / XML, str(Path(XML).parent))]
     data += [(f, "recovery") for f in (TOOLS / "recovery").glob("*.py") if not f.name.startswith("test_")]
+    data += [(TOOLS / "recovery" / "x28-mtd.txt", "recovery")]
     data += [(TOOLS / "build" / n, "build") for n in BUILD_FILES]
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--name", "x28-flasher",
            "--distpath", args.out, "--workpath", work, "--specpath", work, "--exclude-module", "PySide6", "--exclude-module", "mtkclient.gui",

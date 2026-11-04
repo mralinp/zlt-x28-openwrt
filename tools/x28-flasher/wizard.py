@@ -39,7 +39,7 @@ if questionary:
 
 MENU = [("Set up UART logger", "uart"), ("Backup", "backup"), ("Build", "build"), ("Test (read-only checks)", "test"),
         ("Flash slot A (rehearsal or write)", "flash"), ("Auto pilot", "auto"), ("Read one partition and verify it", "read"), ("Quit", "quit")]
-COMING = {"backup": "Backup (#284): a full router backup beside the binary", "build": "Build (#285): a flashable image from your own vendor backup",
+COMING = {"build": "Build (#285): a flashable image from your own vendor backup",
           "auto": "Auto pilot (#286): backup, build, test and flash as one guided job"}
 
 
@@ -179,6 +179,20 @@ def watch_uart(fl, ui, cfg):
     return 0
 
 
+def backup(fl, ui, cfg):
+    """Full read-only backup over USB, in the folder layout the guarded tools read."""
+    from common import VENDOR_DA
+    loader = ask_path(ui, cfg, "loader", "Vendor download agent file (DA_BR.bin)", VENDOR_DA, False)
+    out = ui.text("Save the backup in", str(fl.default_backup_dir()))
+    twice = ui.confirm("Read every partition twice to verify it? (about twice as long, recommended)", True)
+    print("  " + paint("Read-only. Nothing is written to the router.", "dim"))
+    argv = ["--out", out, "--loader", loader] + ([] if twice else ["--no-verify"])
+    fl.power_off_countdown()
+    code = fl.run_tool("usb_backup.py", argv)
+    print("  " + (good(f"Backup saved in {out}") if code == 0 else bad(f"Backup stopped (exit {code}). Run it again with the same folder to resume.")))
+    return code
+
+
 def coming(name):
     def action(fl, ui, cfg):
         print("  " + warn(f"Not built yet. {COMING[name]}."))
@@ -231,7 +245,7 @@ def flash(fl, ui, cfg):
     return code
 
 
-ACTIONS = {"test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash,
+ACTIONS = {"backup": backup, "test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash,
            **{name: coming(name) for name in COMING}}
 
 

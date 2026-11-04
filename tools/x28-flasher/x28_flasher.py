@@ -80,6 +80,11 @@ def auto_baud(port, rates=(921600, 115200, 57600, 38400, 19200, 9600), listen=2.
 SESSION = {}  # the one running logger: the serial port can be opened only once, and every step needs the same log
 
 
+def default_backup_dir():
+    """Beside the binary, named with the time; a source checkout keeps backups under private/."""
+    return (Path(sys.executable).parent if FROZEN else PRIVATE / "backups") / time.strftime("x28-backup-%Y%m%d-%H%M%S")
+
+
 def log_dir():
     """Beside the binary; a source checkout keeps it with the other run records."""
     return Path(sys.executable).parent if FROZEN else PRIVATE / "usb-probe"
