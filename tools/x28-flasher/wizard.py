@@ -39,8 +39,7 @@ if questionary:
 
 MENU = [("Set up UART logger", "uart"), ("Backup", "backup"), ("Build", "build"), ("Test (read-only checks)", "test"),
         ("Flash slot A (rehearsal or write)", "flash"), ("Auto pilot", "auto"), ("Read one partition and verify it", "read"), ("Quit", "quit")]
-COMING = {"build": "Build (#285): a flashable image from your own vendor backup",
-          "auto": "Auto pilot (#286): backup, build, test and flash as one guided job"}
+COMING = {"auto": "Auto pilot (#286): backup, build, test and flash as one guided job"}
 
 
 def printable_share(data):
@@ -202,6 +201,63 @@ def backup(fl, ui, cfg):
     return code
 
 
+def build(fl, ui, cfg):
+    """A flashable image: the newest release, or a local run of the build pipeline. Both land in private/build/native-ubi-*, where Flash looks."""
+    import images
+    from common import PRIVATE
+    how = ui.select("Where should the image come from?", [("Download the newest release image", "download"), ("Build it here from your own inputs", "local")])
+    dest = PRIVATE / "build"
+    try:
+        if how == "download":
+            out = images.download(dest)
+            print("  " + good(f"Image saved in {out} (checksum and manifest verified)"))
+            print("  " + paint("The checksum only shows the download is intact; Flash still asks you to type the image hash.", "dim"))
+            return 0
+        if fl.FROZEN:
+            print("  " + warn("A local build needs a source checkout (tools/build and Docker). Download the release image or run from a checkout."))
+            return 1
+        return build_local(fl, ui, cfg, dest)
+    except (RuntimeError, ValueError, OSError) as err:
+        print("  " + bad(str(err)))
+        return 1
+
+
+def build_local(fl, ui, cfg, dest):
+    import images
+    import shutil
+    import subprocess
+    from common import PRIVATE, REPO
+    if not shutil.which("docker"):
+        print("  " + bad("Docker is not installed or not running: the UBI packaging step runs in a container."))
+        return 1
+    inputs = {
+        "stock": ask_path(ui, cfg, "build_stock", "Stock rootfs archive (rootfs-b-system.tar.gz)", "", False),
+        "modern": ask_path(ui, cfg, "build_modern", "OpenWrt userspace rootfs tarball (userspace build output)", "", False),
+        "key": ask_path(ui, cfg, "build_key", "Your SSH public key for the image", Path.home() / ".ssh/id_ed25519.pub", False),
+        "kmods": ask_path(ui, cfg, "build_kmods", "Folder with the built kernel modules", PRIVATE / "kmods", True),
+    }
+    for key, msg, default in (("extra_ipks", "Folder with alsa-lib and libstdcpp6 .ipk files", PRIVATE / "third-party"),
+                              ("feed", "Folder with the ipset, libipset13 and x28-ipset-kernel .ipk files", PRIVATE / "feed-2")):
+        folder = Path(ask_path(ui, cfg, "build_" + key, msg, default, True))
+        inputs[key] = sorted(str(p) for p in folder.rglob("*.ipk"))
+        if not inputs[key]:
+            print("  " + bad(f"no .ipk files under {folder}"))
+            return 1
+    work = dest / f"local-{images.stamp()}"
+    out = dest / f"native-ubi-local-{images.stamp()}"
+    print("  " + paint("Writes only under private/build. Nothing touches the router.", "dim"))
+    if not ui.confirm(f"Build the image in {work.name} now? (several minutes)", True):
+        return 0
+    work.mkdir(parents=True)
+    for cmd in images.local_commands(inputs, work, out, REPO):
+        print("  " + paint("$ " + " ".join(cmd[:3]) + " ...", "dim"))
+        if subprocess.call(cmd) != 0:
+            print("  " + bad(f"Build stopped at {cmd[0]} {cmd[1]}; nothing was flashed. Folder kept: {work}"))
+            return 1
+    print("  " + good(f"Image built: {out}"))
+    return 0
+
+
 def coming(name):
     def action(fl, ui, cfg):
         print("  " + warn(f"Not built yet. {COMING[name]}."))
@@ -254,7 +310,7 @@ def flash(fl, ui, cfg):
     return code
 
 
-ACTIONS = {"backup": backup, "test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash,
+ACTIONS = {"backup": backup, "build": build, "test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash,
            **{name: coming(name) for name in COMING}}
 
 

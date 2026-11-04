@@ -21,6 +21,7 @@ python3 -m unittest discover -s tools/build -p 'test_*.py'
 for t in tools/recovery/test_*.py; do python3 $t; done
 python3 tools/x28-flasher/x28_flasher.py --selftest
 python3 tools/x28-flasher/test_wizard.py
+python3 tools/x28-flasher/test_images.py
 node tests/test_luci.cjs
 sh -n package/x28-mipc/files/x28_mipc.sh tests/run-case.sh
 ```

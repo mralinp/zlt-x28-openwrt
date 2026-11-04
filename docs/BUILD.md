@@ -571,3 +571,16 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
 
 The feed is now [`feed-2`](research/signed-package-feed.md). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
 was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh`.
+
+## Getting an image from the x28-flasher wizard (#285)
+
+The wizard's **Build** entry puts a flashable image folder (`manifest.json` and `rootfs-a-experimental.bin`) under
+`private/build/native-ubi-*`, which is where **Flash** looks. Two sources:
+
+- **Download:** the newest release that carries the asset `x28-native-image.tar.gz` (exactly those two files) and a
+  `sha256sums` file naming it. The wizard checks the archive against `sha256sums` and the image against the manifest, and
+  unpacks the two files by name. This is what #254 must publish; until then the wizard says no release has an image.
+  The checksum only proves the download is intact: Flash still asks the owner to type the image hash.
+- **Local build** (source checkout and Docker only): asks for the stock rootfs archive, the userspace tarball, an SSH public
+  key, the kernel-module folder and the two `.ipk` folders, then runs `stage_native.py`, `first_boot.py` and `package_ubi.py`
+  in the container exactly as above, into `private/build/local-<time>` and `native-ubi-local-<time>`.

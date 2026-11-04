@@ -107,8 +107,17 @@ class PlainPromptTests(unittest.TestCase):
         from contextlib import redirect_stdout
         out = io.StringIO()
         with redirect_stdout(out):
-            self.assertEqual(wizard.coming("build")(None, None, None), 0)
-        self.assertIn("#285", out.getvalue())
+            self.assertEqual(wizard.coming("auto")(None, None, None), 0)
+        self.assertIn("#286", out.getvalue())
+
+    def test_build_reports_a_missing_release_without_crashing(self):
+        import io
+        from contextlib import redirect_stdout
+        ui = types.SimpleNamespace(select=lambda msg, choices: "download")
+        out = io.StringIO()
+        with redirect_stdout(out), mock.patch("images.get", return_value=b"[]"):
+            self.assertEqual(wizard.build(types.SimpleNamespace(FROZEN=False), ui, None), 1)
+        self.assertIn("#254", out.getvalue())
 
 
 if __name__ == "__main__":
