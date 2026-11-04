@@ -55,12 +55,28 @@ class BackupTests(unittest.TestCase):
         fl = types.SimpleNamespace(PRIVATE=Path(tempfile.mkdtemp()), default_backup_dir=lambda: Path("/x/b"), power_off_countdown=lambda: ran.append("countdown"),
                                    run_tool=lambda script, argv: ran.append((script, argv)) or 0)
         da = Path(tempfile.mkdtemp()) / "DA.bin"
+        fl.default_backup_dir = lambda: fl.PRIVATE / "backups" / "x28-backup-new"
         da.write_bytes(b"x")
         cfg = wizard.Config(fl.PRIVATE / "c.json")
         cfg.set("loader", str(da))
         ui = types.SimpleNamespace(text=lambda msg, default="": default, confirm=lambda msg, default=True: False)
         self.assertEqual(wizard.backup(fl, ui, cfg), 0)
-        self.assertEqual(ran, ["countdown", ("usb_backup.py", ["--out", "/x/b", "--loader", str(da), "--no-verify"])])
+        self.assertEqual(ran, ["countdown", ("usb_backup.py", ["--out", str(fl.PRIVATE / "backups" / "x28-backup-new"), "--loader", str(da), "--no-verify"])])
+
+    def test_an_unfinished_backup_is_offered_for_resume(self):
+        ran = []
+        fl = types.SimpleNamespace(PRIVATE=Path(tempfile.mkdtemp()), power_off_countdown=lambda: None, run_tool=lambda s, a: ran.append(a) or 0)
+        old = fl.PRIVATE / "backups" / "x28-backup-old"
+        old.mkdir(parents=True)
+        (old / "SHA256SUMS.partial").write_text("aa  images/a\nbb  images/b\n")
+        fl.default_backup_dir = lambda: fl.PRIVATE / "backups" / "x28-backup-new"
+        da = fl.PRIVATE / "DA.bin"
+        da.write_bytes(b"x")
+        cfg = wizard.Config(fl.PRIVATE / "c.json")
+        cfg.set("loader", str(da))
+        ui = types.SimpleNamespace(text=lambda msg, default="": str(default), confirm=lambda msg, default=True: True)
+        wizard.backup(fl, ui, cfg)
+        self.assertEqual(ran[0][1], str(old))
 
 
 class PlainPromptTests(unittest.TestCase):

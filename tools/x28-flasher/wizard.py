@@ -183,7 +183,13 @@ def backup(fl, ui, cfg):
     """Full read-only backup over USB, in the folder layout the guarded tools read."""
     from common import VENDOR_DA
     loader = ask_path(ui, cfg, "loader", "Vendor download agent file (DA_BR.bin)", VENDOR_DA, False)
-    out = ui.text("Save the backup in", str(fl.default_backup_dir()))
+    default = fl.default_backup_dir()
+    unfinished = sorted(default.parent.glob("x28-backup-*/SHA256SUMS.partial"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if unfinished:
+        done = len(unfinished[0].read_text().splitlines())
+        if ui.confirm(f"Resume the unfinished backup {unfinished[0].parent.name} ({done} partitions done)?", True):
+            default = unfinished[0].parent
+    out = ui.text("Save the backup in", str(default))
     twice = ui.confirm("Read every partition twice to verify it? (about twice as long, recommended)", True)
     print("  " + paint("Read-only. Nothing is written to the router.", "dim"))
     argv = ["--out", out, "--loader", loader] + ([] if twice else ["--no-verify"])
