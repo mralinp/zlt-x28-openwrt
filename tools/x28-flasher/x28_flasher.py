@@ -28,7 +28,7 @@ VENV_PY = MTK_HOME / "venv" / "bin" / "python"
 if "--selftest" not in sys.argv:
     ensure_venv()
 
-from wizard import Ui, pick, printable_share  # noqa: E402
+from wizard import Ui, bad, good, paint, pick, printable_share, warn  # noqa: E402
 
 BACKUP_NAME = "x28-backup/complete-captured-partitions.tar"
 NOISE = ("debug-console", "Bluetooth")
@@ -88,7 +88,7 @@ def log_dir():
 def start_capture(ui=None):
     """Start the background UART logger, or return the one already running (cap, path)."""
     if SESSION.get("cap") and SESSION["cap"].is_alive():
-        print(f"  UART logger already running: {SESSION['path']} ({SESSION['cap'].bytes} bytes)")
+        print("  " + good(f"UART logger already running: {SESSION['path']} ({SESSION['cap'].bytes} bytes)"))
         return SESSION["cap"], SESSION["path"]
     ui = ui or Ui()
     port = ui.select("UART adapter", [(f"{d}  {desc}", d) for d, desc in list_ports()])
@@ -103,9 +103,9 @@ def start_capture(ui=None):
     cap = Capture(port, baud, path)
     cap.start()
     time.sleep(3)
-    print(f"  UART logger running in the background: {port} @ {baud} -> {path} ({cap.bytes} bytes so far)")
+    print("  " + good(f"UART logger running in the background: {port} @ {baud} -> {path} ({cap.bytes} bytes so far)"))
     if not cap.bytes:
-        print("  nothing received yet. A silent line is fine until the router boots, but the tools refuse a log\n"
+        print("  " + warn("nothing received yet.") + " A silent line is fine until the router boots, but the tools refuse a log\n"
               "  that was not updated within the last 60 s, so the baud rate must be right (the X28 console is 921600) and the router must be sending.")
     SESSION.update(cap=cap, path=path)
     return cap, path
@@ -114,7 +114,7 @@ def start_capture(ui=None):
 def stop_capture():
     if SESSION.get("cap"):
         SESSION["cap"].stop_event.set()
-        print(f"  UART log kept: {SESSION['path']}")
+        print("  " + good(f"UART log kept: {SESSION['path']}"))
         SESSION.clear()
 
 
@@ -175,9 +175,9 @@ def power_off_countdown(seconds=10, ask=input, sleep=time.sleep):
     """The preloader only answers for ~1 s after power-on and a stuck DA needs a full power-off first."""
     ask("Unplug the router's power, then press Enter: ")
     for left in range(seconds, 0, -1):
-        print(f"\r  keep the power off: {left:2d} s ", end="", flush=True)
+        print(paint(f"\r  keep the power off: {left:2d} s ", "yellow"), end="", flush=True)
         sleep(1)
-    print("\r  off long enough. Starting the tool now; plug the power in as soon as it says it is waiting (no buttons).")
+    print("\r" + good("off long enough. Starting the tool now; ") + paint("plug the power in as soon as it says it is waiting (no buttons).", "bold"))
 
 
 def cmd_read(args):
