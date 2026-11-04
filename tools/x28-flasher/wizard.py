@@ -39,7 +39,6 @@ if questionary:
 
 MENU = [("Set up UART logger", "uart"), ("Backup", "backup"), ("Build", "build"), ("Test (read-only checks)", "test"),
         ("Flash slot A (rehearsal or write)", "flash"), ("Auto pilot", "auto"), ("Read one partition and verify it", "read"), ("Quit", "quit")]
-COMING = {"auto": "Auto pilot (#286): backup, build, test and flash as one guided job"}
 
 
 def printable_share(data):
@@ -210,6 +209,7 @@ def build(fl, ui, cfg):
     try:
         if how == "download":
             out = images.download(dest)
+            cfg.set("last_image", str(out))
             print("  " + good(f"Image saved in {out} (checksum and manifest verified)"))
             print("  " + paint("The checksum only shows the download is intact; Flash still asks you to type the image hash.", "dim"))
             return 0
@@ -254,15 +254,53 @@ def build_local(fl, ui, cfg, dest):
         if subprocess.call(cmd) != 0:
             print("  " + bad(f"Build stopped at {cmd[0]} {cmd[1]}; nothing was flashed. Folder kept: {work}"))
             return 1
+    cfg.set("last_image", str(out))
     print("  " + good(f"Image built: {out}"))
     return 0
 
 
-def coming(name):
-    def action(fl, ui, cfg):
-        print("  " + warn(f"Not built yet. {COMING[name]}."))
+def autopilot(fl, ui, cfg):
+    """Backup, build, test, rehearsal, write as one job. Each step is the menu entry itself, so every guard and
+    typed phrase stays; any failure stops the run and nothing is retried or skipped."""
+    from common import PRIVATE
+    if fl.FROZEN:
+        print("  " + warn("Auto pilot ends in a flash, which this build cannot do (#272). Run the steps from the menu, or use a source checkout."))
         return 0
-    return action
+    print("  " + paint("Backup, Build, Test, then a rehearsal and the write, each with its own confirmation.", "dim"))
+    existing = sorted((p.parent for p in PRIVATE.glob("backups/x28-backup-*/ARCHIVE.sha256")), key=lambda d: d.stat().st_mtime, reverse=True)
+    if existing and ui.confirm(f"Use the finished backup {existing[0].name} instead of making a new one?", True):
+        cfg.set("backup", str(existing[0]))
+    else:
+        code = backup(fl, ui, cfg)
+        if code != 0:
+            return stopped("Backup", code)
+    for title, step in (("Build", build), ("Test", test_readonly)):
+        print("\n  " + paint(title, "bold"))
+        code = step(fl, ui, cfg)
+        if code != 0:
+            return stopped(title, code)
+    image = cfg.get("last_image")
+    if not image or not Path(image).is_dir():
+        print("  " + bad("No image from Build."))
+        return 1
+    base = ui.select("Image now on slot A (the base)", [("None / not known", None), ("Another folder...", "other")])
+    base = ui.text("Folder of the image now on slot A") if base == "other" else base
+    for title, mode in (("Rehearsal", "identical"), ("Write", "write")):
+        print("\n  " + paint(title, "bold"))
+        if mode == "write":
+            runs = verified_identicals(PRIVATE / "usb-probe")
+            if not runs:
+                return stopped("Rehearsal", 1)
+        code = flash(fl, ui, cfg, {"mode": mode, "candidate": image, "base": base})
+        if code != 0:
+            return stopped(title, code)
+    print("\n  " + good("Auto pilot finished. Power-cycle the router and check it boots."))
+    return 0
+
+
+def stopped(step, code):
+    print("  " + bad(f"Auto pilot stopped at {step} (exit {code}). Fix that, then run it again; finished steps are kept."))
+    return code or 1
 
 
 def test_readonly(fl, ui, cfg):
@@ -277,7 +315,7 @@ def test_readonly(fl, ui, cfg):
     return 0
 
 
-def flash(fl, ui, cfg):
+def flash(fl, ui, cfg, preset=None):
     import argparse
     from common import DEFAULT_BACKUP, PRIVATE, VENDOR_DA
     if fl.FROZEN:
@@ -285,12 +323,13 @@ def flash(fl, ui, cfg):
         return 0
     backup = ask_path(ui, cfg, "backup", "Folder with your verified backup", DEFAULT_BACKUP, True)
     loader = ask_path(ui, cfg, "loader", "Vendor download agent file (DA_BR.bin)", VENDOR_DA, False)
-    mode = ui.select("Which run?", [("Rehearsal: write the image, read it back, compare (identical)", "identical"),
+    preset = preset or {}
+    mode = preset.get("mode") or ui.select("Which run?", [("Rehearsal: write the image, read it back, compare (identical)", "identical"),
                                     ("Write the image (needs a verified rehearsal from the last 24 h)", "write")])
     images = [(d.name, str(d)) for d in image_dirs(PRIVATE / "build")]
-    candidate = ui.select("Image to flash", images + [("Another folder...", None)]) if images else None
+    candidate = preset.get("candidate") or (ui.select("Image to flash", images + [("Another folder...", None)]) if images else None)
     candidate = candidate or ui.text("Folder with the image (package_ubi output)")
-    base = ui.select("Image now on slot A (the base)", [("None / not known", None)] + images + [("Another folder...", "other")])
+    base = preset["base"] if "base" in preset else ui.select("Image now on slot A (the base)", [("None / not known", None)] + images + [("Another folder...", "other")])
     if base == "other":
         base = ui.text("Folder of the image now on slot A")
     prior = None
@@ -310,8 +349,7 @@ def flash(fl, ui, cfg):
     return code
 
 
-ACTIONS = {"backup": backup, "build": build, "test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash,
-           **{name: coming(name) for name in COMING}}
+ACTIONS = {"backup": backup, "build": build, "auto": autopilot, "test": test_readonly, "read": read_partition, "uart": watch_uart, "flash": flash}
 
 
 def run(fl, ui=None):

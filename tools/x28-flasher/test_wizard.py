@@ -102,13 +102,21 @@ class PlainPromptTests(unittest.TestCase):
         self.assertEqual(calls, ["test"])
         self.assertEqual((started, stopped), ([1], [1]))  # logger starts with the session and stops when it ends
 
-    def test_placeholder_entries_say_what_is_coming(self):
+    def test_autopilot_stops_at_the_first_failed_step_and_flashes_nothing(self):
         import io
         from contextlib import redirect_stdout
-        out = io.StringIO()
-        with redirect_stdout(out):
-            self.assertEqual(wizard.coming("auto")(None, None, None), 0)
-        self.assertIn("#286", out.getvalue())
+        ran = []
+        ui = types.SimpleNamespace(confirm=lambda *a, **k: False)
+        with redirect_stdout(io.StringIO()), mock.patch.object(wizard, "backup", lambda *a: ran.append("backup") or 3), \
+                mock.patch.object(wizard, "build", lambda *a: ran.append("build") or 0), mock.patch.object(wizard, "flash", lambda *a, **k: ran.append("flash") or 0):
+            code = wizard.autopilot(types.SimpleNamespace(FROZEN=False), ui, None)
+        self.assertEqual((code, ran), (3, ["backup"]))
+
+    def test_autopilot_does_not_flash_from_a_frozen_binary(self):
+        import io
+        from contextlib import redirect_stdout
+        with redirect_stdout(io.StringIO()), mock.patch.object(wizard, "backup", side_effect=AssertionError):
+            self.assertEqual(wizard.autopilot(types.SimpleNamespace(FROZEN=True), None, None), 0)
 
     def test_build_reports_a_missing_release_without_crashing(self):
         import io
