@@ -1,6 +1,6 @@
 name: Release
 
-# Every merge to main is a release (same flow as MQute): CI and the userspace build run,
+# A merge to main that touches the paths below is a release (docs-only and CI-only merges are not; run this by hand to force one): CI and the builds run,
 # the next SemVer is derived from the Conventional Commits since the last vX.Y.Z tag
 # (scripts/release.py), then the tag and a GitHub release are created. 0.x releases are
 # pre-releases. Assets are the OPEN userspace and the x28-flasher tool: vendor files never enter this public repo.
@@ -8,6 +8,16 @@ name: Release
 on:
   push:
     branches: [main]
+    paths:  # only what ends up in the release assets: userspace build inputs and the x28-flasher with the tools it bundles
+      - "tools/build/**"
+      - "tools/recovery/**"
+      - "tools/x28-flasher/**"
+      - "package/iwinfo-mtwifi/**"
+      - "package/x28-feed/**"
+      - ".github/workflows/release.yml"
+      - ".github/workflows/userspace.yml"
+      - ".github/workflows/x28-flasher.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

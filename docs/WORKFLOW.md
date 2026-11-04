@@ -17,7 +17,7 @@ Every piece of work starts as a GitHub issue (use the Task template). No issue, 
 
 An issue is ready when it has: a goal, acceptance criteria (checkboxes), priority, type, area, milestone.
 
-## Branches: trunk-based, every merge to `main` is a release
+## Branches: trunk-based, a merge that changes shippable files is a release
 
 There is only `main` (no `develop`, no `release/*` branches):
 
@@ -33,9 +33,9 @@ main ── feature/12-vendorsync-dhcp ──► PR ──► main ──► tag
 
 ## Releases: automatic, from the PR title
 
-`.github/workflows/release.yml` runs on every push to `main` (the same flow as the maintainer's other projects):
+`.github/workflows/release.yml` runs on pushes to `main` that touch the release inputs (userspace build files, the x28-flasher and the tools it bundles, and their workflows; see its `paths`) and on manual dispatch. Docs-only and CI-only merges build and tag nothing:
 
-1. CI (`ci.yml`) and the userspace build (`userspace.yml`) run.
+1. CI (`ci.yml`), the userspace build (`userspace.yml`) and the x28-flasher builds (`x28-flasher.yml`) run.
 2. `scripts/release.py next-version` derives the next SemVer from the Conventional Commits since the last
    `vX.Y.Z` tag: `type!:` or a `BREAKING CHANGE:` footer → major (minor while on 0.x), `feat` → minor,
    anything else → patch. The first release is **v0.1.0**.
