@@ -77,7 +77,19 @@ def auto_baud(port, rates=(921600, 115200, 57600, 38400, 19200, 9600), listen=2.
     return best[1] if best[0] >= 0.9 else None
 
 
+SESSION = {}  # the one running logger: the serial port can be opened only once, and every step needs the same log
+
+
+def log_dir():
+    """Beside the binary; a source checkout keeps it with the other run records."""
+    return Path(sys.executable).parent if FROZEN else PRIVATE / "usb-probe"
+
+
 def start_capture(ui=None):
+    """Start the background UART logger, or return the one already running (cap, path)."""
+    if SESSION.get("cap") and SESSION["cap"].is_alive():
+        print(f"  UART logger already running: {SESSION['path']} ({SESSION['cap'].bytes} bytes)")
+        return SESSION["cap"], SESSION["path"]
     ui = ui or Ui()
     port = ui.select("UART adapter", [(f"{d}  {desc}", d) for d, desc in list_ports()])
     baud = ui.select("Baud rate", [("Auto-detect (the router must be sending output)", 0), ("921600 (the X28 console)", 921600), ("115200", 115200)])
@@ -86,16 +98,24 @@ def start_capture(ui=None):
         baud = auto_baud(port)
         print(f"  detected {baud}" if baud else "  nothing readable heard (router silent or off); using 921600, the X28 console")
         baud = baud or 921600
-    path = PRIVATE / "usb-probe" / f"uart-{time.strftime('%Y%m%d-%H%M%S')}.log"
+    path = log_dir() / f"x28-uart-{time.strftime('%Y%m%d-%H%M%S')}.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     cap = Capture(port, baud, path)
     cap.start()
     time.sleep(3)
-    print(f"capturing {port} @ {baud} -> {path} ({cap.bytes} bytes so far)")
+    print(f"  UART logger running in the background: {port} @ {baud} -> {path} ({cap.bytes} bytes so far)")
     if not cap.bytes:
         print("  nothing received yet. A silent line is fine until the router boots, but the tools refuse a log\n"
               "  that was not updated within the last 60 s, so the baud rate must be right (the X28 console is 921600) and the router must be sending.")
+    SESSION.update(cap=cap, path=path)
     return cap, path
+
+
+def stop_capture():
+    if SESSION.get("cap"):
+        SESSION["cap"].stop_event.set()
+        print(f"  UART log kept: {SESSION['path']}")
+        SESSION.clear()
 
 
 def flash_cmd(args, uart, backup_copy):
@@ -148,7 +168,6 @@ def cmd_flash(args, ui=None):
     try:
         return run_tool("slot_entry.py", flash_cmd(args, uart, copy))
     finally:
-        cap.stop_event.set()
         print(f"UART log: {uart}")
 
 

@@ -62,10 +62,12 @@ class PlainPromptTests(unittest.TestCase):
 
     def test_menu_loop_runs_an_action_then_quits(self):
         calls = []
-        fl = types.SimpleNamespace(PRIVATE=Path(tempfile.mkdtemp()))
-        with mock.patch.dict(wizard.ACTIONS, {"test": lambda *a: calls.append("test")}), mock.patch("builtins.input", side_effect=["4", "8"]):
+        started, stopped = [], []
+        fl = types.SimpleNamespace(PRIVATE=Path(tempfile.mkdtemp()), start_capture=lambda ui: started.append(1), stop_capture=lambda: stopped.append(1))
+        with mock.patch.dict(wizard.ACTIONS, {"test": lambda *a: calls.append("test")}), mock.patch("builtins.input", side_effect=["", "4", "8"]):
             self.assertEqual(wizard.run(fl, self.ui), 0)
         self.assertEqual(calls, ["test"])
+        self.assertEqual((started, stopped), ([1], [1]))  # logger starts with the session and stops when it ends
 
     def test_placeholder_entries_say_what_is_coming(self):
         import io

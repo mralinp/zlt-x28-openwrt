@@ -144,7 +144,8 @@ def read_partition(fl, ui, cfg):
 
 
 def watch_uart(fl, ui, cfg):
-    return fl.cmd_uart(None, ui)
+    fl.start_capture(ui)  # runs in the background until you quit; flash, read and test use the same log
+    return 0
 
 
 def coming(name):
@@ -207,12 +208,20 @@ def run(fl, ui=None):
     ui = ui or Ui()
     cfg = Config(fl.PRIVATE / "x28-flasher.json")
     print("\n  x28-flasher: ZLT X28 flash and recovery\n")
-    while True:
-        try:
-            action = ui.select("What do you want to do?", MENU)
-            if action == "quit":
-                return 0
-            ACTIONS[action](fl, ui, cfg)
-        except KeyboardInterrupt:
-            print("\n  cancelled")
-        print()
+    try:
+        if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it.", True):
+            fl.start_capture(ui)
+    except KeyboardInterrupt:
+        print("\n  skipped; start it from the menu before flashing")
+    try:
+        while True:
+            try:
+                action = ui.select("What do you want to do?", MENU)
+                if action == "quit":
+                    return 0
+                ACTIONS[action](fl, ui, cfg)
+            except KeyboardInterrupt:
+                print("\n  cancelled")
+            print()
+    finally:
+        fl.stop_capture()
