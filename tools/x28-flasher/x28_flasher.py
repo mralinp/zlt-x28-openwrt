@@ -122,6 +122,8 @@ def tool_paths(args):
 
 
 def cmd_flash(args):
+    if FROZEN:  # auditor gate (#272): lifted by the PR that asserts the compiled library and tool sources equal the bundled copies
+        sys.exit("frozen builds are read-only until the build-time equality gate exists (#272); flash from a source checkout")
     loader = Path(args.loader) if args.loader else VENDOR_DA
     if not loader.is_file():
         sys.exit(f"download agent missing: {loader}")

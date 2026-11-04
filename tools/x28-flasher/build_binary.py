@@ -54,6 +54,8 @@ def main():
     if head != MTKCLIENT_COMMIT or Path(sys.executable).resolve() != (home / "venv/bin/python").resolve():
         sys.exit("BUILD_HOME/src must be the pinned commit and this must run under BUILD_HOME/venv")
 
+    if subprocess.check_output(["git", "-C", home / "src", "status", "--porcelain", "--ignored"], text=True).strip():
+        sys.exit("BUILD_HOME/src is not a clean checkout of the pinned commit")  # the identity check only covers xml_lib.py
     run(sys.executable, "-m", "pip", "install", "-q", "--no-deps", home / "src")
     pkg = next((home / "venv").glob("lib/python3*/site-packages/mtkclient"))
     for rel, old, new, required in PATCHES:
@@ -73,7 +75,10 @@ def main():
     xml = host_identity()
     work = args.out.resolve().parent / "build-x28-flasher"
     work.mkdir(parents=True, exist_ok=True)
-    (work / "identity.json").write_text(json.dumps({"commit": MTKCLIENT_COMMIT, "xml_lib_sha256": hashlib.sha256(xml.encode()).hexdigest()}))
+    from importlib.metadata import version
+    tools = {n: version(n) for n in ("pyinstaller", "pyusb", "pycryptodome", "pycryptodomex", "pyserial", "colorama")}
+    (work / "identity.json").write_text(json.dumps({"commit": MTKCLIENT_COMMIT, "xml_lib_sha256": hashlib.sha256(xml.encode()).hexdigest(),
+                                                    "python": sys.version.split()[0], "build_tools": tools}, indent=1))
     data = [(work / "identity.json", "."), (pkg.parent / XML, str(Path(XML).parent))]
     data += [(f, "recovery") for f in (TOOLS / "recovery").glob("*.py") if not f.name.startswith("test_")]
     data += [(TOOLS / "build" / n, "build") for n in BUILD_FILES]
