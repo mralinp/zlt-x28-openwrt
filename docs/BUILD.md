@@ -559,7 +559,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   `iptables-mod-extra` wants `kmod-ipt-extra`, and the kernel has its `owner`, `addrtype`, `pkttype` and `quota` matches
   but not `cgroup`. `first_boot.py` does what Passwall2's `uci-defaults`
   would (the profile strips them): its config with `prefer_nft=0` and `tcp_proxy_way=tproxy`, the firewall include,
-  `dhcp localuse`, its `ucitrack` entry and the feeds. Passwall2 keeps its boot link, because LuCI's apply skips disabled services; `x28-kmods`
+  `dhcp localuse`, its `ucitrack` entry and the feeds. Passwall2 keeps its boot and stop links (`S99`, `K15`; `enabled` needs both), because LuCI's apply skips services that are not enabled (#297); `x28-kmods`
   starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
   LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
   [PASSWALL2](PASSWALL2.md).

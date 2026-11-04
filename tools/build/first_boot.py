@@ -296,9 +296,11 @@ def integrate(stage,key,stock_path,output,kmods_dir=None,ipks=()):
     if 'lib/preinit/00_preinit.conf' in tree:
         config=tree['lib/preinit/00_preinit.conf'][1].decode()
         put('lib/preinit/00_preinit.conf',config+'\npi_preinit_no_failsafe="y"\n')
-    def enable(start,service):
+    def enable(start,service,stop=None):
         if 'etc/init.d/'+service not in tree:raise ValueError('missing service: '+service)
-        link=tarfile.TarInfo(f'etc/rc.d/S{start}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
+        for kind,n in (('S',start),('K',stop)):
+            if n is None:continue
+            link=tarfile.TarInfo(f'etc/rc.d/{kind}{n}{service}');link.type=tarfile.SYMTYPE;link.linkname='../init.d/'+service;tree[link.name]=(link,b'')
     put('etc/init.d/x28-switch',SWITCH_INIT,0o755);enable(18,'x28-switch')
     put('sbin/x28-leds',(LEDS/'x28-leds').read_text(),0o755)
     put('sbin/x28-wps',(WIFI/'x28-wps').read_text(),0o755)
@@ -461,7 +463,7 @@ config dhcp 'wan'
         put('etc/opkg/keys/'+PASSWALL_KEY_ID,(FEED_KEY.parent/'passwall.pub').read_text())
         # LuCI's apply (luci-reload) restarts only enabled services. Its boot start waits start_delay (60 s); x28-kmods
         # loads TPROXY about 30 s after boot and starts it again then, in case the modules came late.
-        enable(99,'passwall2')
+        enable(99,'passwall2',15)  # its init has STOP=15: ucitrack skips a service whose `enabled` needs the K link too (#297)
         if 'etc/config/ucitrack' in tree and "config passwall2\n" not in tree['etc/config/ucitrack'][1].decode():
             put('etc/config/ucitrack',tree['etc/config/ucitrack'][1].decode().rstrip('\n')+"\n\nconfig passwall2\n\toption init 'passwall2'\n")
     put('etc/opkg/keys/'+FEED_KEY_ID,FEED_KEY.read_text())

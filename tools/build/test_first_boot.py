@@ -215,6 +215,7 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(any(n.startswith('lib/modules/4.19.205/') for n in tree))  # out of modprobe's reach
         self.assertIn("config passwall2\n\toption init 'passwall2'\n",tree['etc/config/ucitrack'][1].decode())
         self.assertEqual(tree['etc/rc.d/S99passwall2'][0].linkname,'../init.d/passwall2')  # luci-reload skips disabled services
+        self.assertEqual(tree['etc/rc.d/K15passwall2'][0].linkname,'../init.d/passwall2')  # `enabled` needs START and STOP links, else ucitrack registers no trigger (#297)
         self.assertEqual(tree['etc/x28-killswitch.sh'][1],Path(f.__file__).with_name('x28-killswitch.sh').read_bytes())
         self.assertEqual(tree['etc/x28-killswitch.sh'][0].mode,0o755)
         self.assertIn("config include 'x28_killswitch'",tree['etc/config/firewall'][1].decode())

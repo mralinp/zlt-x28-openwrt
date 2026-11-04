@@ -53,6 +53,26 @@ Live results and the untested clean-flash/reboot boundary: [TESTING 40](TESTING.
 To clear the guard after turning Passwall2 off in UCI, run `/etc/x28-killswitch.sh`; no networking restart is
 needed. Disabling only the fw3 include does not opt out: the Passwall2 service hooks still apply it.
 
+## Turning it on for the first time
+
+A flashed image ships Passwall2 **off**, with the stock defaults and no node of yours. Nothing here is changed in the image;
+these are the steps and traps seen on the unit (2026-11-04).
+
+1. Add your node (Passwall2 > Node List), then set **Node** in Basic Settings to it, not to `rulenode`. `rulenode` is the
+   package's split-routing node: its default node is the placeholder `examplenode`, and its `IR` group needs `geosite:ir`.
+   The `geosite.dat` in the image (Sep 2024) has no usable `IR` entry, so xray refuses to start
+   (`failed to check code IR from geosite.dat > EOF`) while the firewall rules still load. That redirects LAN traffic to a dead
+   TPROXY port and the kill switch blocks the direct path, so the LAN is offline until you stop the service.
+2. **Save & Apply must restart Passwall2.** Its init is not procd, so LuCI reaches it through `ucitrack`, which registers a
+   trigger only where `/etc/init.d/passwall2 enabled` succeeds. That needs both `S99passwall2` and `K15passwall2`
+   (`START=99`, `STOP=15`). Images built before #297 had only the S link, so Save & Apply did nothing: run
+   `ssh x28 '/etc/init.d/passwall2 restart'` (or `/etc/init.d/passwall2 enable`) and check `pgrep -af bin/xray` and
+   `tail /tmp/log/passwall2.log`. After a reflash of a fixed image, confirm the switch starts xray by itself.
+3. **IPv6:** `ipv6_tproxy` is off by default (Passwall2 > Other Settings > Forwarding Settings > IPv6 TProxy). While Passwall2 is
+   enabled the kill switch rejects direct IPv6 forwarding, so LAN clients have no IPv6 until it is ticked and the service
+   restarted. The Linksys-style case of a second router behind the X28 shows it as "IPv4 works, IPv6 does not".
+4. If the LAN goes dark after a change, `ssh x28 '/etc/init.d/passwall2 stop'` brings direct traffic back at once.
+
 ## State of the test unit
 
 Installed by hand the way the image will have it, not yet from an image:
