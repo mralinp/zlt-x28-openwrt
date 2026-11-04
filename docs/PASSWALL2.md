@@ -58,11 +58,12 @@ needed. Disabling only the fw3 include does not opt out: the Passwall2 service h
 A flashed image ships Passwall2 **off**, with the stock defaults and no node of yours. Nothing here is changed in the image;
 these are the steps and traps seen on the unit (2026-11-04).
 
-1. Add your node (Passwall2 > Node List), then set **Node** in Basic Settings to it, not to `rulenode`. `rulenode` is the
-   package's split-routing node: its default node is the placeholder `examplenode`, and its `IR` group needs `geosite:ir`.
-   The `geosite.dat` in the image (Sep 2024) has no usable `IR` entry, so xray refuses to start
-   (`failed to check code IR from geosite.dat > EOF`) while the firewall rules still load. That redirects LAN traffic to a dead
-   TPROXY port and the kill switch blocks the direct path, so the LAN is offline until you stop the service.
+1. The image carries no node. Add yours (Passwall2 > Node List), then set **Node** in Basic Settings to it. The stock
+   default for **Node** is `rulenode`, the package's split-routing node, whose default node is the placeholder `examplenode`;
+   leave it and there is nothing real to proxy through. A `rulenode` group whose rule needs a `geosite` entry missing from the
+   image's `geosite.dat` (Sep 2024), such as `IR` (`failed to check code IR from geosite.dat > EOF`), makes xray refuse to
+   start while the firewall rules still load. That redirects LAN traffic to a dead TPROXY port and the kill switch blocks the
+   direct path, so the LAN is offline until you stop the service. The stock `CN` group is fine.
 2. **Save & Apply must restart Passwall2.** Its init is not procd, so LuCI reaches it through `ucitrack`, which registers a
    trigger only where `/etc/init.d/passwall2 enabled` succeeds. That needs both `S99passwall2` and `K15passwall2`
    (`START=99`, `STOP=15`). Images built before #297 had only the S link, so Save & Apply did nothing: run
