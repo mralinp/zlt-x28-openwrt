@@ -5,6 +5,7 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import images
 
@@ -67,6 +68,48 @@ class LocalTests(unittest.TestCase):
         self.assertIn("/w/stage", cmds[1])
         self.assertIn("/w/profile:/profile:ro", cmds[3])
         self.assertEqual(cmds[3][-1], "/out/native-ubi-local-1")
+
+
+def public_inputs(tamper=False):
+    blobs, assets = {}, {"latest": [], "feed-2": []}
+
+    def add(tag, name, data):
+        url = f"u/{tag}/{name}"
+        blobs[url] = data
+        assets[tag].append({"name": name, "browser_download_url": url, "digest": "sha256:" + images.sha256(b"x" if tamper else data)})
+
+    add("latest", "x28-userspace-v1-openwrt-23.05.5-armsr-armv8-rootfs.tar.gz", b"userspace")
+    add("latest", "SHA256SUMS", b"ignored")
+    for name in ("ipset_1.ipk", "libipset13_1.ipk", "x28-ipset-kernel_1.ipk", "kmod-other.ipk"):
+        add("feed-2", name, name.encode())
+    for name, (base, want) in images.EXTRA_IPKS.items():
+        blobs[base + name] = name.encode()
+
+    def fetch(url):
+        if "api.github" in url:
+            tag = "feed-2" if url.endswith("tags/feed-2") else "latest"
+            rels = [{"tag_name": "v1", "assets": assets[tag]}]
+            return json.dumps(rels if tag == "latest" else rels[0]).encode()
+        return blobs[url]
+    return fetch
+
+
+class InputTests(unittest.TestCase):
+    def test_extra_ipk_hashes_are_checked(self):
+        with mock.patch.dict(images.EXTRA_IPKS, {n: (b, "0" * 64) for n, (b, _) in images.EXTRA_IPKS.items()}):
+            with self.assertRaises(ValueError):
+                images.fetch_inputs(Path(tempfile.mkdtemp()), fetch=public_inputs())
+
+    def test_a_mismatch_keeps_nothing(self):
+        dest = Path(tempfile.mkdtemp())
+        with self.assertRaises(ValueError):
+            images.fetch_inputs(dest, fetch=public_inputs(tamper=True))
+        self.assertEqual(list(dest.iterdir()), [])
+
+    def test_stock_extraction_is_offline_and_read_only(self):
+        cmd = images.stock_command(Path("/b/rootfs_b.bin"), Path("/o"), Path("/r"))
+        self.assertIn("none", cmd)
+        self.assertIn("/b/rootfs_b.bin:/in/rootfs_b.bin:ro", cmd)
 
 
 if __name__ == "__main__":

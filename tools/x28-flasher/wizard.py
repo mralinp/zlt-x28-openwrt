@@ -226,23 +226,34 @@ def build_local(fl, ui, cfg, dest):
     import images
     import shutil
     import subprocess
-    from common import PRIVATE, REPO
-    if not shutil.which("docker"):
-        print("  " + bad("Docker is not installed or not running: the UBI packaging step runs in a container."))
+    from common import DEFAULT_BACKUP, PRIVATE, REPO
+    if not shutil.which("docker") or subprocess.call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL):
+        print("  " + bad("Docker is not installed or not running: extracting the stock rootfs and packaging the image run in a container."))
         return 1
-    inputs = {
-        "stock": ask_path(ui, cfg, "build_stock", "Stock rootfs archive (rootfs-b-system.tar.gz)", "", False),
-        "modern": ask_path(ui, cfg, "build_modern", "OpenWrt userspace rootfs tarball (userspace build output)", "", False),
-        "key": ask_path(ui, cfg, "build_key", "Your SSH public key for the image", Path.home() / ".ssh/id_ed25519.pub", False),
-        "kmods": ask_path(ui, cfg, "build_kmods", "Folder with the built kernel modules", PRIVATE / "kmods", True),
-    }
-    for key, msg, default in (("extra_ipks", "Folder with alsa-lib and libstdcpp6 .ipk files", PRIVATE / "third-party"),
-                              ("feed", "Folder with the ipset, libipset13 and x28-ipset-kernel .ipk files", PRIVATE / "feed-2")):
-        folder = Path(ask_path(ui, cfg, "build_" + key, msg, default, True))
-        inputs[key] = sorted(str(p) for p in folder.rglob("*.ipk"))
-        if not inputs[key]:
-            print("  " + bad(f"no .ipk files under {folder}"))
-            return 1
+    backup = Path(ask_path(ui, cfg, "backup", "Folder with your verified backup", DEFAULT_BACKUP, True))
+    rootfs_b = next(iter(sorted(backup.glob("images/*-rootfs_b.bin"))), None)
+    if not rootfs_b:
+        print("  " + bad(f"no rootfs_b image in {backup}/images"))
+        return 1
+    cache = dest / "inputs"
+    cache.mkdir(parents=True, exist_ok=True)
+    try:
+        print("  " + paint("Fetching the public inputs (userspace, feed packages, OpenWrt ipks), each checked against its SHA-256...", "dim"))
+        inputs = images.fetch_inputs(cache)
+        stock = cache / "rootfs-b-system.tar.gz"
+        if not stock.is_file():
+            print("  " + paint("Extracting the stock rootfs from your backup in the container...", "dim"))
+            if subprocess.call(["docker", "build", "-q", "-t", "x28-firmware-tools:ubi", "-f", str(REPO / "tools/firmware/Dockerfile"), str(REPO / "tools/firmware")], stdout=subprocess.DEVNULL) \
+                    or subprocess.call(images.stock_command(rootfs_b, cache, REPO)) or not stock.is_file() or stock.stat().st_size < 10_000_000:
+                stock.unlink(missing_ok=True)
+                print("  " + bad("Could not extract the stock rootfs."))
+                return 1
+    except (RuntimeError, ValueError, OSError) as err:
+        print("  " + bad(str(err)))
+        return 1
+    inputs["stock"] = str(stock)
+    inputs["key"] = ask_path(ui, cfg, "build_key", "Your SSH public key for the image", Path.home() / ".ssh/id_ed25519.pub", False)
+    inputs["kmods"] = ask_path(ui, cfg, "build_kmods", "Folder with the built kernel modules (private SDK build)", PRIVATE / "kmods", True)
     work = dest / f"local-{images.stamp()}"
     out = dest / f"native-ubi-local-{images.stamp()}"
     print("  " + paint("Writes only under private/build. Nothing touches the router.", "dim"))

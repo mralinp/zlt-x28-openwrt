@@ -581,6 +581,9 @@ The wizard's **Build** entry puts a flashable image folder (`manifest.json` and 
   `sha256sums` file naming it. The wizard checks the archive against `sha256sums` and the image against the manifest, and
   unpacks the two files by name. This is what #254 must publish; until then the wizard says no release has an image.
   The checksum only proves the download is intact: Flash still asks the owner to type the image hash.
-- **Local build** (source checkout and Docker only): asks for the stock rootfs archive, the userspace tarball, an SSH public
-  key, the kernel-module folder and the two `.ipk` folders, then runs `stage_native.py`, `first_boot.py` and `package_ubi.py`
-  in the container exactly as above, into `private/build/local-<time>` and `native-ubi-local-<time>`.
+- **Local build** (source checkout and Docker only, #311): fetches what is public into `private/build/inputs`, each file checked
+  against a SHA-256 (the newest release's userspace tarball and the `feed-2` ipset packages by GitHub's asset digest; `alsa-lib`
+  and `libstdcpp6` from downloads.openwrt.org by pinned hash), and extracts the stock rootfs from the backup's `rootfs_b` image
+  in the tools container (no network, read-only input). It asks only for your SSH public key and the kernel-module folder
+  (built against the private SDK, so not fetchable), then runs `stage_native.py`, `first_boot.py` and `package_ubi.py` in the
+  container as above, into `private/build/local-<time>` and `native-ubi-local-<time>`.
