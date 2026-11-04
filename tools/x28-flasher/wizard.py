@@ -195,7 +195,10 @@ def backup(fl, ui, cfg):
     argv = ["--out", out, "--loader", loader] + ([] if twice else ["--no-verify"])
     fl.power_off_countdown()
     code = fl.run_tool("usb_backup.py", argv)
-    print("  " + (good(f"Backup saved in {out}") if code == 0 else bad(f"Backup stopped (exit {code}). Run it again with the same folder to resume.")))
+    if code == 3:
+        print("  " + warn("Paused: a best-effort partition was cut short. Power-cycle the router and run Backup again to continue."))
+    else:
+        print("  " + (good(f"Backup saved in {out}") if code == 0 else bad(f"Backup stopped (exit {code}). Run it again with the same folder to resume.")))
     return code
 
 

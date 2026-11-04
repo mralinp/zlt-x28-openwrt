@@ -20,6 +20,8 @@ from common import fmt_eta, image_name, parse_mtd, sha256_file
 
 LAYOUT = Path(__file__).with_name("x28-mtd.txt")
 PARTIAL = "SHA256SUMS.partial"
+DEGRADED = "DEGRADED.json"
+BEST_EFFORT = {"expdb"}  # crash logs the running system rewrites; the download agent stops reading this one at 18 MiB (#284)
 CHUNK = 4 << 20  # one 20 MiB READ-FLASH came back at 18 MiB on this DA, twice; small reads also show which piece fails
 
 
@@ -43,7 +45,31 @@ def read_chunked(readflash, part, path, chunk=CHUNK, say=print):
     return True
 
 
-def write_backup(out, parts, read, verify=True, say=print):
+class NeedsRestart(Exception):
+    """A best-effort partition was cut short: the session is over but the backup can be resumed."""
+
+
+def read_whole(read, p, path, best_effort):
+    """Read a partition into path. Returns the bytes really read: the full size, or for a best-effort partition the whole pieces
+    before the fault with the rest filled with 0xFF. Anything else short raises."""
+    if read(p, path) and path.stat().st_size == p["size"]:
+        return p["size"]
+    good = path.stat().st_size if path.exists() else 0
+    if p["name"] not in best_effort or good >= p["size"]:
+        raise RuntimeError(f"read of {p['name']} failed or came back short; run again with the same --out to resume")
+    with open(path, "ab") as f:
+        f.write(b"\xff" * (p["size"] - good))
+    return good
+
+
+def note_degraded(out, p, good):
+    path = out / DEGRADED
+    data = json.loads(path.read_text()) if path.exists() else {}
+    data[p["name"]] = {"read": good, "size": p["size"]}
+    path.write_text(json.dumps(data, indent=1))
+
+
+def write_backup(out, parts, read, verify=True, say=print, best_effort=BEST_EFFORT):
     """read(part, path) -> bool fills path with the partition's bytes. Returns the list of (sha256, relative path)."""
     images = out / "images"
     images.mkdir(parents=True, exist_ok=True)
@@ -60,12 +86,18 @@ def write_backup(out, parts, read, verify=True, say=print):
             finished += p["size"]
             continue
         say(f"[{i}/{len(parts)}] reading {p['name']} ({p['size'] / 2**20:.1f} MiB)")
-        if not read(p, path) or path.stat().st_size != p["size"]:
-            raise RuntimeError(f"read of {p['name']} failed or came back short; run again with the same --out to resume")
+        good = read_whole(read, p, path, best_effort)
         digest = sha256_file(path)
+        if good < p["size"]:
+            # The download agent stops answering after a fault, so this partition cannot be read twice and the session cannot go on.
+            note_degraded(out, p, good)
+            with partial.open("a") as f:
+                f.write(f"{digest}  {rel}\n")
+            raise NeedsRestart(f"{p['name']}: only the first {good >> 20} of {p['size'] >> 20} MiB could be read (the rest is filled with 0xFF "
+                               "and noted). Power-cycle the router and run Backup again with the same folder to continue.")
         if verify:
             again = out / (name + ".verify")
-            if not read(p, again) or sha256_file(again) != digest:
+            if read_whole(read, p, again, best_effort) != good or sha256_file(again) != digest:
                 again.unlink(missing_ok=True)
                 raise RuntimeError(f"two reads of {p['name']} disagree; nothing was kept for it")
             again.unlink()
@@ -89,6 +121,11 @@ def seal(out, sums, layout_text):
         tar.add(out / "mtd.txt", arcname="mtd.txt")
         tar.add(out / "SHA256SUMS", arcname="SHA256SUMS")
     (out / "ARCHIVE.sha256").write_text(f"{sha256_file(archive)}  {archive.name}\n")
+    degraded = json.loads((out / DEGRADED).read_text()) if (out / DEGRADED).exists() else {}
+    if degraded:
+        (out / "BACKUP-NOTES.txt").write_text("This backup is complete except for best-effort partitions the download agent could not read in full.\n"
+                                             "The unread part of each is filled with 0xFF.\n" + "".join(
+            f"{n}: bytes {d['read']:#x}..{d['size']:#x} not read (read {d['read'] >> 20} of {d['size'] >> 20} MiB)\n" for n, d in degraded.items()))
     (out / PARTIAL).unlink(missing_ok=True)
     return archive
 
@@ -113,11 +150,16 @@ def main():
             return read_chunked(lambda addr, n, name: mtk.daloader.readflash(addr=addr, length=n, filename=name, parttype=None, display=False) is True,
                                 p, path, say=lambda m, **kw: print(m, flush=True, **kw))
         sums = write_backup(args.out.resolve(), parts, read, verify=not args.no_verify)
+    except NeedsRestart as stop:
+        print(f"\n{stop}")
+        sys.exit(3)
     finally:
         print("cycle the modem's power to boot it normally")
         mtk.port.close()
     archive = seal(args.out.resolve(), sums, layout_text)
     print(f"backup complete: {len(sums)} partitions, archive {archive} ({sha256_file(archive)[:12]})")
+    if (args.out / "BACKUP-NOTES.txt").exists():
+        print("NOTE: " + (args.out / "BACKUP-NOTES.txt").read_text().splitlines()[-1] + "  (see BACKUP-NOTES.txt)")
     problems.report()
 
 

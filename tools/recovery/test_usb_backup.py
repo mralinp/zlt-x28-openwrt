@@ -52,6 +52,26 @@ class BackupTests(unittest.TestCase):
         usb_backup.write_backup(self.out, self.parts, fake_read(calls), say=lambda *_: None)
         self.assertEqual(calls, ["beta", "beta"])
 
+    def test_best_effort_partition_is_padded_noted_and_the_run_resumes_after_a_restart(self):
+        parts = common.parse_mtd('dev:    size   erasesize  name\nmtd0: 00000040 00040000 "alpha"\nmtd1: 00000040 00040000 "expdb"\nmtd2: 00000040 00040000 "gamma"\n')
+
+        def read(p, path):
+            if p["name"] == "expdb":
+                Path(path).write_bytes(b"e" * 0x10)  # only the first 16 of 64 bytes come back
+                return False
+            Path(path).write_bytes(p["name"].encode() * 64)
+            Path(path).write_bytes(Path(path).read_bytes()[:p["size"]])
+            return True
+        with self.assertRaises(usb_backup.NeedsRestart):  # the agent is stuck after the fault: stop, keep what is done
+            usb_backup.write_backup(self.out, parts, read, say=lambda *_: None)
+        self.assertEqual((self.out / "images" / common.image_name(parts[1])).read_bytes(), b"e" * 0x10 + b"\xff" * 0x30)
+        sums = usb_backup.write_backup(self.out, parts, read, say=lambda *_: None)  # after a power cycle: expdb is kept, gamma is read
+        self.assertEqual(len(sums), 3)
+        usb_backup.seal(self.out, sums, SMALL)
+        self.assertIn("expdb: bytes 0x10..0x40 not read", (self.out / "BACKUP-NOTES.txt").read_text())
+        with self.assertRaisesRegex(RuntimeError, "short"):  # alpha is not best-effort
+            usb_backup.read_whole(lambda p, path: False, parts[0], self.out / "x.bin", usb_backup.BEST_EFFORT)
+
     def test_short_read_fails(self):
         def short(p, path):
             Path(path).write_bytes(b"x")
