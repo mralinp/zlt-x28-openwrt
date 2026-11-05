@@ -73,8 +73,8 @@ class Ui:
 
     def select(self, msg, choices):
         """choices: [(label, value)]"""
-        if self.fancy:
-            return self._ask(questionary.select(msg, choices=[questionary.Choice(label, value=value) for label, value in choices], style=STYLE, qmark="\u276f"))
+        if self.fancy:  # by index: questionary returns the label for a None value, which would turn "None / not known" into a base image
+            return choices[self._ask(questionary.select(msg, choices=[questionary.Choice(label, value=i) for i, (label, _) in enumerate(choices)], style=STYLE, qmark="\u276f"))][1]
         return dict(choices)[pick([label for label, _ in choices], msg)]
 
     def text(self, msg, default=""):

@@ -143,5 +143,26 @@ class PlainPromptTests(unittest.TestCase):
         self.assertEqual(seen[0][-1], None)
 
 
+class FancySelectTests(unittest.TestCase):
+    """questionary returns a choice's label when its value is None (#325); select must hand back the real value."""
+    def test_a_none_choice_comes_back_as_none(self):
+        class Choice:
+            def __init__(self, label, value=None):
+                self.value = label if value is None else value  # what questionary does
+
+        class Question:
+            def __init__(self, choices, pick):
+                self.choices, self.pick = choices, pick
+
+            def ask(self):
+                return self.choices[self.pick].value
+
+        for pick, want in ((0, None), (1, "dir"), (2, "other")):
+            fake = types.SimpleNamespace(Choice=Choice, select=lambda msg, choices, **kw: Question(choices, pick))
+            with mock.patch.object(wizard, "questionary", fake):
+                ui = wizard.Ui(fancy=True)
+                self.assertEqual(ui.select("Image now on slot A", [("None / not known", None), ("native-ubi", "dir"), ("Another folder...", "other")]), want)
+
+
 if __name__ == "__main__":
     unittest.main()
