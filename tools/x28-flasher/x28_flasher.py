@@ -129,6 +129,8 @@ def flash_cmd(args, uart, backup_copy):
     for flag in ("base_dir", "prior_identical"):
         if getattr(args, flag):
             cmd += ["--" + flag.replace("_", "-"), getattr(args, flag)]
+    if getattr(args, "no_ssh", False):
+        cmd.append("--no-ssh")
     return cmd
 
 
