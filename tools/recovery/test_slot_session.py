@@ -298,14 +298,15 @@ class UnitPinTests(unittest.TestCase):
         return bytes(misc)
 
     def images(self, record):
-        return {'misc': self.misc_with(record), 'rootfs_a': b'A' * 64, 'rootfs_b': b'B' * 0x2100000, 'boot_para': b'P' * 32}
+        return {'misc': self.misc_with(record), 'rootfs_a': bytes(range(256)) * 0x40000, 'rootfs_b': b'UBI#' + (bytes(range(256)) * 0x40000)[4:],
+                'boot_para': bytes(range(256)) * 0x2000}
 
     def test_pins_are_the_hashes_of_this_units_images(self):
         pins = s.unit_pins(self.images(self.SECOND_UNIT_RECORD))
-        self.assertEqual(pins['rootfs_a'], s.digest(b'A' * 64))
-        self.assertEqual(pins['rootfs_b_head'], s.digest(b'B' * 0x2000000))
+        self.assertEqual(pins['rootfs_a'], s.digest(self.images(self.SECOND_UNIT_RECORD)['rootfs_a']))
+        self.assertEqual(pins['rootfs_b_head'], s.digest(self.images(self.SECOND_UNIT_RECORD)['rootfs_b'][:0x2000000]))
         self.assertEqual(pins['misc'], s.digest(self.misc_with(self.SECOND_UNIT_RECORD)))
-        self.assertEqual(s.unit_pins(self.images(s.MISC_BEFORE))['boot_para'], s.digest(b'P' * 32))
+        self.assertEqual(s.unit_pins(self.images(s.MISC_BEFORE))['boot_para'], s.digest(self.images(s.MISC_BEFORE)['boot_para']))
 
     def test_misc_must_be_the_stock_b_selected_record_in_all_four_copies(self):
         for bad in (s.MISC_AFTER, bytes.fromhex('00414230ffffffff0e0001020f000100'), b'\xff' * 16):
@@ -320,6 +321,14 @@ class UnitPinTests(unittest.TestCase):
         short['misc'] = short['misc'][:-1]
         with self.assertRaises(ValueError):
             s.unit_pins(short)
+
+    def test_blank_short_or_non_ubi_images_are_refused(self):
+        for name, bad in (('rootfs_a', b'\xff' * 0x4000000), ('rootfs_a', b'\0' * 0x4000000), ('rootfs_a', b'A' * 64),
+                          ('boot_para', b'\xff' * 0x200000), ('rootfs_b', bytes(range(256)) * 0x40000), ('rootfs_b', b'UBI#')):
+            images = self.images(s.MISC_BEFORE)
+            images[name] = bad
+            with self.assertRaises(ValueError, msg=name):
+                s.unit_pins(images)
 
     def test_default_pins_are_the_first_unit_and_change_nothing(self):
         self.assertEqual(s.common_guards(), s.COMMON)

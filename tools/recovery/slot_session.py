@@ -78,11 +78,17 @@ MISC_B_SELECTED = re.compile(rb'\x00AB0\xff\xff\xff\xff\x0e\x00\x01[\x00\x01]\x0
 
 
 def unit_pins(images):
-    """The per-unit pins of a verified backup. images: {partition name: bytes}. Raises unless misc is the stock B-selected record."""
+    """The per-unit pins of a verified backup. images: {partition name: bytes}. Raises unless misc is the stock B-selected record
+    and rootfs_a/rootfs_b/boot_para are full-size and not blank."""
     misc = images['misc']
     if len(misc) != 0x100000 or any(not MISC_B_SELECTED.fullmatch(misc[off:off + 16]) for off in MISC_COPIES) \
             or len({misc[off:off + 16] for off in MISC_COPIES}) != 1:
         raise ValueError('misc is not the stock B-selected record in all four copies')
+    for name, size in (('rootfs_a', 0x4000000), ('rootfs_b', 0x4000000), ('boot_para', 0x200000)):
+        if len(images[name]) != size or len(set(images[name])) < 3:  # right size, and not blank (all 0xff or zero)
+            raise ValueError(f'{name} is not a plausible stock image')
+    if images['rootfs_b'][:4] != b'UBI#':
+        raise ValueError('rootfs_b is not a stock UBI image')
     return {'rootfs_a': digest(images['rootfs_a']), 'rootfs_b': digest(images['rootfs_b']),
             'rootfs_b_head': digest(images['rootfs_b'][:ROOTFS_B_HEAD]), 'misc': digest(misc), 'boot_para': digest(images['boot_para'])}
 

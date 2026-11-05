@@ -84,7 +84,10 @@ def load_inputs(backup, loader, target, mode, candidate_dir, base_dir=None):
             raise ValueError('base does not match its build manifest')
     if target == 'rootfs_a':
         head = base_head(base, json.loads((base_dir / 'manifest.json').read_text())) if base else 0
-        pins = session.unit_pins({n: Path(by_name[n]['image']).read_bytes() for n in ('misc', 'rootfs_a', 'rootfs_b', 'boot_para')})
+        images = {n: Path(by_name[n]['image']).read_bytes() for n in ('misc', 'rootfs_a', 'rootfs_b', 'boot_para')}
+        if any(digest(images[n]) != by_name[n]['sha256'] for n in images):  # pin the bytes verified_backup hashed, not a second read
+            raise ValueError('backup image changed after verification')
+        pins = session.unit_pins(images)
         spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else '', head, pins), rootfs_a_image
     else:
         spec = session.misc_spec(rootfs_a_sha)
