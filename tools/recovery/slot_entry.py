@@ -84,7 +84,8 @@ def load_inputs(backup, loader, target, mode, candidate_dir, base_dir=None):
             raise ValueError('base does not match its build manifest')
     if target == 'rootfs_a':
         head = base_head(base, json.loads((base_dir / 'manifest.json').read_text())) if base else 0
-        spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else '', head), rootfs_a_image
+        pins = session.unit_pins({n: Path(by_name[n]['image']).read_bytes() for n in ('misc', 'rootfs_a', 'rootfs_b', 'boot_para')})
+        spec, candidate = session.rootfs_a_spec(rootfs_a_sha, digest(base) if base else '', head, pins), rootfs_a_image
     else:
         spec = session.misc_spec(rootfs_a_sha)
         candidate = bytearray(original)
@@ -191,7 +192,9 @@ def main():
         backup, loader, args.target, args.mode, args.candidate_dir.resolve(strict=True),
         args.base_dir.resolve(strict=True) if args.base_dir else None)
     rootfs_a_sha = identity['rootfs_a']
-    specs = {'rootfs_a': session.rootfs_a_spec(rootfs_a_sha, identity['base'], identity['base_head']), 'misc': session.misc_spec(rootfs_a_sha)}
+    # rootfs_a sessions use this unit's pins from its backup; misc sessions stay on the first unit's pins (not supported elsewhere)
+    specs = {'rootfs_a': spec if args.target == 'rootfs_a' else session.rootfs_a_spec(rootfs_a_sha, identity['base'], identity['base_head']),
+             'misc': session.misc_spec(rootfs_a_sha)}
     priors = {}
     for flag, target, mode, verified in wanted:
         # Every prior is bound to this unit, host, tools and the same approved rootfs_a image (from the manifest, not a receipt).

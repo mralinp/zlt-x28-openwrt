@@ -286,5 +286,63 @@ class BaseModeTests(FakeDA):
                 s.rootfs_a_spec('a' * 64, base, head)
 
 
+class UnitPinTests(unittest.TestCase):
+    """Per-unit pins come from a verified backup (#318); the boot chain stays pinned for every unit."""
+    SECOND_UNIT_RECORD = bytes.fromhex('00414230ffffffff0e0001010f000101')  # the second unit's real stock misc record
+
+    @staticmethod
+    def misc_with(record, copies=s.MISC_COPIES):
+        misc = bytearray(b'\xff' * 0x100000)
+        for off in copies:
+            misc[off:off + 16] = record
+        return bytes(misc)
+
+    def images(self, record):
+        return {'misc': self.misc_with(record), 'rootfs_a': b'A' * 64, 'rootfs_b': b'B' * 0x2100000, 'boot_para': b'P' * 32}
+
+    def test_pins_are_the_hashes_of_this_units_images(self):
+        pins = s.unit_pins(self.images(self.SECOND_UNIT_RECORD))
+        self.assertEqual(pins['rootfs_a'], s.digest(b'A' * 64))
+        self.assertEqual(pins['rootfs_b_head'], s.digest(b'B' * 0x2000000))
+        self.assertEqual(pins['misc'], s.digest(self.misc_with(self.SECOND_UNIT_RECORD)))
+        self.assertEqual(s.unit_pins(self.images(s.MISC_BEFORE))['boot_para'], s.digest(b'P' * 32))
+
+    def test_misc_must_be_the_stock_b_selected_record_in_all_four_copies(self):
+        for bad in (s.MISC_AFTER, bytes.fromhex('00414230ffffffff0e0001020f000100'), b'\xff' * 16):
+            with self.assertRaises(ValueError, msg=bad.hex()):
+                s.unit_pins(self.images(bad))
+        mixed = self.images(s.MISC_BEFORE)
+        mixed['misc'] = self.misc_with(self.SECOND_UNIT_RECORD, s.MISC_COPIES[:3])
+        mixed['misc'] = mixed['misc'][:s.MISC_COPIES[3]] + s.MISC_BEFORE + mixed['misc'][s.MISC_COPIES[3] + 16:]
+        with self.assertRaises(ValueError):
+            s.unit_pins(mixed)
+        short = self.images(s.MISC_BEFORE)
+        short['misc'] = short['misc'][:-1]
+        with self.assertRaises(ValueError):
+            s.unit_pins(short)
+
+    def test_default_pins_are_the_first_unit_and_change_nothing(self):
+        self.assertEqual(s.common_guards(), s.COMMON)
+        self.assertEqual(s.rootfs_a_spec('a' * 64).original_sha, s.ROOTFS_A_SHA)
+
+    def test_spec_uses_the_unit_pins_but_keeps_the_boot_chain_pinned(self):
+        pins = s.unit_pins(self.images(self.SECOND_UNIT_RECORD))
+        spec = s.rootfs_a_spec('c' * 64, pins=pins)
+        guards = {g[0]: g[3] for g in spec.guards}
+        self.assertEqual((spec.original_sha, guards['misc'], guards['boot_para'], guards['rootfs_b']),
+                         (pins['rootfs_a'], pins['misc'], pins['boot_para'], pins['rootfs_b_head']))
+        first = {g[0]: g[3] for g in s.rootfs_a_spec('c' * 64).guards}
+        for name in ('boot_a', 'boot_b', 'lk_a', 'lk_b', 'tee_a', 'tee_b', 'rootfs_sig_a', 'rootfs_sig_b', 'proinfo'):
+            self.assertEqual(guards[name], first[name], name)
+        for name in ('misc', 'boot_para', 'rootfs_b'):
+            self.assertNotEqual(guards[name], first[name], name)
+
+    def test_candidate_may_not_be_this_units_own_stock_image(self):
+        pins = s.unit_pins(self.images(self.SECOND_UNIT_RECORD))
+        for bad in (pins['rootfs_a'], pins['rootfs_b']):
+            with self.assertRaises(ValueError):
+                s.rootfs_a_spec(bad, pins=pins)
+
+
 if __name__ == '__main__':
     unittest.main()

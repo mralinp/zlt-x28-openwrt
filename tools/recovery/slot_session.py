@@ -8,6 +8,7 @@ docs/research/rootfs-a-write-plan.md.
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -65,31 +66,52 @@ def validate_misc(original, candidate):
         raise ValueError('misc candidate is not exactly the four-copy A selection')
 
 
-B_SIDE = (('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, 0x2000000, ROOTFS_B_HEAD_SHA),
-          ('lk_b', 0x1d800000, 0x200000, LK_A), ('tee_b', 0x1da00000, 0x100000, TEE_A))
 # Static modem-side partitions (identical A/B copies); the 80 MiB md1img pair and the live nvdata/nvram are not re-read.
 MODEM_SIDE = (('proinfo', 0x600000, 0x100000, 'f5fb04aa5b882706b9309e885f19477261336ef76a150c3b4d3489dfac3953ec'), ('md1dsp_a', 0x10000000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'), ('md1dsp_b', 0x1c600000, 0xa00000, '1bfda52e00b6a792e4b2c47abb7d7efc3ed5cea8f97e4dcd18e816b0e758bbb0'),
               ('mcf1_a', 0x6d00000, 0x800000, 'c01bb4545be6644cb666943b501d20ecc447208b25ad06879e7a29bb70c32351'), ('mcf1_b', 0x7d00000, 0x800000, 'c01bb4545be6644cb666943b501d20ecc447208b25ad06879e7a29bb70c32351'),
               ('mcf2_a', 0x7500000, 0x800000, '6762592011405cc420e001697b0d245b8a01871f7934f2b132b4ca9d231bd154'), ('mcf2_b', 0x8500000, 0x800000, '6762592011405cc420e001697b0d245b8a01871f7934f2b132b4ca9d231bd154'))
-COMMON = (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG),
-          ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG), ('boot_para', 0x8e00000, 0x200000, BOOT_PARA),
-          ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A), *B_SIDE, *MODEM_SIDE)
+# What differs between units (docs/research/flash-other-units.md): rootfs, misc and boot_para. The boot chain, modem side and
+# slot-selection layout above stay pinned for every unit: a unit without them is refused.
+FIRST_UNIT = {'rootfs_a': ROOTFS_A_SHA, 'rootfs_b': ROOTFS_B_SHA, 'rootfs_b_head': ROOTFS_B_HEAD_SHA, 'misc': MISC_SHA, 'boot_para': BOOT_PARA}
+ROOTFS_B_HEAD = 0x2000000
+MISC_B_SELECTED = re.compile(rb'\x00AB0\xff\xff\xff\xff\x0e\x00\x01[\x00\x01]\x0f\x00\x01[\x00\x01]')  # per-slot priority, tries, successful, verity flag
 
 
-def rootfs_a_spec(candidate_sha, base_sha='', base_head=0):
+def unit_pins(images):
+    """The per-unit pins of a verified backup. images: {partition name: bytes}. Raises unless misc is the stock B-selected record."""
+    misc = images['misc']
+    if len(misc) != 0x100000 or any(not MISC_B_SELECTED.fullmatch(misc[off:off + 16]) for off in MISC_COPIES) \
+            or len({misc[off:off + 16] for off in MISC_COPIES}) != 1:
+        raise ValueError('misc is not the stock B-selected record in all four copies')
+    return {'rootfs_a': digest(images['rootfs_a']), 'rootfs_b': digest(images['rootfs_b']),
+            'rootfs_b_head': digest(images['rootfs_b'][:ROOTFS_B_HEAD]), 'misc': digest(misc), 'boot_para': digest(images['boot_para'])}
+
+
+def common_guards(pins=FIRST_UNIT):
+    return (('boot_a', 0x11500000, 0x2000000, BOOT_SHA), ('rootfs_sig_a', 0x13500000, 0x100000, ROOTFS_SIG),
+            ('rootfs_sig_b', 0x1fb00000, 0x100000, ROOTFS_SIG), ('boot_para', 0x8e00000, 0x200000, pins['boot_para']),
+            ('lk_a', 0x11200000, 0x200000, LK_A), ('tee_a', 0x11400000, 0x100000, TEE_A),
+            ('boot_b', 0x1db00000, 0x2000000, BOOT_SHA), ('rootfs_b', 0x1fc00000, ROOTFS_B_HEAD, pins['rootfs_b_head']),
+            ('lk_b', 0x1d800000, 0x200000, LK_A), ('tee_b', 0x1da00000, 0x100000, TEE_A), *MODEM_SIDE)
+
+
+COMMON = common_guards()
+
+
+def rootfs_a_spec(candidate_sha, base_sha='', base_head=0, pins=FIRST_UNIT):
     """Write rootfs_a. `restore` is refused unless misc still selects B: restore misc first once A is selected.
 
     With base_sha (#137) the target already holds that earlier native image and misc may select A: misc is then only
     required to stay unchanged during the session (it is never written here), and the caller checks the live slot is A.
     """
-    if len(candidate_sha) != 64 or candidate_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA, base_sha):
+    if len(candidate_sha) != 64 or candidate_sha in (pins['rootfs_a'], pins['rootfs_b'], base_sha):
         raise ValueError('rootfs_a candidate hash must be a new SHA-256')
-    if base_sha and (len(base_sha) != 64 or base_sha in (ROOTFS_A_SHA, ROOTFS_B_SHA)):
+    if base_sha and (len(base_sha) != 64 or base_sha in (pins['rootfs_a'], pins['rootfs_b'])):
         raise ValueError('rootfs_a base hash must be a native image SHA-256')
     if bool(base_sha) != bool(base_head) or not 0 <= base_head < 0x4000000 or base_head % 0x40000:
         raise ValueError('base head must be a whole number of erase blocks inside rootfs_a, with a base')
-    guards = (*COMMON, ('misc', 0x700000, 0x100000, None if base_sha else MISC_SHA))
-    return Spec('rootfs_a', 0x13600000, 0x4000000, ROOTFS_A_SHA, guards, validate_rootfs_a, candidate_sha, guards, base_sha, base_head)
+    guards = (*common_guards(pins), ('misc', 0x700000, 0x100000, None if base_sha else pins['misc']))
+    return Spec('rootfs_a', 0x13600000, 0x4000000, pins['rootfs_a'], guards, validate_rootfs_a, candidate_sha, guards, base_sha, base_head)
 
 
 def misc_spec(rootfs_a_sha):
