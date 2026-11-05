@@ -34,7 +34,13 @@ def cases():
         case("attach-sync-iptype", ia="IA apn:example.invalid pdp_type:3 roaming_type:3 bearer_bitmask:0xffffffff\n",
              expect_cmds=["--apn_ia_set example.invalid 1 3", "--at_cmd at+cfun=1", "--data_call_act"]),
         case("attach-sync-no-profile", ia="", expect_cmds=["--apn_ia_set example.invalid 1 3", "--data_call_act"]),
-        case("attach-set-failed", ia="", ia_set_rc=1, error="ATTACH_FAILED", no_activate_call=True),
+        case("attach-set-failed", ia="", ia_set_noop=1, error="ATTACH_FAILED", no_activate_call=True,
+             no_cfun=True),
+        case("attach-cfun-lost", ia="", cfun_ok=0, error="ATTACH_FAILED", no_activate_call=True,
+             expect_cmds=["--apn_ia_set", "--at_cmd at+cfun=0", "--at_cmd at+cfun=1"]),
+        case("in-sync-unregistered", reg=0, error="ATTACH_FAILED", no_activate_call=True, no_ia_set=True,
+             expect_cmds=["--at_cmd at+cfun=1"]),
+        case("leading-dash-apn", config={"apn": "-x"}, error="INVALID_CONFIG", no_cli=True),
         case("attach-no-registration", ia="", reg=0, error="ATTACH_FAILED", no_activate_call=True),
         case("roaming-off", reg=5, error="ROAMING_DISABLED", no_activate_call=True, no_ia_set=True),
         case("roaming-on", reg=5, config={"roaming": True}),
@@ -115,6 +121,8 @@ def verify(item, directory):
     assert idx == sorted(idx), commands
     if item.get("no_activate_call"):
         assert not activations, commands
+    if item.get("no_cfun"):
+        assert not any("cfun" in c for c in commands), commands
     if item.get("no_ia_set"):
         assert not any(c.startswith("--apn_ia_set") for c in commands), commands
     if item.get("no_cli"):
@@ -190,7 +198,8 @@ def main():
                 item.get("expect_apn", item["config"]["apn"]), item["config"]["iptype"])
             (d / "ia").write_text(ia)
             (d / "reg").write_text(str(item.get("reg", 1)))
-            (d / "ia_set_rc").write_text(str(item.get("ia_set_rc", 0)))
+            (d / "ia_set_noop").write_text(str(item.get("ia_set_noop", 0)))
+            (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:
                 (d / field).write_text(str(item[field]))
