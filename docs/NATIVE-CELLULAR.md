@@ -18,6 +18,8 @@ This is the first native cellular integration slice for the ZLT X28. Stock LuCI 
 
 Requires a pre-initialized modem, its CCCI/kernel support, and an ABI-compatible `mipc_wan_cli` supplied separately by the vendor `mipc-wan` package. These dependencies are not included. The existing vendor package's source, licensing, libraries and startup side effects still need auditing before a clean firmware build. Retaining a hardware dependency does not make vendor LAN/WAN policy managers part of the target design.
 
+Attach APN and roaming (#331): before the data call the handler compares `mipc_wan_cli --apn_ia_get` with the configured APN and IP type and, when they differ, runs `--apn_ia_set <apn> <iptype> 3` and re-attaches (`cfun` 0/1), as the vendor `dialer` and the SDK's `check_ia` do. Without it a PDN whose APN differs from the attach APN is refused (result 1314103, seen on a roaming SIM whose attach APN was `mcinet`). `option roaming 1` allows a bearer while registered as roaming (CEREG/C5GREG stat 5); the default is off, like the vendor's data-roaming switch, and setup then fails with `ROAMING_DISABLED`. Changing the APN or IP type re-attaches the modem, which drops the connection for up to ~40 s.
+
 The handler refuses setup while `wan_mgr` is running. It serializes its own operations, validates configuration and modem replies, reports a dynamic ccmni device, and records the CID with an interface ownership marker. Cleanup deactivates only that returned CID; it never deactivates by APN, kills processes or edits DHCP/firewall configuration. The marker records protocol ownership; it cannot prove the modem allocated a new bearer. That modem behavior must be verified on recoverable hardware.
 
 ## Build integration

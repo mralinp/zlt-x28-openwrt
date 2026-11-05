@@ -21,6 +21,15 @@ mipc_wan_cli() {
   --data_call_act) cat "$case_dir/reply"; return "$(cat "$case_dir/activate_rc")" ;;
   --data_call_deact) return "$(cat "$case_dir/deactivate_rc")" ;;
   --data_call_get) [ -s "$case_dir/get" ] && cat "$case_dir/get" ;;
+  --apn_ia_get) cat "$case_dir/ia" ;;
+  --apn_ia_set) printf 'IA apn:%s pdp_type:%s roaming_type:%s bearer_bitmask:0xffffffff\n' "$2" "$3" "$4" > "$case_dir/ia"; return "$(cat "$case_dir/ia_set_rc")" ;;
+  --at_cmd)
+   case "$2" in
+    at+cereg?) printf 'AT response:\n+CEREG: 0,%s\n\nOK\n' "$(cat "$case_dir/reg")" ;;
+    at+c5greg?) printf 'AT response:\n+C5GREG: 0,0\n\nOK\n' ;;
+    at+cfun=0|at+cfun=1) ;;
+    *) printf 'Unexpected AT command\n' >&2; return 99 ;;
+   esac ;;
   *) printf 'Unexpected modem command\n' >&2; return 99 ;;
  esac
 }

@@ -14,12 +14,44 @@ proto_x28_mipc_init_config() {
  proto_config_add_string apn
  proto_config_add_int mtu
  proto_config_add_int iptype
+ proto_config_add_boolean roaming
  proto_config_add_defaults
 }
 
 x28_mipc_uint() {
  case "$1" in ''|*[!0-9]*) return 1 ;; esac
  [ "${#1}" -le 10 ] && [ "$1" -le "$2" ]
+}
+
+# Registration state from the modem's AT view: 1 home, 5 roaming. CEREG covers LTE/NSA, C5GREG covers SA.
+x28_mipc_reg() {
+ local cmd stat
+ for cmd in cereg c5greg; do
+  stat="$(mipc_wan_cli --at_cmd "at+$cmd?" 2>/dev/null | sed -n 's/^+C[0-9A-Z]*REG: *[0-9]*,\([0-9]*\).*/\1/p' | head -n 1)"
+  case "$stat" in 1|5) echo "$stat"; return 0 ;; esac
+ done
+ return 1
+}
+
+# The vendor dialer rewrites the initial-attach APN (ql_ia_apn_set) instead of asking for a second PDN, and a PDN
+# whose APN differs from the attach one is refused (observed, result 1314103, on a roaming SIM). Same as the SDK's check_ia.
+x28_mipc_sync_attach() {
+ local apn="$1" ip="$2" ia ia_apn ia_pdp ia_roam i
+ ia="$(mipc_wan_cli --apn_ia_get 2>/dev/null | sed -n 's/^IA apn:\([^ ]*\) pdp_type:\([0-9]*\) roaming_type:\([0-9]*\).*/\1 \2 \3/p' | head -n 1)"
+ set -- $ia
+ ia_apn="$(echo "$1" | tr 'A-Z' 'a-z')" ia_pdp="$2" ia_roam="$3"
+ [ "$ia_apn" = "$(echo "$apn" | tr 'A-Z' 'a-z')" ] && [ "$ia_pdp" = "$ip" ] && [ "$ia_roam" = 3 ] && return 0
+ mipc_wan_cli --apn_ia_set "$apn" "$ip" 3 >/dev/null 2>&1 || return 1
+ # The attach profile applies on the next attach.
+ mipc_wan_cli --at_cmd at+cfun=0 >/dev/null 2>&1
+ sleep 2
+ # ponytail: radio left off if all three cfun=1 fail; the next retry would find the profile already in sync.
+ for i in 1 2 3; do mipc_wan_cli --at_cmd at+cfun=1 >/dev/null 2>&1 && break; done
+ i=0
+ until x28_mipc_reg >/dev/null; do
+  [ "$i" -ge 40 ] && return 1
+  sleep 1; i=$((i + 1))
+ done
 }
 
 x28_mipc_ipv4() {
@@ -123,16 +155,17 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype defaultroute peerdns metric sim reply result cid ifname
+ local interface="$1" apn mtu iptype roaming defaultroute peerdns metric sim reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype defaultroute peerdns metric
- mtu="${mtu:-1500}"; iptype="${iptype:-3}"
+ json_get_vars apn mtu iptype roaming defaultroute peerdns metric
+ mtu="${mtu:-1500}"; iptype="${iptype:-3}"; roaming="${roaming:-0}"
  defaultroute="${defaultroute:-1}"; peerdns="${peerdns:-1}"; metric="${metric:-0}"
  # Empty APN = automatic from the SIM, resolved once the SIM is ready.
  if { [ -n "$apn" ] && { [ "${#apn}" -gt 100 ] || case "$apn" in *[!a-zA-Z0-9._-]*) true ;; *) false ;; esac; }; } ||
     { [ "$iptype" != 1 ] && [ "$iptype" != 2 ] && [ "$iptype" != 3 ]; } ||
     ! x28_mipc_uint "$mtu" 1500 || [ "$mtu" -lt 576 ] ||
     ! x28_mipc_uint "$metric" 65535 ||
+    { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
     { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; }; then
   proto_notify_error "$interface" INVALID_CONFIG
@@ -158,6 +191,12 @@ x28_mipc_setup() {
   apn="$(${X28_MIPC_APN_CMD:-x28-apn} 2>/dev/null | head -n 1 | cut -f 2)"
   case "$apn" in ''|*[!a-zA-Z0-9._-]*) proto_notify_error "$interface" NO_SIM_APN; return 1 ;; esac
  fi
+
+ # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
+ if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
+  proto_notify_error "$interface" ROAMING_DISABLED; return 1
+ fi
+ x28_mipc_sync_attach "$apn" "$iptype" || { proto_notify_error "$interface" ATTACH_FAILED; return 1; }
 
  # shortcut: no PAP/CHAP; add auth when an operator needs it.
  # shortcut: one native WAN interface; multi-bearer ownership needs a modem API audit.

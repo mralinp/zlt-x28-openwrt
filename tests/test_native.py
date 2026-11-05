@@ -29,6 +29,16 @@ def cases():
     own = {"data": {"x28_mipc_cid": 4, "x28_mipc_owner": "wan"}}
     return [
         case("point-to-point"),
+        case("attach-sync-apn", ia="IA apn:mcinet pdp_type:1 roaming_type:3 bearer_bitmask:0xffffffff\n",
+             expect_cmds=["--apn_ia_set example.invalid 1 3", "--at_cmd at+cfun=0", "--at_cmd at+cfun=1", "--data_call_act"]),
+        case("attach-sync-iptype", ia="IA apn:example.invalid pdp_type:3 roaming_type:3 bearer_bitmask:0xffffffff\n",
+             expect_cmds=["--apn_ia_set example.invalid 1 3", "--at_cmd at+cfun=1", "--data_call_act"]),
+        case("attach-sync-no-profile", ia="", expect_cmds=["--apn_ia_set example.invalid 1 3", "--data_call_act"]),
+        case("attach-set-failed", ia="", ia_set_rc=1, error="ATTACH_FAILED", no_activate_call=True),
+        case("attach-no-registration", ia="", reg=0, error="ATTACH_FAILED", no_activate_call=True),
+        case("roaming-off", reg=5, error="ROAMING_DISABLED", no_activate_call=True, no_ia_set=True),
+        case("roaming-on", reg=5, config={"roaming": True}),
+        case("roaming-invalid", config={"roaming": 2}, error="INVALID_CONFIG", no_cli=True),
         case("gateway", reply={"v4_gw": "198.51.100.1", "v4_mask": "255.255.255.0"}),
         case("no-route-dns", config={"defaultroute": False, "peerdns": False}),
         case("bad-apn", config={"apn": "x;touch /tmp/should-not-exist"}, error="INVALID_CONFIG", no_cli=True),
@@ -100,6 +110,13 @@ def verify(item, directory):
                               "bearer_bitmask": "0xfffdffff", "mtu": item["config"]["mtu"], "mode": 1}, activation
     deactivations = [c for c in commands if c.startswith("--data_call_deact ")]
     assert deactivations == (["--data_call_deact 4"] if item["cleanup"] else []), commands
+    want = item.get("expect_cmds") or []
+    idx = [next(i for i, c in enumerate(commands) if c.startswith(w)) for w in want]
+    assert idx == sorted(idx), commands
+    if item.get("no_activate_call"):
+        assert not activations, commands
+    if item.get("no_ia_set"):
+        assert not any(c.startswith("--apn_ia_set") for c in commands), commands
     if item.get("no_cli"):
         assert not commands, commands
     if item.get("no_activate"):
@@ -169,6 +186,11 @@ def main():
             (d / "reply").write_text(item.get("raw_reply", json.dumps(item["reply"])))
             (d / "sim_apns").write_text(item["sim_apns"])
             (d / "v6_global").write_text(item["v6_global"])
+            ia = item["ia"] if "ia" in item else "IA apn:%s pdp_type:%s roaming_type:3 bearer_bitmask:0xffffffff\n" % (
+                item.get("expect_apn", item["config"]["apn"]), item["config"]["iptype"])
+            (d / "ia").write_text(ia)
+            (d / "reg").write_text(str(item.get("reg", 1)))
+            (d / "ia_set_rc").write_text(str(item.get("ia_set_rc", 0)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:
                 (d / field).write_text(str(item[field]))

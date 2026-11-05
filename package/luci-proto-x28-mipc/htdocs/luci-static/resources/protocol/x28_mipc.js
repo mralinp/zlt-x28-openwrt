@@ -6,8 +6,10 @@
 
 network.registerPatternVirtual(/^ccmni[0-9]+$/);
 [
- ['INVALID_CONFIG', 'Invalid APN, IP type, MTU or routing options'],
+ ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, MTU or routing options'],
  ['NO_SIM_APN', 'No APN is known for this SIM; choose or enter one'],
+ ['ROAMING_DISABLED', 'Registered on a roaming network and roaming is off; enable Allow roaming'],
+ ['ATTACH_FAILED', 'The modem could not re-attach with this APN and IP type'],
  ['NO_IPV6', 'The network sent no IPv6 prefix'],
  ['VENDOR_WAN_ACTIVE', 'The vendor WAN manager is active; native ownership is not established'],
  ['MODEM_BUSY', 'Another modem operation is in progress'],
@@ -56,6 +58,9 @@ return network.registerProtocol('x28_mipc', {
   option.value('1', _('IPv4 only'));
   option.value('2', _('IPv6 only'));
   option.default = '3';
+  option = section.taboption('general', form.Flag, 'roaming', _('Allow roaming'),
+   _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
+  option.default = '0';
   option = section.taboption('advanced', form.Value, 'mtu', _('MTU'));
   option.datatype = 'range(576,1500)';
   option.placeholder = '1500';
