@@ -181,5 +181,23 @@ class GateTests(unittest.TestCase):
         self.assertEqual(head, 33 * 0x40000)
 
 
+class NoSshTests(unittest.TestCase):
+    def test_phrase_names_the_missing_ssh_check(self):
+        a = slot_session.rootfs_a_spec('abcdef1234567890' * 4)
+        self.assertEqual(e.phrase(a, 'write', a.candidate_sha, False, True), 'WRITE write rootfs_a abcdef123456 NO-SSH')
+        self.assertEqual(e.phrase(a, 'write', a.candidate_sha, True, True), 'WRITE write rootfs_a abcdef123456 NO-SSH SAME-DISK')
+        self.assertNotIn('NO-SSH', e.phrase(a, 'write', a.candidate_sha, False))
+
+    def test_no_ssh_only_for_rootfs_a_from_stock_b(self):
+        plain = slot_session.rootfs_a_spec('c' * 64)
+        based = slot_session.rootfs_a_spec('c' * 64, 'b' * 64, 0x40000)
+        e.check_no_ssh(True, 'rootfs_a', 'write', plain)
+        e.check_no_ssh(True, 'rootfs_a', 'identical', plain)
+        e.check_no_ssh(False, 'misc', 'restore', based)
+        for args in (('misc', 'write', plain), ('rootfs_a', 'restore', plain), ('rootfs_a', 'write', based), ('rootfs_a', 'identical', based)):
+            with self.assertRaises(ValueError, msg=args[:2]):
+                e.check_no_ssh(True, *args)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -155,7 +155,7 @@ def load_prior(run, expect, spec, mode, verified):
     return receipt
 
 
-def phrase(spec, mode, rootfs_a_sha, same_disk):
+def phrase(spec, mode, rootfs_a_sha, same_disk, no_ssh=False):
     # identical and restore write the original; the phrase names the bytes that will land on the target
     image = spec.candidate_sha if mode == 'write' else (spec.base_sha if spec.base_sha and mode == 'identical' else spec.original_sha)
     text = f'WRITE {mode} {spec.name} {image[:12]}'
@@ -163,7 +163,12 @@ def phrase(spec, mode, rootfs_a_sha, same_disk):
         text += f' BASE {spec.base_sha[:12]} MISC-SELECTS-A'
     if spec.name == 'misc':
         text += f' ROOTFS-A {rootfs_a_sha[:12]} BROM-ROUTE-PROVEN'
-    return text + (' SAME-DISK' if same_disk else '')
+    return text + (' NO-SSH' if no_ssh else '') + (' SAME-DISK' if same_disk else '')
+
+
+def check_no_ssh(no_ssh, target, mode, spec):
+    if no_ssh and (target != 'rootfs_a' or spec.base_sha or mode == 'restore'):
+        raise ValueError('--no-ssh is only for rootfs_a identical/write from stock B (no --base-dir): the USB read of misc stands in for the live slot')
 
 
 def main():
@@ -177,6 +182,7 @@ def main():
     ap.add_argument('--base-dir', type=Path, help='rootfs_a only: package_ubi output of the image now on rootfs_a; identical/write start from it, misc may select A')
     ap.add_argument('--backup-copy', type=Path, help='verified second complete-captured-partitions.tar')
     ap.add_argument('--uart-log', type=Path)
+    ap.add_argument('--no-ssh', action='store_true', help='rootfs_a from stock B only: no live SSH check; the DA read of misc must equal the backup\'s B-selected misc instead')
     ap.add_argument('--prior-identical', type=Path)
     ap.add_argument('--prior-rootfs-a', type=Path, help='verified rootfs_a write run (misc sessions)')
     ap.add_argument('--resume', type=Path, help='stopped or finished write run, restore mode only')
@@ -203,6 +209,7 @@ def main():
         # Every prior is bound to this unit, host, tools and the same approved rootfs_a image (from the manifest, not a receipt).
         expect = {**identity, 'target': target, 'original': specs[target].original_sha, 'candidate': specs[target].candidate_sha}
         priors[flag] = load_prior(getattr(args, flag), expect, specs[target], mode, verified)
+    check_no_ssh(args.no_ssh, args.target, args.mode, spec)
     print(f'{args.mode}: {args.target} only at {spec.addr:#x}, {spec.size:#x} bytes; candidate {spec.candidate_sha[:12]}; no reboot or retry')
     if spec.base_head:
         print(f'base mode: before the write only the first {spec.base_head:#x} bytes (layout + rootfs) must match base {spec.base_sha[:12]}; the whole partition, overlay included, is replaced')
@@ -220,7 +227,11 @@ def main():
     same_disk = copy.stat().st_dev == archive.stat().st_dev
     check_uart(uart)
     live = 'a' if spec.base_sha and args.mode != 'restore' else 'b'  # base mode: misc selects A, the unit runs the base image
-    if args.mode != 'restore' and active_slot(table) != live:
+    if args.no_ssh:
+        # No SSH: the session's `before` read of misc must equal the backup's misc, which load_inputs showed is the stock
+        # B-selected record (priorities, zero tries), and the full layout is pinned by LAYOUT_HASH and the guard offsets.
+        print('NO SSH: the live slot is not confirmed by the running system; it rests on the USB read of misc matching your backup.')
+    elif args.mode != 'restore' and active_slot(table) != live:
         raise ValueError(f'live SSH must confirm {live.upper()} and exact full layout')
     probe_dir = PRIVATE / 'usb-probe'
     probe_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -228,7 +239,7 @@ def main():
         raise ValueError('less than 1 GiB free for captures and sources')
     if not sys.stdin.isatty():
         raise ValueError('typed confirmation needs an interactive terminal')
-    expected_phrase = phrase(spec, args.mode, rootfs_a_sha, same_disk)
+    expected_phrase = phrase(spec, args.mode, rootfs_a_sha, same_disk, args.no_ssh)
     print('Confirm UART RX capture continues, stable power, no stock upgrade/FOTA pending, and that the NOT-FLASHABLE marker')
     print('on the candidate is deliberately overridden by the owner. Merging a PR is not approval.')
     if args.target == 'misc':
@@ -239,7 +250,7 @@ def main():
         raise ValueError('operation not confirmed')
     run = Path(tempfile.mkdtemp(prefix=f'slot-{args.target}-{args.mode}-', dir=probe_dir)).resolve()
     receipt = {'schema': 2, 'run': str(run), 'target': args.target, 'mode': args.mode, 'status': 'STARTED', 'identity': identity,
-               'created': time.time(), 'uart': str(uart), 'same_disk_backup': same_disk,
+               'created': time.time(), 'uart': str(uart), 'no_ssh': args.no_ssh, 'same_disk_backup': same_disk,
                'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
     save(run, receipt)
     mtk = None

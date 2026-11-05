@@ -357,6 +357,8 @@ def flash(fl, ui, cfg, preset=None):
     base = preset["base"] if "base" in preset else ui.select("Image now on slot A (the base)", [("None / not known", None)] + images + [("Another folder...", "other")])
     if base == "other":
         base = ui.text("Folder of the image now on slot A")
+    no_ssh = bool(preset["no_ssh"] if "no_ssh" in preset else (not base and ui.confirm(
+        "No SSH to this router? Then the USB read of misc replaces the live-slot check; slot A and misc must still equal your backup (stock).", False)))
     prior = None
     if mode == "write":
         runs = verified_identicals(PRIVATE / "usb-probe")
@@ -368,7 +370,7 @@ def flash(fl, ui, cfg, preset=None):
     if not ui.confirm("Continue to the UART and the typed confirmation?", True):
         return 0
     args = argparse.Namespace(mode=mode, candidate_dir=candidate, base_dir=base, prior_identical=prior,
-                              backup_copy=None, backup=backup, loader=loader)
+                              backup_copy=None, backup=backup, loader=loader, no_ssh=no_ssh)
     code = fl.cmd_flash(args, ui)
     print("  " + (good("Done.") if code == 0 else bad(f"Stopped (exit {code}). The run folder above keeps the logs; nothing was retried.")))
     return code
