@@ -161,7 +161,7 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):f.luci_mtwifi('changed LuCI')
         self.assertIn('add_driver mtwifi',tree['lib/netifd/wireless/mtwifi.sh'][1].decode())
         self.assertIn('append DRIVERS "mtwifi"',tree['lib/wifi/mtwifi.sh'][1].decode())
-        self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])
+        self.assertIn(b"option PasswordAuth 'on'",tree['etc/config/dropbear'][1])
         self.assertEqual(tree['etc/dropbear/authorized_keys'][0].mode,0o600)
         self.assertEqual({row.split(b':')[0]:row.split(b':')[1] for row in tree['etc/shadow'][1].splitlines()},{b'root':b'',b'service':b'!'})  # empty root like stock
         self.assertEqual(tree['etc/rc.d/S96x28-bootok'][0].linkname,'../init.d/x28-bootok')
@@ -170,8 +170,9 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(tree['etc/rc.d/S95done'][0].linkname,'../init.d/done')
         self.assertEqual(tree['etc/rc.d/S98sysntpd'][0].linkname,'../init.d/sysntpd')
         self.assertIn("config timeserver 'ntp'",tree['etc/config/system'][1].decode())
-        self.assertIn(b"option PasswordAuth 'off'",tree['etc/config/dropbear'][1])  # an empty password never works over SSH
-        self.assertIn(b"option RootPasswordAuth 'off'",tree['etc/config/dropbear'][1])
+        self.assertIn(b"option PasswordAuth 'on'",tree['etc/config/dropbear'][1])  # an empty root password never works over SSH, so this opens only once one is set
+        self.assertIn(b"option RootPasswordAuth 'on'",tree['etc/config/dropbear'][1])
+        self.assertIn(b"option Interface 'lan'",tree['etc/config/dropbear'][1])  # LAN only
         self.assertNotIn(b'mtd',tree['etc/rc.local'][1])
         self.assertFalse(r['flashable'])
 

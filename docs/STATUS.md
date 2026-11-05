@@ -21,7 +21,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - Wi-Fi on the MT7915 dual band through the vendor `mt_wifi` driver (both radios up, WPA2).
 - Front panel LEDs from radio, signal and WAN state.
 - The modem stack, services and Wi-Fi defaults start at boot; settings, host keys and the root password survive reboots.
-- SSH is key-only on port 22 (LAN only); root has an empty password until the owner sets one, like stock OpenWrt.
+- SSH takes the owner's key or the root password on port 22 (LAN only). Root has an empty password until the owner sets one (LuCI or `passwd`), like stock OpenWrt; dropbear never accepts an empty password, so password login starts then.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed. OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Apply a private, NOT-FLASHABLE first-boot management profile to #76 staging.
 
-Stock swconfig, observed MT7531AE VLAN table, static LAN on br-lan (all four sockets) with DHCP, front LEDs, key-only SSH.
+Stock swconfig, observed MT7531AE VLAN table, static LAN on br-lan (all four sockets) with DHCP, front LEDs, SSH by key or root password.
 No vendor activation or device I/O.
 """
 import argparse
@@ -494,8 +494,8 @@ config interface 'wan'
  option proto 'x28_mipc'
 """+SWITCH_UCI)
     put('etc/config/dropbear',"""config dropbear
- option PasswordAuth 'off'
- option RootPasswordAuth 'off'
+ option PasswordAuth 'on'
+ option RootPasswordAuth 'on'
  option RootLogin 'on'
  option Port '22'
  option Interface 'lan'
@@ -503,7 +503,7 @@ config interface 'wan'
  option mdns '0'
 """)
     put('etc/dropbear/authorized_keys',key,0o600)
-    # Like stock OpenWrt root starts with an empty password so LuCI can log in and ask for one; dropbear stays key-only.
+    # Like stock OpenWrt root starts with an empty password so LuCI can log in and ask for one; SSH takes keys or the root password; dropbear never accepts an empty one, so password login starts once the owner sets it (LuCI or passwd).
     rows=tree['etc/shadow'][1].decode().splitlines();found=False;locked=[]
     for row in rows:
         fields=row.split(':')
