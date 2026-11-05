@@ -250,7 +250,7 @@ def main():
     if not sys.stdin.isatty():
         raise ValueError('typed confirmation needs an interactive terminal')
     expected_phrase = phrase(spec, args.mode, rootfs_a_sha, same_disk, args.no_ssh, args.no_uart)
-    print('Confirm UART RX capture continues, stable power, no stock upgrade/FOTA pending, and that the NOT-FLASHABLE marker')
+    print(('Confirm stable power' if args.no_uart else 'Confirm UART RX capture continues, stable power') + ', no stock upgrade/FOTA pending, and that the NOT-FLASHABLE marker')
     print('on the candidate is deliberately overridden by the owner. Merging a PR is not approval.')
     if args.target == 'misc':
         print('misc is the LIVE slot selector and is rewritten whole (1 MiB): a power or USB loss can leave no valid record.')
@@ -281,7 +281,7 @@ def main():
             save(args.resume.resolve(), prior)
         session.run_session(mtk.daloader, spec, original, candidate, run, mode=args.mode, base=base)
         receipt['status'] = 'VERIFIED'
-        print('Target and guards verified. No reboot issued; review UART before approving the next step.')
+        print('Target and guards verified. No reboot issued; ' + ('after a no-UART flash do not reboot casually until x28-bootok has reset the boot counter.' if args.no_uart else 'review UART before approving the next step.'))
     except BaseException:
         receipt['status'] = 'STOP_UNVERIFIED'
         print('STOP: no retry, slot switch or reboot. Preserve recovery state and private logs.')

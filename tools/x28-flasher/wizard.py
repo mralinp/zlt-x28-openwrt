@@ -386,7 +386,7 @@ def run(fl, ui=None):
     cfg = Config(fl.PRIVATE / "x28-flasher.json")
     print("\n  " + paint("x28-flasher", "bold", "cyan") + paint("  ZLT X28 flash and recovery", "dim") + "\n")
     try:
-        if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it.", True):
+        if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it unless you have no UART adapter.", True):
             fl.start_capture(ui)
     except KeyboardInterrupt:
         print("\n  skipped; start it from the menu before flashing")
