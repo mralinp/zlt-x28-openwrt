@@ -222,6 +222,20 @@ def build(fl, ui, cfg):
         return 1
 
 
+def choose_key(ui, cfg):
+    """The key that goes into the image is never guessed: the user picks it from ~/.ssh each time, the last choice listed first."""
+    keys = sorted(str(p) for p in (Path.home() / ".ssh").glob("*.pub"))
+    last = cfg.get("build_key")
+    keys.sort(key=lambda k: k != last)
+    choice = ui.select("Which SSH public key goes into the image? (it is the only key that can log in)",
+                       [(k, k) for k in keys] + [("Another file...", None)]) if keys else None
+    key = choice or ui.text("Path of the SSH public key").strip()
+    while not Path(key).is_file():
+        key = ui.text(f"not found: {key}. Path of the SSH public key").strip()
+    cfg.set("build_key", key)
+    return key
+
+
 def build_local(fl, ui, cfg, dest):
     import images
     import shutil
@@ -252,7 +266,7 @@ def build_local(fl, ui, cfg, dest):
         print("  " + bad(str(err)))
         return 1
     inputs["stock"] = str(stock)
-    inputs["key"] = ask_path(ui, cfg, "build_key", "Your SSH public key for the image", Path.home() / ".ssh/id_ed25519.pub", False)
+    inputs["key"] = choose_key(ui, cfg)
     inputs["kmods"] = ask_path(ui, cfg, "build_kmods", "Folder with the built kernel modules (private SDK build)", PRIVATE / "kmods", True)
     work = dest / f"local-{images.stamp()}"
     out = dest / f"native-ubi-local-{images.stamp()}"

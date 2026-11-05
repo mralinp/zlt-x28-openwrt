@@ -128,5 +128,20 @@ class PlainPromptTests(unittest.TestCase):
         self.assertIn("#254", out.getvalue())
 
 
+    def test_choose_key_lists_keys_remembers_and_never_guesses(self):
+        home = Path(tempfile.mkdtemp())
+        (home / ".ssh").mkdir()
+        for n in ("a.pub", "router.pub"):
+            (home / ".ssh" / n).write_text("ssh-ed25519 AAAA x")
+        cfg = wizard.Config(home / "c.json")
+        cfg.set("build_key", str(home / ".ssh/router.pub"))
+        seen = []
+        ui = types.SimpleNamespace(select=lambda msg, choices: seen.append([v for _, v in choices]) or choices[0][1])
+        with mock.patch.object(wizard.Path, "home", return_value=home):
+            key = wizard.choose_key(ui, cfg)
+        self.assertEqual(key, str(home / ".ssh/router.pub"))  # remembered key is offered first, but it is still asked
+        self.assertEqual(seen[0][-1], None)
+
+
 if __name__ == "__main__":
     unittest.main()
