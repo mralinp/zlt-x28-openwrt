@@ -58,7 +58,9 @@ return network.registerProtocol('x28_mipc', {
   option.value('1', _('IPv4 only'));
   option.value('2', _('IPv6 only'));
   option.default = '3';
-  option = section.taboption('general', form.Flag, 'roaming', _('Allow roaming'),
+  // Carrier-related vendor settings (roaming now; operator, network mode, bands, PCI lock later) live together here.
+  section.tab('carrier', _('Carrier'));
+  option = section.taboption('carrier', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';
   option = section.taboption('advanced', form.Value, 'mtu', _('MTU'));
