@@ -359,6 +359,8 @@ def flash(fl, ui, cfg, preset=None):
         base = ui.text("Folder of the image now on slot A")
     no_ssh = bool(preset["no_ssh"] if "no_ssh" in preset else (not base and ui.confirm(
         "No SSH to this router? Then the USB read of misc replaces the live-slot check; slot A and misc must still equal your backup (stock).", False)))
+    no_uart = bool(preset["no_uart"] if "no_uart" in preset else ui.confirm(
+        "No UART adapter? Then there is no boot log if the new image fails; the way back is a USB restore from your backup.", False))
     prior = None
     if mode == "write":
         runs = verified_identicals(PRIVATE / "usb-probe")
@@ -370,7 +372,7 @@ def flash(fl, ui, cfg, preset=None):
     if not ui.confirm("Continue to the UART and the typed confirmation?", True):
         return 0
     args = argparse.Namespace(mode=mode, candidate_dir=candidate, base_dir=base, prior_identical=prior,
-                              backup_copy=None, backup=backup, loader=loader, no_ssh=no_ssh)
+                              backup_copy=None, backup=backup, loader=loader, no_ssh=no_ssh, no_uart=no_uart)
     code = fl.cmd_flash(args, ui)
     print("  " + (good("Done.") if code == 0 else bad(f"Stopped (exit {code}). The run folder above keeps the logs; nothing was retried.")))
     return code
@@ -384,7 +386,7 @@ def run(fl, ui=None):
     cfg = Config(fl.PRIVATE / "x28-flasher.json")
     print("\n  " + paint("x28-flasher", "bold", "cyan") + paint("  ZLT X28 flash and recovery", "dim") + "\n")
     try:
-        if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it.", True):
+        if ui.confirm("Start the UART logger now? It runs in the background for the whole session, and a flash needs it unless you have no UART adapter.", True):
             fl.start_capture(ui)
     except KeyboardInterrupt:
         print("\n  skipped; start it from the menu before flashing")

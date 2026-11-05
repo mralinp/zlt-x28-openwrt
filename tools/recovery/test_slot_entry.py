@@ -199,5 +199,20 @@ class NoSshTests(unittest.TestCase):
                 e.check_no_ssh(True, *args)
 
 
+class NoUartTests(unittest.TestCase):
+    def test_phrase_names_the_missing_uart(self):
+        a = slot_session.rootfs_a_spec('abcdef1234567890' * 4)
+        self.assertEqual(e.phrase(a, 'write', a.candidate_sha, False, False, True), 'WRITE write rootfs_a abcdef123456 NO-UART')
+        self.assertEqual(e.phrase(a, 'write', a.candidate_sha, True, True, True), 'WRITE write rootfs_a abcdef123456 NO-SSH NO-UART SAME-DISK')
+        self.assertNotIn('NO-UART', e.phrase(a, 'write', a.candidate_sha, False, True))
+
+    def test_no_uart_only_for_rootfs_a_and_not_with_a_log(self):
+        e.check_no_uart(True, 'rootfs_a', None)
+        e.check_no_uart(False, 'misc', Path('u.log'))
+        for target, log in (('misc', None), ('rootfs_a', Path('u.log'))):
+            with self.assertRaises(ValueError, msg=target):
+                e.check_no_uart(True, target, log)
+
+
 if __name__ == '__main__':
     unittest.main()

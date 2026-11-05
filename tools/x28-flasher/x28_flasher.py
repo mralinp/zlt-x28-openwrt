@@ -125,7 +125,8 @@ def stop_capture():
 
 def flash_cmd(args, uart, backup_copy):
     cmd = ["rootfs_a", args.mode, "--write", *tool_paths(args),
-           "--candidate-dir", args.candidate_dir, "--backup-copy", str(backup_copy), "--uart-log", str(uart)]
+           "--candidate-dir", args.candidate_dir, "--backup-copy", str(backup_copy)]
+    cmd += ["--no-uart"] if getattr(args, "no_uart", False) else ["--uart-log", str(uart)]
     for flag in ("base_dir", "prior_identical"):
         if getattr(args, flag):
             cmd += ["--" + flag.replace("_", "-"), getattr(args, flag)]
@@ -169,13 +170,14 @@ def cmd_flash(args, ui=None):
     copy = args.backup_copy or (ui.select("Second backup copy (on a different drive)", [(c, c) for c in copies]) if copies else None)
     if not copy:
         sys.exit(f"no second backup copy found (looked for */{BACKUP_NAME}); pass --backup-copy")
-    cap, uart = start_capture(ui)
+    cap, uart = (None, None) if getattr(args, "no_uart", False) else start_capture(ui)
     print("\nNext: the tool shows the exact phrase to type (you type it yourself), then asks you to unplug the\n"
           "router for 10 s or more and plug it back in with no buttons. No retry, no automatic reboot.\n")
     try:
         return run_tool("slot_entry.py", flash_cmd(args, uart, copy))
     finally:
-        print(f"UART log: {uart}")
+        if uart:
+            print(f"UART log: {uart}")
 
 
 def power_off_countdown(seconds=10, ask=input, sleep=time.sleep):
