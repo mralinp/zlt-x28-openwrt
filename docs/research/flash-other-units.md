@@ -17,7 +17,7 @@ Comparing its 51 images with the first unit's backup:
 | `ROOTFS_SIG`, `BOOT_SHA`, `LK_A`, `TEE_A` | identical | stay pinned: they define the supported boot chain; a unit without them is refused |
 | `ROOTFS_A_SHA`, `ROOTFS_B_SHA`, `ROOTFS_B_HEAD_SHA` | differ | come from the user's verified backup |
 | `MISC_SHA`, `MISC_A_SHA`, `BOOT_PARA` | differ | `MISC_SHA`, `BOOT_PARA` from the backup; the A-selected `misc` is computed from the user's own record |
-| `MISC_BEFORE` / `MISC_AFTER` | flags differ | validate the record shape (magic, B-selected priorities) and change only the priorities and A's tries and success bytes, keeping each slot's verity flag |
+| `MISC_BEFORE` / `MISC_AFTER` | flags differ | validate the record shape (magic, B-selected priorities) and apply the vendor's `change_slot_info "_b"` recipe to it: A priority `0f`, tries `03`, success `00`, flag `00`; B priority `0e`, B's tries, success and flag kept. The first unit's flags are `00`, so on it A's flag does not change; on the second unit A's `01` becomes `00`. The byte is called "up-type" in `slot-selection.md` and "verity" here; neither is proven, so the recipe is followed and the phrase names the change (`misc_entry.py`, #327) |
 
 ## No UART, no SSH
 - `check_uart`: with `--no-uart` the gate is waived on an explicit opt-in whose typed phrase says so; everything else still holds.

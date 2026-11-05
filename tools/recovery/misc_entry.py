@@ -63,6 +63,14 @@ def unit_misc_spec(rootfs_a_sha, pins, candidate_sha):
                         (*common, (*rootfs_a, (rootfs_a_sha, pins['rootfs_a'], pins['rootfs_b']))))
 
 
+def phrase(spec, mode, rootfs_a_sha, same_disk, no_ssh, no_uart, original):
+    """slot_entry's phrase minus its BROM-ROUTE-PROVEN claim, which is not true for this route: the USB route to misc is unproven.
+    Names the A flag change when this unit's record has one, so the owner types it."""
+    text = entry.phrase(spec, mode, rootfs_a_sha, same_disk, no_ssh, no_uart).replace('BROM-ROUTE-PROVEN', 'MISC-USB-ROUTE-UNPROVEN')
+    flag = original[session.MISC_COPIES[0] + 11]
+    return text.replace(' MISC-USB-ROUTE-UNPROVEN', f' MISC-USB-ROUTE-UNPROVEN A-FLAG-{flag:02X}-TO-00' if flag else ' MISC-USB-ROUTE-UNPROVEN')
+
+
 def load(backup, loader, candidate_dir):
     """(by_name, table, original, candidate, spec, rootfs_spec, identity). Loading as rootfs_a identical reuses slot_entry's
     identity (unit, host, DA, tools, rootfs_a) and its checks of the backup, the DA and the approved image."""
@@ -125,6 +133,9 @@ def main():
         expect = {**identity, 'target': target, 'original': specs[target].original_sha, 'candidate': specs[target].candidate_sha}
         priors[flag] = entry.load_prior(getattr(args, flag), expect, specs[target], mode, verified)
     print(f'{args.mode}: misc only at {spec.addr:#x}, {spec.size:#x} bytes; candidate {spec.candidate_sha[:12]}; no reboot or retry')
+    print(f'record per copy: {original[session.MISC_COPIES[0]:session.MISC_COPIES[0] + 16].hex()} -> {candidate[session.MISC_COPIES[0]:session.MISC_COPIES[0] + 16].hex()}'
+          + ('' if args.mode != 'identical' else '  (identical writes the unchanged record)'))
+    print('misc_entry.py sha256 ' + sha256_file(Path(__file__)))
     if not args.write:
         print('OFFLINE DRY RUN: no SSH, hardware import, USB command or write; execution gates not checked')
         return
@@ -151,10 +162,12 @@ def main():
         raise ValueError('less than 1 GiB free for captures and sources')
     if not sys.stdin.isatty():
         raise ValueError('typed confirmation needs an interactive terminal')
-    expected_phrase = entry.phrase(spec, args.mode, rootfs_a_sha, same_disk, args.no_ssh, args.no_uart)
+    expected_phrase = phrase(spec, args.mode, rootfs_a_sha, same_disk, args.no_ssh, args.no_uart, original)
     print(('Confirm stable power' if args.no_uart else 'Confirm UART RX capture continues, stable power') + ', and no stock upgrade/FOTA pending.')
     print('misc is the LIVE slot selector and is rewritten whole (1 MiB): a power or USB loss can leave no valid record.')
-    print('The USB route to misc is unproven: block writes were never acknowledged on the first unit. Merging a PR is not approval.')
+    print('The USB route to misc is unproven: block writes were never acknowledged on the first unit. If a block is erased and its write is')
+    print('not acknowledged, that copy is blank or partial, and restore uses the same USB path, so it can fail the same way. The last resort')
+    print('is then BROM or test-point access. Treat any unacknowledged write in `identical` as a stop before `write`. Merging a PR is not approval.')
     if same_disk:
         print('WARNING: backup copy is on the same filesystem; host disk loss would lose both copies.')
     if input(f'Type exactly {expected_phrase!r} to attest those checks and authorize this operation: ') != expected_phrase:
@@ -162,7 +175,7 @@ def main():
     run = Path(tempfile.mkdtemp(prefix=f'slot-misc-{args.mode}-', dir=probe_dir)).resolve()
     receipt = {'schema': 2, 'run': str(run), 'target': 'misc', 'mode': args.mode, 'status': 'STARTED', 'identity': identity,
                'created': time.time(), 'uart': str(uart) if uart else None, 'no_uart': args.no_uart, 'no_ssh': args.no_ssh,
-               'same_disk_backup': same_disk, 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
+               'same_disk_backup': same_disk, 'misc_entry': sha256_file(Path(__file__)), 'priors': {k: str(getattr(args, k).resolve()) for k in priors}}
     save(run, receipt)
     mtk = None
     previous_cwd = Path.cwd()
@@ -204,4 +217,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (ValueError, OSError, KeyError) as error:
+        sys.exit(str(error))

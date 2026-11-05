@@ -67,6 +67,17 @@ class SpecTests(unittest.TestCase):
         self.assertEqual(s.misc_spec('c' * 64).original_sha, s.MISC_SHA)
 
 
+class PhraseTests(unittest.TestCase):
+    def test_phrase_never_claims_the_route_is_proven_and_names_the_flag_change(self):
+        for record, tail in ((FIRST, 'MISC-USB-ROUTE-UNPROVEN'), (SECOND, 'MISC-USB-ROUTE-UNPROVEN A-FLAG-01-TO-00')):
+            original = misc_with(record)
+            pins = s.unit_pins(SpecTests().images(record))
+            spec = m.unit_misc_spec('c' * 64, pins, m.digest(m.misc_candidate(original)))
+            text = m.phrase(spec, 'write', 'c' * 64, False, True, True, original)
+            self.assertNotIn('BROM-ROUTE-PROVEN', text)
+            self.assertTrue(text.endswith(f' ROOTFS-A cccccccccccc {tail} NO-SSH NO-UART'), text)
+
+
 class FrozenToolsTests(unittest.TestCase):
     def test_this_file_is_not_hashed_into_receipts(self):
         # Receipts bind to the hash of these files; adding misc_entry to it would invalidate every earlier receipt.
