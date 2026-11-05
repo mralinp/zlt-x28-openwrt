@@ -15,6 +15,7 @@ proto_x28_mipc_init_config() {
  proto_config_add_int mtu
  proto_config_add_int iptype
  proto_config_add_boolean roaming
+ proto_config_add_string plmn
  proto_config_add_defaults
 }
 
@@ -73,6 +74,32 @@ x28_mipc_sync_attach() {
  mipc_wan_cli --at_cmd at+cfun=0 >/dev/null 2>&1
  sleep 2
  x28_mipc_cfun_on && x28_mipc_wait_reg
+}
+
+# Operator: empty = automatic, else manual selection of that numeric PLMN (like the vendor's network search).
+# +COPS: <mode>,<format>,"<oper>",<act>; mode 0 automatic, 1 manual. A manual choice that does not register is undone.
+x28_mipc_operator() {
+ local want="$1" cops mode oper i=0
+ mipc_wan_cli --at_cmd 'at+cops=3,2' >/dev/null 2>&1
+ cops="$(mipc_wan_cli --at_cmd 'at+cops?' 2>/dev/null | sed -n 's/^+COPS: *\([0-9]*\)\(,[0-9]*,"\([0-9]*\)"\)\{0,1\}.*/\1 \3/p' | head -n 1)"
+ set -- $cops
+ mode="$1" oper="$2"
+ if [ -z "$want" ]; then
+  [ "$mode" = 0 ] && return 0
+  mipc_wan_cli --at_cmd 'at+cops=0' 2>/dev/null | grep -q '^OK' || return 1
+  x28_mipc_wait_reg
+  return
+ fi
+ [ "$mode" = 1 ] && [ "$oper" = "$want" ] && return 0
+ if mipc_wan_cli --at_cmd "at+cops=1,2,\"$want\"" 2>/dev/null | grep -q '^OK'; then
+  until [ "$(mipc_wan_cli --at_cmd 'at+cops?' 2>/dev/null | sed -n 's/^+COPS: *[0-9]*,[0-9]*,"\([0-9]*\)".*/\1/p' | head -n 1)" = "$want" ] && x28_mipc_reg >/dev/null; do
+   [ "$i" -ge 60 ] && break
+   sleep 1; i=$((i + 1))
+  done
+  [ "$i" -lt 60 ] && return 0
+ fi
+ mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
+ return 1
 }
 
 x28_mipc_ipv4() {
@@ -176,9 +203,9 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming defaultroute peerdns metric sim rc reply result cid ifname
+ local interface="$1" apn mtu iptype roaming plmn defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype roaming defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn defaultroute peerdns metric
  mtu="${mtu:-1500}"; iptype="${iptype:-3}"; roaming="${roaming:-0}"
  defaultroute="${defaultroute:-1}"; peerdns="${peerdns:-1}"; metric="${metric:-0}"
  # Empty APN = automatic from the SIM, resolved once the SIM is ready.
@@ -187,6 +214,7 @@ x28_mipc_setup() {
     ! x28_mipc_uint "$mtu" 1500 || [ "$mtu" -lt 576 ] ||
     ! x28_mipc_uint "$metric" 65535 ||
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
+    { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
     { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; }; then
   proto_notify_error "$interface" INVALID_CONFIG
@@ -213,6 +241,7 @@ x28_mipc_setup() {
   case "$apn" in ''|-*|*[!a-zA-Z0-9._-]*) proto_notify_error "$interface" NO_SIM_APN; return 1 ;; esac
  fi
 
+ x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

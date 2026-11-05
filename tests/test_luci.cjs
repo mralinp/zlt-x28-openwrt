@@ -8,7 +8,7 @@ const errors = {}, options = {};
 let name;
 const protocol = vm.runInNewContext('(function(){' + script + '\n})()', {
  _: value => value,
- form: {Value:'value', ListValue:'listvalue', Flag:'flag', DynamicList:'list'},
+ form: {Button:'button', Value:'value', ListValue:'listvalue', Flag:'flag', DynamicList:'list'},
  fs: {},
  L: {},
  network: {

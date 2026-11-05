@@ -6,7 +6,7 @@
 
 network.registerPatternVirtual(/^ccmni[0-9]+$/);
 [
- ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, MTU or routing options'],
+ ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, operator, MTU or routing options'],
  ['NO_SIM_APN', 'No APN is known for this SIM; choose or enter one'],
  ['ROAMING_DISABLED', 'Registered on a roaming network and roaming is off; enable Allow roaming'],
  ['ATTACH_FAILED', 'The modem could not re-attach with this APN and IP type'],
@@ -18,6 +18,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['SIM_NOT_READY', 'The SIM is not ready'],
  ['CONNECT_FAILED', 'The modem could not establish the data connection'],
  ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
+ ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],
@@ -62,6 +63,25 @@ return network.registerProtocol('x28_mipc', {
   option = section.taboption('general', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';
+  option = section.taboption('carrier', form.Value, 'plmn', _('Operator (PLMN)'),
+   _('Leave empty to register automatically, or pick the numeric PLMN (MCC+MNC) of a network from the last scan. If it does not register, the modem goes back to automatic.'));
+  option.placeholder = _('Automatic');
+  option.validate = function(_section, value) {
+   return /^([0-9]{5,6})?$/.test(value || '') || _('Enter a 5 or 6 digit PLMN, e.g. 43211.');
+  };
+  option.load = function(section_id) {
+   // x28-plmn-scan --last prints "plmn<TAB>name<TAB>act<TAB>status" per network of the last scan.
+   return fs.exec('/sbin/x28-plmn-scan', ['--last']).then(L.bind(function(res) {
+    (res.stdout || '').split('\n').forEach(L.bind(function(line) {
+     var f = line.split('\t');
+     if (f[0]) this.value(f[0], '%s (%s)'.format(f[0], f[1] || _('network')));
+    }, this));
+   }, this)).catch(function() {}).then(L.bind(form.Value.prototype.load, this, section_id));
+  };
+  option = section.taboption('carrier', form.Button, 'plmnscan', _('Search networks'),
+   _('Takes up to a few minutes and drops the data connection meanwhile; it reconnects by itself. Reload this page afterwards for the list.'));
+  option.inputtitle = _('Scan');
+  option.onclick = function() { return fs.exec('/sbin/x28-plmn-scan'); };
   option = section.taboption('advanced', form.Value, 'mtu', _('MTU'));
   option.datatype = 'range(576,1500)';
   option.placeholder = '1500';

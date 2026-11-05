@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Scans for networks (AT+COPS=?), prints "plmn<TAB>name<TAB>act<TAB>status" per network and keeps the last result in
+# /tmp/x28-plmn-scan. A scan takes up to a few minutes and the modem is off its network meanwhile: it drops the data
+# connection, which comes back by itself afterwards (netifd retries). `x28-plmn-scan --last` prints the cached result.
+# status: 1 available, 2 current, 3 forbidden (3GPP), 0 unknown. act: 0 GSM, 2 UMTS, 7 LTE, 12/13 NR.
+
+OUT=${X28_PLMN_SCAN_FILE:-/tmp/x28-plmn-scan}
+
+parse() {
+	# +COPS: (2,"long","short","43211",7),(1,"long","short","43235",7),,(0-4),(0-2)
+	tr -d '\r' | sed -n 's/^+COPS: *//p' | sed 's/),,.*//; s/^(//; s/)$//; s/),(/\n/g' | awk -F, '
+		{ gsub(/"/, ""); if ($4 ~ /^[0-9]+$/) printf "%s\t%s\t%s\t%s\n", $4, $2, $5, $1 }'
+}
+
+selftest() {
+	got=$(printf 'AT response:\r\n+COPS: (2,"MCI","MCI","43211",7),(1,"Irancell","IR-TCI","43235",7),(3,"X","X","99999",2),,(0-4),(0-2)\r\n\r\nOK\r\n' | parse | tr '\t\n' '|;')
+	want='43211|MCI|7|2;43235|Irancell|7|1;99999|X|2|3;'
+	[ "$got" = "$want" ] || { echo "got $got"; return 1; }
+	echo "selftest ok"
+}
+
+case "$1" in
+	selftest) selftest ;;
+	--last) cat "$OUT" 2>/dev/null ;;
+	*)
+		res="$(mipc_wan_cli --at_cmd 'at+cops=?' 2>/dev/null | parse)" || exit 1
+		[ -n "$res" ] || exit 1
+		printf '%s\n' "$res" > "$OUT"
+		printf '%s\n' "$res" ;;
+esac
