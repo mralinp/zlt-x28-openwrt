@@ -31,9 +31,10 @@ mipc_wan_cli() {
     at+cops?) set -- "$1" "$(cat "$case_dir/cops")"; printf 'AT response:\n+COPS: %s,2,"%s",7\n\nOK\n' "${2%% *}" "${2#* }" ;;
     at+cops=0) echo "0 43211" > "$case_dir/cops"; printf 'AT response:\nOK\n' ;;
     at+cops=1,2,*)
-     [ "$(cat "$case_dir/cops_set_ok")" = 1 ] || { printf 'AT response:\n+CME ERROR: 3\n'; return 0; }
+     # Like the modem: it can answer an error and still apply (cops_err_applied), or answer OK and not.
+     [ "$(cat "$case_dir/cops_set_ok")" = 1 ] || [ "$(cat "$case_dir/cops_err_applied")" = 1 ] || { printf 'AT response:\n+CME ERROR: 3\n'; return 0; }
      [ "$(cat "$case_dir/cops_noop")" = 1 ] || echo "1 $(echo "${2#at+cops=1,2,}" | tr -d '"')" > "$case_dir/cops"
-     printf 'AT response:\nOK\n' ;;
+     if [ "$(cat "$case_dir/cops_err_applied")" = 1 ]; then printf 'AT response:\n+CME ERROR: 100\n'; else printf 'AT response:\nOK\n'; fi ;;
     at+cfun=0) printf 'AT response:\nOK\n' ;;
     at+cfun=1) [ "$(cat "$case_dir/cfun_ok")" = 1 ] && printf 'AT response:\nOK\n' ;;
     *) printf 'Unexpected AT command\n' >&2; return 99 ;;

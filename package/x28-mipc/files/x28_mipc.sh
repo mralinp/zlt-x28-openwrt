@@ -76,28 +76,30 @@ x28_mipc_sync_attach() {
  x28_mipc_cfun_on && x28_mipc_wait_reg
 }
 
+# "<mode> <oper>" from +COPS: <mode>,<format>,"<oper>",<act>; mode 0 automatic, 1 manual.
+x28_mipc_cops() {
+ mipc_wan_cli --at_cmd 'at+cops?' 2>/dev/null | sed -n 's/^+COPS: *\([0-9]*\)\(,[0-9]*,"\([0-9]*\)"\)\{0,1\}.*/\1 \3/p' | head -n 1
+}
+
 # Operator: empty = automatic, else manual selection of that numeric PLMN (like the vendor's network search).
-# +COPS: <mode>,<format>,"<oper>",<act>; mode 0 automatic, 1 manual. A manual choice that does not register is undone.
+# The modem answers +CME ERROR 100 to AT+COPS=1 yet applies it (observed), so the result is read back, not taken from
+# the reply. A manual choice that does not register is set back to automatic.
 x28_mipc_operator() {
- local want="$1" cops mode oper i=0
+ local want="$1" want_mode=0 i=0
  mipc_wan_cli --at_cmd 'at+cops=3,2' >/dev/null 2>&1
- cops="$(mipc_wan_cli --at_cmd 'at+cops?' 2>/dev/null | sed -n 's/^+COPS: *\([0-9]*\)\(,[0-9]*,"\([0-9]*\)"\)\{0,1\}.*/\1 \3/p' | head -n 1)"
- set -- $cops
- mode="$1" oper="$2"
- if [ -z "$want" ]; then
-  [ "$mode" = 0 ] && return 0
-  mipc_wan_cli --at_cmd 'at+cops=0' 2>/dev/null | grep -q '^OK' || return 1
-  x28_mipc_wait_reg
-  return
+ [ -z "$want" ] || want_mode=1
+ [ "$(x28_mipc_cops)" = "$want_mode${want:+ $want}" ] && return 0
+ [ -n "$want" ] || [ "$(x28_mipc_cops | cut -d' ' -f1)" != 0 ] || return 0
+ if [ -n "$want" ]; then
+  mipc_wan_cli --at_cmd "at+cops=1,2,\"$want\"" >/dev/null 2>&1
+ else
+  mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
  fi
- [ "$mode" = 1 ] && [ "$oper" = "$want" ] && return 0
- if mipc_wan_cli --at_cmd "at+cops=1,2,\"$want\"" 2>/dev/null | grep -q '^OK'; then
-  until [ "$(mipc_wan_cli --at_cmd 'at+cops?' 2>/dev/null | sed -n 's/^+COPS: *[0-9]*,[0-9]*,"\([0-9]*\)".*/\1/p' | head -n 1)" = "$want" ] && x28_mipc_reg >/dev/null; do
-   [ "$i" -ge 60 ] && break
-   sleep 1; i=$((i + 1))
-  done
-  [ "$i" -lt 60 ] && return 0
- fi
+ until [ "$(x28_mipc_cops | cut -d' ' -f1)" = "$want_mode" ] && { [ -z "$want" ] || [ "$(x28_mipc_cops | cut -d' ' -f2)" = "$want" ]; } && x28_mipc_reg >/dev/null; do
+  [ "$i" -ge 60 ] && break
+  sleep 1; i=$((i + 1))
+ done
+ [ "$i" -lt 60 ] && return 0
  mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
  return 1
 }

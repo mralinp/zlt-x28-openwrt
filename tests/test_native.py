@@ -43,6 +43,8 @@ def cases():
         case("leading-dash-apn", config={"apn": "-x"}, error="INVALID_CONFIG", no_cli=True),
         case("attach-no-registration", ia="", reg=0, error="ATTACH_FAILED", no_activate_call=True),
         case("operator-manual", config={"plmn": "43235"}, expect_cmds=['--at_cmd at+cops=1,2,"43235"', "--data_call_act"]),
+        case("operator-error-but-applied", config={"plmn": "43235"}, cops_err_applied=1,
+             expect_cmds=['--at_cmd at+cops=1,2,"43235"', "--data_call_act"]),
         case("operator-already", config={"plmn": "43211"}, cops="1 43211", no_cops_set=True),
         case("operator-back-to-auto", cops="1 43235", expect_cmds=["--at_cmd at+cops=0", "--data_call_act"]),
         case("operator-rejected", config={"plmn": "43235"}, cops_set_ok=0, error="OPERATOR_FAILED", no_activate_call=True,
@@ -214,6 +216,7 @@ def main():
             (d / "ia_set_noop").write_text(str(item.get("ia_set_noop", 0)))
             (d / "cops").write_text(item.get("cops", "0 43211"))
             (d / "cops_set_ok").write_text(str(item.get("cops_set_ok", 1)))
+            (d / "cops_err_applied").write_text(str(item.get("cops_err_applied", 0)))
             (d / "cops_noop").write_text(str(item.get("cops_noop", 0)))
             (d / "act_hang").write_text(str(item.get("act_hang", 0)))
             (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
