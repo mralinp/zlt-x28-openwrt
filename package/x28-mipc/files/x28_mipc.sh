@@ -176,7 +176,7 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming defaultroute peerdns metric sim reply result cid ifname
+ local interface="$1" apn mtu iptype roaming defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
  json_get_vars apn mtu iptype roaming defaultroute peerdns metric
  mtu="${mtu:-1500}"; iptype="${iptype:-3}"; roaming="${roaming:-0}"
@@ -231,9 +231,16 @@ x28_mipc_setup() {
  json_add_string bearer_bitmask "0xfffdffff"
  json_add_int mtu "$mtu"
  json_add_int mode 1
- reply="$(mipc_wan_cli --data_call_act "$(json_dump)" 2>/dev/null)" || {
-  proto_notify_error "$interface" CONNECT_FAILED; return 1;
- }
+ reply="$(timeout 30 mipc_wan_cli --data_call_act "$(json_dump)" 2>/dev/null)"
+ rc=$?
+ if [ "$rc" = 124 ]; then
+  # After a teardown the modem may never answer (observed, #337); a radio cycle clears it, then netifd retries.
+  mipc_wan_cli --at_cmd at+cfun=0 >/dev/null 2>&1
+  sleep 2
+  x28_mipc_cfun_on && x28_mipc_wait_reg
+  proto_notify_error "$interface" CONNECT_TIMEOUT; return 1
+ fi
+ [ "$rc" = 0 ] || { proto_notify_error "$interface" CONNECT_FAILED; return 1; }
  if ! json_load "$reply"; then
   proto_notify_error "$interface" INVALID_REPLY
   proto_block_restart "$interface"; return 1

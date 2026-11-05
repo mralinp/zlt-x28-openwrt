@@ -34,6 +34,13 @@ mipc_wan_cli() {
   *) printf 'Unexpected modem command\n' >&2; return 99 ;;
  esac
 }
+timeout() {
+ shift
+ "$@"
+ local rc=$?
+ [ "$(cat "$case_dir/act_hang")" = 1 ] && return 124
+ return $rc
+}
 ubus() {
  if [ "$1" = call ] && [ "$2" = network.interface ] && [ "$3" = notify_proto ]; then
   printf '%s\n' "$4" >> "$NOTIFICATIONS"

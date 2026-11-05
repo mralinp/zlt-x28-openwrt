@@ -17,6 +17,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['SIM_PIN_LOCKED', 'The SIM requires PIN or PUK handling'],
  ['SIM_NOT_READY', 'The SIM is not ready'],
  ['CONNECT_FAILED', 'The modem could not establish the data connection'],
+ ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],

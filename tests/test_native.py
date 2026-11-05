@@ -65,6 +65,8 @@ def cases():
         case("vendor-active", vendor_active=1, error="VENDOR_WAN_ACTIVE", no_cli=True),
         case("sim-locked", sim="MIPC_SIM_STATUS_SIM_PIN", error="SIM_PIN_LOCKED", no_activate=True),
         case("sim-pending", sim="MIPC_SIM_STATUS_NOT_READY", error="SIM_NOT_READY", no_activate=True),
+        case("activate-hang", act_hang=1, error="CONNECT_TIMEOUT",
+             expect_cmds=["--data_call_act", "--at_cmd at+cfun=0", "--at_cmd at+cfun=1"]),
         case("activate-failed", activate_rc=1, error="CONNECT_FAILED"),
         case("malformed-json", raw_reply="not json", error="INVALID_REPLY"),
         case("modem-rejected", reply={"result": 7}, error="CONNECT_FAILED"),
@@ -199,6 +201,7 @@ def main():
             (d / "ia").write_text(ia)
             (d / "reg").write_text(str(item.get("reg", 1)))
             (d / "ia_set_noop").write_text(str(item.get("ia_set_noop", 0)))
+            (d / "act_hang").write_text(str(item.get("act_hang", 0)))
             (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:

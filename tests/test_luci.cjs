@@ -34,7 +34,7 @@ assert.equal(options.apn.validate(null, ''), true);
 assert.deepEqual(Object.keys(options.iptype.choices).sort(), ['1', '2', '3']);
 assert.equal(options.iptype.default, '3');
 assert.equal(options.roaming.default, '0');
-assert(errors.ROAMING_DISABLED && errors.ATTACH_FAILED);
+assert(errors.CONNECT_TIMEOUT && errors.ROAMING_DISABLED && errors.ATTACH_FAILED);
 assert.equal(options.mtu.datatype, 'range(576,1500)');
 assert.equal(options.metric.datatype, 'range(0,65535)');
 assert.equal(options.defaultroute.default, '1');
