@@ -19,7 +19,7 @@ plus a recovery slot on B. History: `CHANGELOG.md`.
 - Never run vendor binaries with unknown flags (`sms_mgr -h` rebooted the device). Never put the LAN IP/netmask behind an automatic apply path.
 - Never enter passwords, forge sessions (`ubus session create`), or run broad `find / -exec rm|chown` on the router. Sending an SMS or placing a call needs the user to name the number.
 - Flash/bootloader work (`risk/brick`) requires: full verified mtd dump, UART access, tested way back, and only the inactive A/B slot.
-- Native image flashing goes only through the guarded sessions in `tools/recovery/` (dry run first; typed phrase from the owner for each step;
+- Native image flashing goes only through the guarded sessions in `tools/recovery/` of the separate repo mralinp/x28-flasher (it pins this one as a submodule) (dry run first; typed phrase from the owner for each step;
   never edit those tools mid-chain: their hashes bind the receipts). The router-safety-auditor reviews any change to them.
 - The preloader adds a boot "try" to the A record on boots; `x28-bootok` resets it. Do not reboot the unit casually while it is not reset,
   and never boot stock B with A's tries above 3 (B repairs, i.e. erases, A).
@@ -35,7 +35,7 @@ plus a recovery slot on B. History: `CHANGELOG.md`.
 
 ## Architecture in one paragraph
 **Native image (current):** OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, built by `tools/build/` (`stage_native.py` -> `first_boot.py` -> `package_ubi.py`)
-and flashed to slot A by `tools/recovery/slot_entry.py`. Vendor daemons (`ql_ril_service`, `ql_netd`, `mipc_submonitor`, `atci_service`, ...) run only as the modem
+and flashed to slot A by `tools/recovery/slot_entry.py` (repo mralinp/x28-flasher). Vendor daemons (`ql_ril_service`, `ql_netd`, `mipc_submonitor`, `atci_service`, ...) run only as the modem
 backend, started by `package/x28-modem`; networking is standard OpenWrt (netifd, dnsmasq, fw3) with our `x28_mipc` protocol for the 5G WAN, `x28-wifi` for the
 MT7915, `x28-leds` for the front LEDs and `x28-bootok` for the A/B boot counter. Details: `docs/STATUS.md`, `docs/BUILD.md`, `docs/NATIVE-CELLULAR.md`.
 **Stock-firmware overlay (legacy):** `router/usr/lib/lua/vendorbridge.lua` logs into `/tzwww/cgi-bin/http.cgi` (creds in `/etc/vendor-ui.cred`, session cached in

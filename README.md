@@ -148,10 +148,12 @@ flowchart LR
 - **Our packages** (`package/`): `x28-mipc` (cellular netifd protocol) with its LuCI page, `x28-modem` (starts the
   vendor modem stack), `x28-wifi`, `x28-leds`, `x28-bootok` (A/B boot counter) and `x28-kmods` (WireGuard and TPROXY
   modules for the vendor kernel: sources here, built locally against the kernel tree, loaded after a good boot).
-- **Guarded flashing.** The tools in `tools/recovery/` write only the targets they were built for, check the other
+- **Guarded flashing.** The tools in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/` there) write only the targets they were built for, check the other
   slot and neighbouring partitions before and after every write, and need a typed phrase from the owner.
 
 ## Build and flash overview
+
+Backup, USB and flash steps (1, 2 and 5) run from a checkout of [x28-flasher](https://github.com/mralinp/x28-flasher), which pins this repo as a submodule; the commands below name its `tools/recovery/` paths.
 
 Everything is detailed, with expected output, in [docs/BUILD.md](docs/BUILD.md) and
 [docs/TESTING.md](docs/TESTING.md). Hardware: a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work), a **1.8 V**

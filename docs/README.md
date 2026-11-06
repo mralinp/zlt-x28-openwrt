@@ -57,7 +57,7 @@ docs/
 |---|---|
 | `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter) |
 | `tools/build/` | `userspace.sh` (ImageBuilder), `stage_native.py` (private rootfs staging), `first_boot.py` (the management profile and policy), `ab_guard.py` (refuses images whose boot path can write flash), `package_ubi.py` (UBI packaging), `qemu_boot_test.py`, `device_ram_test.sh`, `link_check.py`, `management_auth_test.py` |
-| `tools/recovery/` | backup and verify, mtkclient setup, USB reads, and the guarded flash sessions: `slot_entry.py` / `slot_session.py` (`rootfs_a`), `slot_blocks_entry.py` / `slot_blocks.py` (`misc` blocks, `rootfs_sig_a` rehearsal), `restore_entry.py` |
+| (moved) | the backup, USB and guarded flash tools live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/`, `tools/x28-flasher/`) |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |
 | `scripts/` | `release.py` (version and PR-title rules), `changelog.py` (regenerates the release list in CHANGELOG.md), `install.sh` (deploys the stock-firmware overlay), label sync |
@@ -66,5 +66,5 @@ docs/
 | `.github/workflows/` | `ci.yml`, `userspace.yml`, `release.yml` |
 
 Every analysis tool has a runnable self-check: `python3 tools/firmware/inventory.py selftest`,
-`python3 tools/recovery/common.py`, `python3 scripts/release.py selftest`, `python3 scripts/changelog.py --check`
+`python3 scripts/release.py selftest`, `python3 scripts/changelog.py --check`
 (CI runs the self-checks; `changelog.py --check` itself needs `gh` and network access, so only its self-test runs in CI).
