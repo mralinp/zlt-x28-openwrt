@@ -205,6 +205,8 @@ SquashFS/XZ, a **fresh empty UBIFS overlay**, and a UBI container with this unit
 reservations. This is an offline packaging result, **not flash/boot approval**. Stock boot and signature
 partitions are neither changed nor generated. No captured writable overlay is reused.
 
+The assembly tools (`stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`) and the tools Dockerfile now live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/build/`, `tools/firmware/`); paths below are relative to that repo.
+
 Build the local tooling image (public tools only), then run with networking disabled and private
 inputs read-only. The output parent must exist and the output directory must not:
 

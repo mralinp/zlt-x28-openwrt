@@ -34,7 +34,7 @@ plus a recovery slot on B. History: `CHANGELOG.md`.
 - Access: SSH key auth, `ssh x28` (port 22 on the native image, 2222 on older ones; `~/.ssh/config`); LuCI `https://192.168.70.1/cgi-bin/luci` (self-signed; HTTP redirects) (empty root password until you set one); the native image has no vendor UI.
 
 ## Architecture in one paragraph
-**Native image (current):** OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, built by `tools/build/` (`stage_native.py` -> `first_boot.py` -> `package_ubi.py`)
+**Native image (current):** OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, built by the x28-flasher repo (`tools/build/`: `stage_native.py` -> `first_boot.py` -> `package_ubi.py`)
 and flashed to slot A by `tools/recovery/slot_entry.py` (repo mralinp/x28-flasher). Vendor daemons (`ql_ril_service`, `ql_netd`, `mipc_submonitor`, `atci_service`, ...) run only as the modem
 backend, started by `package/x28-modem`; networking is standard OpenWrt (netifd, dnsmasq, fw3) with our `x28_mipc` protocol for the 5G WAN, `x28-wifi` for the
 MT7915, `x28-leds` for the front LEDs and `x28-bootok` for the A/B boot counter. Details: `docs/STATUS.md`, `docs/BUILD.md`, `docs/NATIVE-CELLULAR.md`.
