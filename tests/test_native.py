@@ -57,12 +57,13 @@ def cases():
              expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--data_call_act"]),
         case("cell-lock-already", config={"celllock": "42090:258"}, lock="1,7,0,42090,258,0", no_lock_set=True),
         case("cell-lock-off", lock="1,7,0,42090,258,0", expect_cmds=["--at_cmd at+emmchlck=0", "--data_call_act"]),
-        case("cell-lock-no-service", config={"celllock": "42090:258"}, reg=0, error="CELL_LOCK_FAILED", no_activate_call=True,
-             expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--at_cmd at+emmchlck=0"]),
+        # reg=0 means no registration at all, so setup later stops at the attach step; the lock was set once and not removed.
+        case("cell-lock-no-service-kept", config={"celllock": "42090:258"}, reg=0, error="ATTACH_FAILED", no_activate_call=True,
+             one_lock_set=True, no_lock_clear=True, expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258"]),
         case("cell-lock-not-applied", config={"celllock": "42090:258"}, lock_noop=1, error="CELL_LOCK_FAILED", no_activate_call=True,
-             expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--at_cmd at+emmchlck=0"]),
-        case("cell-lock-stale-no-service", config={"celllock": "42090:258"}, lock="1,7,0,42090,258,0", reg=0,
-             error="CELL_LOCK_FAILED", no_activate_call=True, no_lock_set_cmd=True, expect_cmds=["--at_cmd at+emmchlck=0"]),
+             one_lock_set=True, no_lock_clear=True, expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258"]),
+        case("cell-lock-stale-kept", config={"celllock": "42090:258"}, lock="1,7,0,42090,258,0", reg=0,
+             error="ATTACH_FAILED", no_activate_call=True, no_lock_set=True, no_lock_clear=True),
         case("cell-lock-off-unreadable", lock="garbage", expect_cmds=["--at_cmd at+emmchlck=0", "--data_call_act"]),
         case("cell-lock-leading-zero", config={"celllock": "042090:258"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-pci-leading-zero", config={"celllock": "42090:0258"}, error="INVALID_CONFIG", no_cli=True),
@@ -203,6 +204,10 @@ def verify(item, directory):
         assert sum(c.startswith("x28-nrband set") for c in commands) == 1, commands
     if item.get("one_epbse_set"):
         assert sum(c.startswith("--at_cmd at+epbse=") for c in commands) == 1, commands
+    if item.get("one_lock_set"):
+        assert sum(c.startswith("--at_cmd at+emmchlck=1") for c in commands) == 1, commands
+    if item.get("no_lock_clear"):
+        assert not any(c == "--at_cmd at+emmchlck=0" for c in commands), commands
     if item.get("no_nr_set"):
         assert not any(c.startswith("x28-nrband set") for c in commands), commands
     if item.get("no_nr_any"):

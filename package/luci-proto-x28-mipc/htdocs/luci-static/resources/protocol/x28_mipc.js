@@ -19,7 +19,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['CONNECT_FAILED', 'The modem could not establish the data connection'],
  ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
  ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
- ['CELL_LOCK_FAILED', 'The cell lock did not hold or the cell has no service; it was removed'],
+ ['CELL_LOCK_FAILED', 'The cell lock did not take effect on the modem'],
  ['BAND_LOCK_FAILED', 'The band lock did not take effect on the modem'],
  ['NRBAND_LOCK_FAILED', 'The 5G band lock did not take effect on the modem, or the band tool (x28-nrband) is missing'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
@@ -188,7 +188,7 @@ return network.registerProtocol('x28_mipc', {
 
   // Cell lock. The mode is not stored; the UCI option `celllock` is (set = locked).
   option = section.taboption('carrier', form.ListValue, 'cellmode', _('Cell lock'),
-   _('Lock the modem to one LTE cell. The modem can lock a single cell only (no list, no exclusion) and only on 4G. If the cell has no service the lock is removed.'));
+   _('Lock the modem to one LTE cell. The modem can lock a single cell only (no list, no exclusion) and only on 4G. If the cell has no service, remove the lock: it is not removed for you.'));
   option.value('none', _('No lock'));
   option.value('lock', _('Lock to the selected cell'));
   option.default = 'none';

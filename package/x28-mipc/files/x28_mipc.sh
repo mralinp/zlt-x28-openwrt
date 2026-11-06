@@ -212,9 +212,9 @@ x28_mipc_cell_ok() {
 }
 
 # LTE cell lock "<earfcn>:<pci>" (AT+EMMCHLCK; its range excludes NR on this modem), empty = off. Locking re-selects the
-# cell and drops the bearer, so it is applied before the data call. Only a positive read counts: "off" for
-# +EMMCHLCK: 0, the cell for a lock, empty when unreadable (the CLI sometimes crashes). A lock that does not hold or has
-# no service is undone, also when it was already set by an earlier, interrupted attempt.
+# cell and drops the bearer, so it is applied before the data call. Only a positive read counts: "off" for +EMMCHLCK: 0,
+# the cell for a lock, empty when unreadable (the CLI sometimes crashes). Strict (owner decision): a lock that took effect is
+# never undone for lack of service, only a lock that did not take effect is an error.
 x28_mipc_celllock() {
  local want="$1" i=0
  x28_mipc_lockread() {
@@ -231,15 +231,18 @@ x28_mipc_celllock() {
  fi
  if [ "$(x28_mipc_lockread)" != "$want" ]; then
   mipc_wan_cli --at_cmd "at+emmchlck=1,7,0,${want%:*},${want#*:}" >/dev/null 2>&1
-  until [ "$(x28_mipc_lockread)" = "$want" ]; do
-   [ "$i" -ge 10 ] && break
+  held=0
+  while [ "$i" -le 10 ]; do
+   [ "$(x28_mipc_lockread)" = "$want" ] && { held=1; break; }
    sleep 1; i=$((i + 1))
   done
+  [ "$held" = 1 ] || return 1
   sleep 3
  fi
- [ "$i" -lt 10 ] && x28_mipc_wait_reg && return 0
- mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
- return 1
+ # Strict: a lock that took effect stays, also one left by an earlier attempt. No service afterwards is for the owner to
+ # fix by removing the lock.
+ x28_mipc_wait_reg || logger -t x28_mipc "no service after the cell lock ($want); remove the lock to get it back"
+ return 0
 }
 
 x28_mipc_ipv4() {
