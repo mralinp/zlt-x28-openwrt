@@ -53,6 +53,18 @@ def cases():
              expect_cmds=['--at_cmd at+cops=1,2,"43235"', "--at_cmd at+cops=0"]),
         case("operator-short", config={"plmn": "4321"}, error="INVALID_CONFIG", no_cli=True),
         case("operator-nondigit", config={"plmn": "43x11"}, error="INVALID_CONFIG", no_cli=True),
+        case("cell-lock-set", config={"celllock": "42090:258"},
+             expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--data_call_act"]),
+        case("cell-lock-already", config={"celllock": "42090:258"}, lock="1,7,0,42090,258,0", no_lock_set=True),
+        case("cell-lock-off", lock="1,7,0,42090,258,0", expect_cmds=["--at_cmd at+emmchlck=0", "--data_call_act"]),
+        case("cell-lock-no-service", config={"celllock": "42090:258"}, reg=0, error="CELL_LOCK_FAILED", no_activate_call=True,
+             expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--at_cmd at+emmchlck=0"]),
+        case("cell-lock-not-applied", config={"celllock": "42090:258"}, lock_noop=1, error="CELL_LOCK_FAILED", no_activate_call=True,
+             expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258", "--at_cmd at+emmchlck=0"]),
+        case("cell-lock-no-pci", config={"celllock": "42090"}, error="INVALID_CONFIG", no_cli=True),
+        case("cell-lock-big-earfcn", config={"celllock": "46590:258"}, error="INVALID_CONFIG", no_cli=True),
+        case("cell-lock-big-pci", config={"celllock": "42090:512"}, error="INVALID_CONFIG", no_cli=True),
+        case("cell-lock-junk", config={"celllock": "42090:25x"}, error="INVALID_CONFIG", no_cli=True),
         case("roaming-off", reg=5, error="ROAMING_DISABLED", no_activate_call=True, no_ia_set=True),
         case("roaming-on", reg=5, config={"roaming": True}),
         case("roaming-invalid", config={"roaming": 2}, error="INVALID_CONFIG", no_cli=True),
@@ -136,6 +148,8 @@ def verify(item, directory):
         assert not activations, commands
     if item.get("no_cops_set"):
         assert not any(c.startswith("--at_cmd at+cops=1") or c.startswith("--at_cmd at+cops=0") for c in commands), commands
+    if item.get("no_lock_set"):
+        assert not any(c.startswith("--at_cmd at+emmchlck=") for c in commands), commands
     if item.get("no_cfun"):
         assert not any("cfun" in c for c in commands), commands
     if item.get("no_ia_set"):
@@ -218,6 +232,8 @@ def main():
             (d / "cops_set_ok").write_text(str(item.get("cops_set_ok", 1)))
             (d / "cops_err_applied").write_text(str(item.get("cops_err_applied", 0)))
             (d / "cops_noop").write_text(str(item.get("cops_noop", 0)))
+            (d / "lock").write_text(item.get("lock", "0"))
+            (d / "lock_noop").write_text(str(item.get("lock_noop", 0)))
             (d / "act_hang").write_text(str(item.get("act_hang", 0)))
             (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")

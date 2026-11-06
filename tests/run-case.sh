@@ -27,6 +27,9 @@ mipc_wan_cli() {
    case "$2" in
     at+cereg?) printf 'AT response:\n+CEREG: 0,%s\n\nOK\n' "$(cat "$case_dir/reg")" ;;
     at+c5greg?) printf 'AT response:\n+C5GREG: 0,0\n\nOK\n' ;;
+    at+emmchlck=0) echo 0 > "$case_dir/lock"; printf 'AT response:\nOK\n' ;;
+    at+emmchlck=1,7,0,*) [ "$(cat "$case_dir/lock_noop")" = 1 ] || echo "${2#at+emmchlck=},0" > "$case_dir/lock"; printf 'AT response:\nOK\n' ;;
+    at+emmchlck?) printf 'AT response:\n+EMMCHLCK: %s\n\nOK\n' "$(cat "$case_dir/lock")" ;;
     at+cops=3,2) printf 'AT response:\nOK\n' ;;
     at+cops?) set -- "$1" "$(cat "$case_dir/cops")"; printf 'AT response:\n+COPS: %s,2,"%s",7\n\nOK\n' "${2%% *}" "${2#* }" ;;
     at+cops=0) echo "0 43211" > "$case_dir/cops"; printf 'AT response:\nOK\n' ;;

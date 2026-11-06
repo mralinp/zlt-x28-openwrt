@@ -1,0 +1,57 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Read-only modem state for the LuCI Carrier tab, one "key<TAB>value" per line:
+#   operator, selection (auto|manual), registration (home|roaming|none), lock (off|<earfcn>:<pci>), apn,
+#   serving and cell: "<earfcn>:<pci><TAB>band<TAB>rsrp dBm<TAB>rsrq dB" (the serving cell first, then neighbours).
+# Cells come from AT+ECELL (LTE only; quarter-dB units). Values are what the modem reports, nothing is written.
+
+cells() {
+	# +ECELL: <n>,<rat>,<serving: cellid,tac,mcc,mnc,pci,x,y,rsrp,rsrq,,,,,earfcn,rat,mask,mask,,>, then 15 fields per neighbour
+	tr -d '\r' | sed -n 's/^+ECELL: *//p' | head -n 1 | awk -F, '
+		function band(e) {
+			if (e <= 599) return 1; if (e >= 1200 && e <= 1949) return 3; if (e >= 2750 && e <= 3449) return 7
+			if (e >= 3450 && e <= 3799) return 8; if (e >= 6150 && e <= 6449) return 20; if (e >= 9210 && e <= 9659) return 28
+			if (e >= 37750 && e <= 38249) return 38; if (e >= 38650 && e <= 39649) return 40; if (e >= 39650 && e <= 41589) return 41
+			if (e >= 41590 && e <= 43589) return 42; if (e >= 43590 && e <= 45589) return 43; return "?"
+		}
+		function emit(key, pci, rsrp, rsrq, earfcn) {
+			if (pci !~ /^[0-9]+$/ || earfcn !~ /^[0-9]+$/ || rsrp !~ /^-?[0-9]+$/ || rsrq !~ /^-?[0-9]+$/) return
+			printf "%s\t%s:%s\t%s\t%.1f\t%.1f\n", key, earfcn, pci, band(earfcn), rsrp / 4, rsrq / 4
+		}
+		$2 == 7 {
+			emit("serving", $7, $10, $11, $16)
+			for (i = 22; i <= NF; i += 15) emit("cell", $i, $(i + 3), $(i + 4), $(i + 9))
+		}'
+}
+
+selftest() {
+	got=$(cat <<'EOS' | cells | tr '\t\n' '|;'
++ECELL: 3,7,"0018B230B","2715",432,44,258,38,19,-412,-42,8,10,,0,42090,7,"00FFFFFFF","FFFF",,,311,34,9,-428,-62,,10,,,41890,7,"00FFFFFFF","FFFF",,,105,31,3,-440,-74,,10,,,2850,7,"00FFFFFFF","FFFF",,,
+EOS
+)
+	want='serving|42090:258|42|-103.0|-10.5;cell|41890:311|42|-107.0|-15.5;cell|2850:105|7|-110.0|-18.5;'
+	[ "$got" = "$want" ] || { echo "got $got"; return 1; }
+	echo "selftest ok"
+}
+
+at() { mipc_wan_cli --at_cmd "$1" 2>/dev/null | tr -d '\r'; }
+
+status() {
+	cops="$(at 'at+cops?' | sed -n 's/^+COPS: *\([0-9]*\),[0-9]*,"\([0-9]*\)".*/\1 \2/p' | head -n 1)"
+	printf 'operator\t%s\n' "${cops#* }"
+	[ "${cops%% *}" = 0 ] && sel=auto || sel=manual
+	printf 'selection\t%s\n' "$sel"
+	reg="$(at 'at+cereg?' | sed -n 's/^+CEREG: *[0-9]*,\([0-9]*\).*/\1/p' | head -n 1)"
+	case "$reg" in 1) r=home ;; 5) r=roaming ;; *) r=none ;; esac
+	printf 'registration\t%s\n' "$r"
+	lock="$(at 'at+emmchlck?' | sed -n 's/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1)"
+	printf 'lock\t%s\n' "${lock:-off}"
+	printf 'apn\t%s\n' "$(mipc_wan_cli --apn_ia_get 2>/dev/null | sed -n 's/^IA apn:\([^ ]*\) .*/\1/p' | head -n 1)"
+	at 'at+ecell' | cells
+}
+
+case "$1" in
+	selftest) selftest ;;
+	cells) cells ;;
+	*) status ;;
+esac

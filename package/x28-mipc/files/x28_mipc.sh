@@ -16,6 +16,7 @@ proto_x28_mipc_init_config() {
  proto_config_add_int iptype
  proto_config_add_boolean roaming
  proto_config_add_string plmn
+ proto_config_add_string celllock
  proto_config_add_defaults
 }
 
@@ -101,6 +102,30 @@ x28_mipc_operator() {
  done
  [ "$i" -lt 60 ] && return 0
  mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
+ return 1
+}
+
+# LTE cell lock "<earfcn>:<pci>" (AT+EMMCHLCK; its range excludes NR on this modem), empty = off. Locking re-selects the
+# cell and drops the bearer, so it is applied before the data call. A lock that does not hold or does not register is undone.
+x28_mipc_celllock() {
+ local want="$1" i=0 cur
+ cur() { mipc_wan_cli --at_cmd 'at+emmchlck?' 2>/dev/null | sed -n 's/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1; }
+ [ "$(cur)" = "$want" ] && return 0
+ if [ -n "$want" ]; then
+  mipc_wan_cli --at_cmd "at+emmchlck=1,7,0,${want%:*},${want#*:}" >/dev/null 2>&1
+ else
+  mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
+ fi
+ until [ "$(cur)" = "$want" ]; do
+  [ "$i" -ge 10 ] && break
+  sleep 1; i=$((i + 1))
+ done
+ if [ "$i" -lt 10 ]; then
+  [ -z "$want" ] && return 0
+  sleep 3
+  x28_mipc_wait_reg && return 0
+ fi
+ mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
  return 1
 }
 
@@ -205,9 +230,9 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming plmn defaultroute peerdns metric sim rc reply result cid ifname
+ local interface="$1" apn mtu iptype roaming plmn celllock defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype roaming plmn defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn celllock defaultroute peerdns metric
  mtu="${mtu:-1500}"; iptype="${iptype:-3}"; roaming="${roaming:-0}"
  defaultroute="${defaultroute:-1}"; peerdns="${peerdns:-1}"; metric="${metric:-0}"
  # Empty APN = automatic from the SIM, resolved once the SIM is ready.
@@ -215,6 +240,7 @@ x28_mipc_setup() {
     { [ "$iptype" != 1 ] && [ "$iptype" != 2 ] && [ "$iptype" != 3 ]; } ||
     ! x28_mipc_uint "$mtu" 1500 || [ "$mtu" -lt 576 ] ||
     ! x28_mipc_uint "$metric" 65535 ||
+    { [ -n "$celllock" ] && { case "$celllock" in *[!0-9:]*|*:*:*|:*|*:) true ;; *:*) [ "${celllock%:*}" -gt 46589 ] || [ "${celllock#*:}" -gt 511 ] ;; *) true ;; esac; }; } ||
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
@@ -244,6 +270,7 @@ x28_mipc_setup() {
  fi
 
  x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
+ x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

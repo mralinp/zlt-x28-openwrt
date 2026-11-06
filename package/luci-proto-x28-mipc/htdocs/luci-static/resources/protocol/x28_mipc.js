@@ -6,7 +6,7 @@
 
 network.registerPatternVirtual(/^ccmni[0-9]+$/);
 [
- ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, operator, MTU or routing options'],
+ ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, operator, cell lock, MTU or routing options'],
  ['NO_SIM_APN', 'No APN is known for this SIM; choose or enter one'],
  ['ROAMING_DISABLED', 'Registered on a roaming network and roaming is off; enable Allow roaming'],
  ['ATTACH_FAILED', 'The modem could not re-attach with this APN and IP type'],
@@ -19,6 +19,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['CONNECT_FAILED', 'The modem could not establish the data connection'],
  ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
  ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
+ ['CELL_LOCK_FAILED', 'The cell lock did not hold or the cell has no service; it was removed'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],
@@ -62,6 +63,32 @@ return network.registerProtocol('x28_mipc', {
   option.default = '3';
   // Carrier-related vendor settings (roaming now; operator, network mode, bands, PCI lock later) live together here.
   section.tab('carrier', _('Carrier'));
+  // One call of the read-only status helper per page load; its lines are "key<TAB>value...".
+  var modemStatus = function() {
+   return modemStatus.cache || (modemStatus.cache = fs.exec('/sbin/x28-modem-status').then(function(res) {
+    var out = { info: [], cells: [] };
+    (res.stdout || '').split('\n').forEach(function(line) {
+     var f = line.split('\t');
+     if (f[0] == 'serving' || f[0] == 'cell') out.cells.push({ serving: f[0] == 'serving', id: f[1], band: f[2], rsrp: f[3], rsrq: f[4] });
+     else if (f[0]) out.info.push(f);
+    });
+    return out;
+   }).catch(function() { return { info: [], cells: [] }; }));
+  };
+  modemStatus.cache = null;
+  option = section.taboption('carrier', form.DummyValue, 'x28status', _('Modem status'));
+  option.rawhtml = true;
+  option.load = function() {
+   return modemStatus().then(L.bind(function(st) {
+    var esc = function(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var text = st.info.map(function(f) { return '%s: %s'.format(f[0], f[1] || '-'); });
+    st.cells.forEach(function(c) {
+     text.push('%s: EARFCN:PCI %s, band %s, RSRP %s dBm, RSRQ %s dB'.format(c.serving ? 'serving cell' : 'cell', c.id, c.band, c.rsrp, c.rsrq));
+    });
+    this.status = '<pre>' + esc(text.join('\n') || _('Modem status unavailable')) + '</pre>';
+   }, this));
+  };
+  option.cfgvalue = function() { return this.status; };
   option = section.taboption('carrier', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';
@@ -84,6 +111,20 @@ return network.registerProtocol('x28_mipc', {
    _('Takes up to a few minutes and drops the data connection meanwhile; it reconnects by itself. Reload this page afterwards for the list.'));
   option.inputtitle = _('Scan');
   option.onclick = function() { return fs.exec('/sbin/x28-plmn-scan'); };
+  option = section.taboption('carrier', form.Value, 'celllock', _('Cell lock (LTE)'),
+   _('Lock to one LTE cell as EARFCN:PCI, e.g. 42090:258, from the cells above. Empty means no lock. If the cell has no service the lock is removed. 5G cells cannot be locked on this modem.'));
+  option.placeholder = _('No lock');
+  option.validate = function(_section, value) {
+   var m = /^([0-9]{1,5}):([0-9]{1,3})$/.exec(value || '');
+   return !value || (m && +m[1] <= 46589 && +m[2] <= 511) || _('Enter EARFCN:PCI, EARFCN up to 46589 and PCI up to 511.');
+  };
+  option.load = function(section_id) {
+   return modemStatus().then(L.bind(function(st) {
+    st.cells.forEach(L.bind(function(c) {
+     this.value(c.id, '%s (band %s, %s dBm)%s'.format(c.id, c.band, c.rsrp, c.serving ? ' ' + _('serving') : ''));
+    }, this));
+   }, this)).then(L.bind(form.Value.prototype.load, this, section_id));
+  };
   option = section.taboption('advanced', form.Value, 'mtu', _('MTU'));
   option.datatype = 'range(576,1500)';
   option.placeholder = '1500';
