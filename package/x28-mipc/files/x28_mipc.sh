@@ -162,6 +162,7 @@ x28_mipc_nrband() {
  set -- $sup; s0="$1" s1="$2" s2="$3"
  set -- $cur; c0="$1" c1="$2" c2="$3"
  [ -n "$s0" ] && [ -n "$s1" ] && [ -n "$s2" ] && [ -n "$c0" ] && [ -n "$c1" ] && [ -n "$c2" ] || { [ "$mode" = none ]; return; }
+ case "$s0$s1$s2$c0$c1$c2" in *[!0-9a-fA-F]*) { [ "$mode" = none ]; return; } ;; esac
  for b in $list; do
   case $(( (b - 1) / 32 )) in 0) l0=$((l0 | (1 << ((b - 1) % 32)))) ;; 1) l1=$((l1 | (1 << ((b - 1) % 32)))) ;; *) l2=$((l2 | (1 << ((b - 1) % 32)))) ;; esac
  done
@@ -170,15 +171,16 @@ x28_mipc_nrband() {
   deny) w0=$((0x$s0 & ~l0 & 0xffffffff)); w1=$((0x$s1 & ~l1 & 0xffffffff)); w2=$((0x$s2 & ~l2 & 0xffffffff)) ;;
   *) w0=$((0x$s0)); w1=$((0x$s1)); w2=$((0x$s2)) ;;
  esac
- [ $((w0 | w1 | w2)) -ne 0 ] || return 1
+ [ $((w0 | w1 | w2)) -ne 0 ] || { [ "$mode" = none ]; return; }
  want="$(printf '%08x %08x %08x' "$w0" "$w1" "$w2")"
  [ "$cur" = "$want" ] && return 0
  timeout 30 "$tool" set $want >/dev/null 2>&1
- until [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$want" ]; do
-  [ "$i" -ge 10 ] && break
+ held=0
+ while [ "$i" -le 10 ]; do
+  [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$want" ] && { held=1; break; }
   sleep 1; i=$((i + 1))
  done
- if [ "$i" -lt 10 ]; then
+ if [ "$held" = 1 ]; then
   sleep 3
   x28_mipc_wait_reg && return 0
  fi
@@ -186,9 +188,11 @@ x28_mipc_nrband() {
  timeout 30 "$tool" set $cur >/dev/null 2>&1
  i=0
  until [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$cur" ]; do
-  [ "$i" -ge 5 ] && break
+  [ "$i" -ge 5 ] && { logger -t x28_mipc "NR band mask restore did not hold (wanted $cur)"; break; }
   sleep 1; i=$((i + 1))
  done
+ # A failed widen with mode none is logged, not fatal: a restricted mask costs 5G at most, stopping the WAN costs everything.
+ [ "$mode" = none ] && { logger -t x28_mipc "NR band mask could not be widened to $want"; return 0; }
  return 1
 }
 
