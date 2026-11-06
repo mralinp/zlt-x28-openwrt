@@ -68,6 +68,22 @@ def cases():
         case("cell-lock-pci-leading-zero", config={"celllock": "42090:0258"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-huge", config={"celllock": "99999999999999999999:1"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-zero-ok", config={"celllock": "0:0"}, expect_cmds=["--at_cmd at+emmchlck=1,7,0,0,0", "--data_call_act"]),
+        case("band-allow", config={"lteband_mode": "allow", "lteband_list": [38, 40, 41, 42]},
+             expect_cmds=["--at_cmd at+epbse=154,145,0,928,0,0,0,0,0,0", "--data_call_act"]),
+        case("band-deny", config={"lteband_mode": "deny", "lteband_list": [1]},
+             expect_cmds=["--at_cmd at+epbse=154,145,2282225876,1952,0,0,0,0,0,0", "--data_call_act"]),
+        case("band-none-unchanged", config={"lteband_mode": "none"}, no_epbse_set=True),
+        case("band-unset-untouched", no_epbse_any=True),
+        case("band-none-restores", config={"lteband_mode": "none"}, epbse="154,145,0,928,0,0,0,0,0,0",
+             expect_cmds=["--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0", "--data_call_act"]),
+        case("band-nothing-left", config={"lteband_mode": "deny", "lteband_list": [1, 3, 5, 7, 8, 20, 28, 32, 38, 40, 41, 42, 43]}, error="BAND_LOCK_FAILED",
+             no_activate_call=True, no_epbse_set=True),
+        case("band-not-applied", config={"lteband_mode": "allow", "lteband_list": [42]}, epbse_noop=1, error="BAND_LOCK_FAILED",
+             no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0", "--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0"]),
+        case("band-no-service", config={"lteband_mode": "allow", "lteband_list": [42]}, reg=0, error="BAND_LOCK_FAILED",
+             no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0", "--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0"]),
+        case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
+        case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-no-pci", config={"celllock": "42090"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-big-earfcn", config={"celllock": "46590:258"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-big-pci", config={"celllock": "42090:512"}, error="INVALID_CONFIG", no_cli=True),
@@ -155,6 +171,10 @@ def verify(item, directory):
         assert not activations, commands
     if item.get("no_cops_set"):
         assert not any(c.startswith("--at_cmd at+cops=1") or c.startswith("--at_cmd at+cops=0") for c in commands), commands
+    if item.get("no_epbse_set"):
+        assert not any(c.startswith("--at_cmd at+epbse=") for c in commands), commands
+    if item.get("no_epbse_any"):
+        assert not any("epbse" in c for c in commands), commands
     if item.get("no_lock_set"):
         assert not any(c.startswith("--at_cmd at+emmchlck=") for c in commands), commands
     if item.get("no_cfun"):
@@ -239,6 +259,8 @@ def main():
             (d / "cops_set_ok").write_text(str(item.get("cops_set_ok", 1)))
             (d / "cops_err_applied").write_text(str(item.get("cops_err_applied", 0)))
             (d / "cops_noop").write_text(str(item.get("cops_noop", 0)))
+            (d / "epbse").write_text(item.get("epbse", "154,145,2282225877,1952,0,0,0,0,0,0"))
+            (d / "epbse_noop").write_text(str(item.get("epbse_noop", 0)))
             (d / "lock").write_text(item.get("lock", "0"))
             (d / "lock_noop").write_text(str(item.get("lock_noop", 0)))
             (d / "act_hang").write_text(str(item.get("act_hang", 0)))

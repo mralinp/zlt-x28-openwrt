@@ -8,7 +8,7 @@ const errors = {}, options = {};
 let name;
 const protocol = vm.runInNewContext('(function(){' + script + '\n})()', {
  _: value => value,
- form: {DummyValue:'dummy', Button:'button', Value:'value', ListValue:'listvalue', Flag:'flag', DynamicList:'list'},
+ form: {MultiValue:'multi', DummyValue:'dummy', Button:'button', Value:'value', ListValue:'listvalue', Flag:'flag', DynamicList:'list'},
  fs: {},
  L: {},
  network: {
@@ -28,7 +28,7 @@ assert.equal(protocol.getIfname(), 'ccmni7');
 assert.equal(protocol.containsDevice('ccmni7'), true);
 assert.equal(protocol.containsDevice('ccmni1'), false);
 const tabs = {};
-protocol.renderFormOptions({tab: (key, title) => tabs[key] = title, taboption: (tab, _type, key) => options[key] = {tab, depends(){}, choices: {}, value(k, v){this.choices[k] = v;}}});
+protocol.renderFormOptions({tab: (key, title) => tabs[key] = title, taboption: (tab, _type, key) => options[key] = {tab, deps: [], depends(k, v){this.deps.push([k, v]);}, choices: {}, keylist: [], value(k, v){this.choices[k] = v; this.keylist.push(k);}}});
 assert.equal(options.apn.validate(null, 'example.invalid'), true);
 assert.equal(typeof options.apn.validate(null, 'x;bad'), 'string');
 assert.equal(options.apn.validate(null, ''), true);
@@ -37,6 +37,35 @@ assert.equal(options.iptype.default, '3');
 assert.equal(tabs.carrier, 'Carrier');
 assert.equal(options.roaming.tab, 'carrier');
 assert.equal(options.roaming.default, '0');
+assert(errors.OPERATOR_FAILED && errors.CELL_LOCK_FAILED && errors.BAND_LOCK_FAILED);
+assert.equal(options.x28status.tab, 'carrier');
+assert.deepEqual(Object.keys(options.opmode.choices).sort(), ['auto', 'manual']);
+assert.equal(options.opmode.default, 'auto');
+assert.deepEqual(options.plmn.deps, [['opmode', 'manual']]);
+assert.deepEqual(options.plmnscan.deps, [['opmode', 'manual']]);
+assert.equal(options.plmn.rmempty, false);
+assert.equal(typeof options.plmn.validate(null, ''), 'string');
+assert.equal(options.plmn.validate(null, '43211'), true);
+assert.equal(options.plmn.validate(null, '432115'), true);
+for (const bad of ['4321', '43x11']) assert.equal(typeof options.plmn.validate(null, bad), 'string', bad);
+assert.equal(typeof options.plmnscan.onclick, 'function');
+const cfgOf = cfg => ({map: {config: 'network', data: {get: () => cfg}}});
+for (const [cfg, want] of [['43211', 'manual'], [undefined, 'auto']]) assert.equal(options.opmode.cfgvalue.call(cfgOf(cfg), 'wan'), want);
+assert.deepEqual(Object.keys(options.cellmode.choices).sort(), ['lock', 'none']);
+assert.deepEqual(options.celllock.deps, [['cellmode', 'lock']]);
+assert.equal(options.celllock.rmempty, false);
+assert.equal(typeof options.celllock.validate(null, ''), 'string');
+assert.equal(options.celllock.validate(null, '42090:258'), true);
+assert.equal(options.celllock.validate(null, '46589:511'), true);
+for (const bad of ['42090', '46590:258', '42090:512', 'a:1', '1:2:3']) assert.equal(typeof options.celllock.validate(null, bad), 'string', bad);
+for (const [cfg, want] of [['42090:258', 'lock'], [undefined, 'none']]) assert.equal(options.cellmode.cfgvalue.call(cfgOf(cfg), 'wan'), want);
+assert.deepEqual(Object.keys(options.lteband_mode.choices), ['none', 'allow', 'deny']);
+assert.equal(options.lteband_mode.default, 'none');
+assert.deepEqual(options.lteband_list.deps, [['lteband_mode', 'allow'], ['lteband_mode', 'deny']]);
+assert.deepEqual(Object.keys(options.lteband_list.choices), ['1', '3', '5', '7', '8', '20', '28', '32', '38', '40', '41', '42', '43']);
+assert.equal(typeof options.lteband_list.validate(null, ''), 'string');
+assert.equal(options.lteband_list.validate(null, ['42']), true);
+assert.equal(options.band5g.tab, 'carrier');
 assert(errors.CONNECT_TIMEOUT && errors.ROAMING_DISABLED && errors.ATTACH_FAILED);
 assert.equal(options.mtu.datatype, 'range(576,1500)');
 assert.equal(options.metric.datatype, 'range(0,65535)');

@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Scans for networks (AT+COPS=?), prints "plmn<TAB>name<TAB>act<TAB>status" per network and keeps the last result in
 # /tmp/x28-plmn-scan. A scan takes up to a few minutes and the modem is off its network meanwhile: it drops the data
-# connection, which comes back by itself afterwards (netifd retries). `x28-plmn-scan --last` prints the cached result.
+# connection, which comes back by itself afterwards (netifd retries). `--start` scans in the background (for LuCI),
+# `--state` prints idle|running|done|failed, `--last` prints the cached result.
 # status: 1 available, 2 current, 3 forbidden (3GPP), 0 unknown. act: 0 GSM, 2 UMTS, 7 LTE, 12/13 NR.
 
 OUT=${X28_PLMN_SCAN_FILE:-/tmp/x28-plmn-scan}
+STATE=$OUT.state
 
 parse() {
 	# +COPS: (2,"long","short","43244","2715",7),(1,"long","short","43235","7ED8",7),,(0-3),(0-2)  (the quoted hex is the area code)
@@ -23,6 +25,12 @@ selftest() {
 case "$1" in
 	selftest) selftest ;;
 	--last) cat "$OUT" 2>/dev/null ;;
+	--state) cat "$STATE" 2>/dev/null || echo idle ;;
+	--start)
+		[ "$(cat "$STATE" 2>/dev/null)" = running ] && exit 0
+		echo running > "$STATE"
+		( r=failed; "$0" >/dev/null 2>&1 && r=done; echo "$r" > "$STATE" ) >/dev/null 2>&1 &
+		;;
 	*)
 		# mipc_wan_cli sometimes crashes on the first call (observed); retry.
 		for i in 1 2 3; do

@@ -17,6 +17,8 @@ proto_x28_mipc_init_config() {
  proto_config_add_boolean roaming
  proto_config_add_string plmn
  proto_config_add_string celllock
+ proto_config_add_string lteband_mode
+ proto_config_add_array 'lteband_list:uinteger'
  proto_config_add_defaults
 }
 
@@ -103,6 +105,54 @@ x28_mipc_operator() {
  [ "$i" -lt 60 ] && return 0
  mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
  return 1
+}
+
+# LTE band lock via AT+EPBSE=<gsm>,<umts>,<lte 1-32>,<lte 33-64>,<4 more> (the last four read 0 here; GSM, UMTS and those are
+# kept as read). Supported LTE bands of this modem (RG500L-EU): 1 3 5 7 8 20 28 32 and 38 40 41 42 43.
+# lteband_mode: none | allow (only the listed bands) | deny (all but the listed). A change re-registers the modem, so it
+# is applied before the data call; a mask that does not read back or has no service is put back as it was.
+X28_MIPC_LTE_LO=2282225877
+X28_MIPC_LTE_HI=1952
+
+x28_mipc_epbse() {
+ mipc_wan_cli --at_cmd "$1" 2>/dev/null | sed -n 's/^+EPBSE: *\([0-9,]*\).*/\1/p' | head -n 1
+}
+
+x28_mipc_bandlock() {
+ local mode="$1" list="$2" cur lo hi b lo_l=0 hi_l=0 want i=0 old
+ cur="$(x28_mipc_epbse 'at+epbse?')"
+ case "$cur" in [0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*) ;; *) return 1 ;; esac
+ for b in $list; do
+  if [ "$b" -le 32 ]; then lo_l=$((lo_l | (1 << (b - 1)))); else hi_l=$((hi_l | (1 << (b - 33)))); fi
+ done
+ case "$mode" in
+  allow) lo=$((lo_l & X28_MIPC_LTE_LO)); hi=$((hi_l & X28_MIPC_LTE_HI)) ;;
+  deny) lo=$((X28_MIPC_LTE_LO & ~lo_l)); hi=$((X28_MIPC_LTE_HI & ~hi_l)) ;;
+  *) lo=$X28_MIPC_LTE_LO; hi=$X28_MIPC_LTE_HI ;;
+ esac
+ [ $((lo | hi)) -ne 0 ] || return 1
+ old="$cur"
+ want="$(echo "$cur" | cut -d, -f1,2),$lo,$hi,$(echo "$cur" | cut -d, -f5-)"
+ [ "$cur" = "$want" ] && return 0
+ mipc_wan_cli --at_cmd "at+epbse=$want" >/dev/null 2>&1
+ until [ "$(x28_mipc_epbse 'at+epbse?')" = "$want" ]; do
+  [ "$i" -ge 10 ] && break
+  sleep 1; i=$((i + 1))
+ done
+ if [ "$i" -lt 10 ]; then
+  sleep 3
+  x28_mipc_wait_reg && return 0
+ fi
+ mipc_wan_cli --at_cmd "at+epbse=$old" >/dev/null 2>&1
+ return 1
+}
+
+# Every listed band must be one of the modem's supported LTE bands.
+x28_mipc_bands_ok() {
+ local b
+ for b in $1; do
+  case " 1 3 5 7 8 20 28 32 38 40 41 42 43 " in *" $b "*) ;; *) return 1 ;; esac
+ done
 }
 
 # "<earfcn>:<pci>", no leading zeros, EARFCN up to 46589 and PCI up to 511.
@@ -243,9 +293,11 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming plmn celllock defaultroute peerdns metric sim rc reply result cid ifname
+ local interface="$1" apn mtu iptype roaming plmn celllock lteband_mode defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype roaming plmn celllock defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn celllock lteband_mode defaultroute peerdns metric
+ local bands="" b
+ json_get_values bands lteband_list
  mtu="${mtu:-1500}"; iptype="${iptype:-3}"; roaming="${roaming:-0}"
  defaultroute="${defaultroute:-1}"; peerdns="${peerdns:-1}"; metric="${metric:-0}"
  # Empty APN = automatic from the SIM, resolved once the SIM is ready.
@@ -254,6 +306,8 @@ x28_mipc_setup() {
     ! x28_mipc_uint "$mtu" 1500 || [ "$mtu" -lt 576 ] ||
     ! x28_mipc_uint "$metric" 65535 ||
     { [ -n "$celllock" ] && ! x28_mipc_cell_ok "$celllock"; } ||
+    { [ -n "$lteband_mode" ] && [ "$lteband_mode" != none ] && [ "$lteband_mode" != allow ] && [ "$lteband_mode" != deny ]; } ||
+    ! x28_mipc_bands_ok "$bands" ||
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
@@ -284,6 +338,7 @@ x28_mipc_setup() {
 
  x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
  x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
+ [ -z "$lteband_mode" ] || x28_mipc_bandlock "$lteband_mode" "$bands" || { proto_notify_error "$interface" BAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

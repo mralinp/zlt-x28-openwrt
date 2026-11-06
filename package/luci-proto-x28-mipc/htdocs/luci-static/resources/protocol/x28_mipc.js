@@ -6,7 +6,7 @@
 
 network.registerPatternVirtual(/^ccmni[0-9]+$/);
 [
- ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, operator, cell lock, MTU or routing options'],
+ ['INVALID_CONFIG', 'Invalid APN, IP type, roaming, operator, cell lock, bands, MTU or routing options'],
  ['NO_SIM_APN', 'No APN is known for this SIM; choose or enter one'],
  ['ROAMING_DISABLED', 'Registered on a roaming network and roaming is off; enable Allow roaming'],
  ['ATTACH_FAILED', 'The modem could not re-attach with this APN and IP type'],
@@ -20,6 +20,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
  ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
  ['CELL_LOCK_FAILED', 'The cell lock did not hold or the cell has no service; it was removed'],
+ ['BAND_LOCK_FAILED', 'The band lock did not hold or left no service; the previous bands were restored'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],
@@ -92,37 +93,104 @@ return network.registerProtocol('x28_mipc', {
   option = section.taboption('carrier', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';
-  option = section.taboption('carrier', form.Value, 'plmn', _('Operator (PLMN)'),
-   _('Leave empty to register automatically, or pick the numeric PLMN (MCC+MNC) of a network from the last scan. If it does not register, the modem goes back to automatic.'));
-  option.placeholder = _('Automatic');
+  // Network selection: Automatic or Manual. The mode is not stored; the UCI option `plmn` is (set = manual).
+  option = section.taboption('carrier', form.ListValue, 'opmode', _('Network selection'),
+   _('Automatic registers on the best network. Manual lets you search for networks and choose one; if it does not register, the modem goes back to automatic.'));
+  option.value('auto', _('Automatic'));
+  option.value('manual', _('Manual'));
+  option.default = 'auto';
+  option.cfgvalue = function(section_id) {
+   try { if (window.sessionStorage.getItem('x28_opmode') === 'manual') return 'manual'; } catch (e) {}
+   return this.map.data.get(this.map.config, section_id, 'plmn') ? 'manual' : 'auto';
+  };
+  option.write = function() {};
+  option.remove = function() {};
+  option = section.taboption('carrier', form.Button, 'plmnscan', _('Search networks'),
+   _('Takes a few minutes and drops the data connection meanwhile; it reconnects by itself. The page reloads with the networks found.'));
+  option.depends('opmode', 'manual');
+  option.inputtitle = _('Scan');
+  option.onclick = function() {
+   var poll = function() {
+    return fs.exec('/sbin/x28-plmn-scan', ['--state']).then(function(res) {
+     if ((res.stdout || '').trim() !== 'running') {
+      try { window.sessionStorage.setItem('x28_opmode', 'manual'); } catch (e) {}
+      window.location.reload();
+      return;
+     }
+     return new Promise(function(resolve) { window.setTimeout(resolve, 3000); }).then(poll);
+    });
+   };
+   return fs.exec('/sbin/x28-plmn-scan', ['--start']).then(poll);
+  };
+  option = section.taboption('carrier', form.ListValue, 'plmn', _('Network'),
+   _('Networks found by the last search. Search first if the list is empty.'));
+  option.depends('opmode', 'manual');
+  option.rmempty = false;
   option.validate = function(_section, value) {
-   return /^([0-9]{5,6})?$/.test(value || '') || _('Enter a 5 or 6 digit PLMN, e.g. 43211.');
+   return /^[0-9]{5,6}$/.test(value || '') || _('Search for networks and pick one.');
   };
   option.load = function(section_id) {
-   // x28-plmn-scan --last prints "plmn<TAB>name<TAB>act<TAB>status" per network of the last scan.
+   // x28-plmn-scan --last prints "plmn<TAB>name<TAB>act<TAB>status" per network (status 1 available, 2 current, 3 forbidden).
+   var status = { '1': _('available'), '2': _('current'), '3': _('forbidden') };
+   this.value('', _('-- search first --'));
    return fs.exec('/sbin/x28-plmn-scan', ['--last']).then(L.bind(function(res) {
     (res.stdout || '').split('\n').forEach(L.bind(function(line) {
      var f = line.split('\t');
-     if (f[0]) this.value(f[0], '%s (%s)'.format(f[0], f[1] || _('network')));
+     if (f[0]) this.value(f[0], '%s%s, %s'.format(f[0], f[1] && f[1] !== f[0] ? ' ' + f[1] : '', status[f[3]] || _('unknown')));
     }, this));
-   }, this)).catch(function() {}).then(L.bind(form.Value.prototype.load, this, section_id));
+   }, this)).catch(function() {}).then(L.bind(function() {
+    var cur = this.map.data.get(this.map.config, section_id, 'plmn');
+    if (cur && !(cur in this.keylist.reduce(function(o, k) { o[k] = 1; return o; }, {}))) this.value(cur, cur);
+    return form.Value.prototype.load.call(this, section_id);
+   }, this));
   };
-  option = section.taboption('carrier', form.Button, 'plmnscan', _('Search networks'),
-   _('Takes up to a few minutes and drops the data connection meanwhile; it reconnects by itself. Reload this page afterwards for the list.'));
-  option.inputtitle = _('Scan');
-  option.onclick = function() { return fs.exec('/sbin/x28-plmn-scan'); };
-  option = section.taboption('carrier', form.Value, 'celllock', _('Cell lock (LTE)'),
-   _('Lock to one LTE cell as EARFCN:PCI, e.g. 42090:258, from the cells above. Empty means no lock. If the cell has no service the lock is removed. 5G cells cannot be locked on this modem.'));
-  option.placeholder = _('No lock');
+  // 4G band lock (AT+EPBSE). The list is this modem's supported LTE bands.
+  option = section.taboption('carrier', form.ListValue, 'lteband_mode', _('4G band lock'),
+   _('Restrict which LTE bands the modem may use. The modem re-registers when this changes, and the change is undone if it has no service.'));
+  option.value('none', _('No lock'));
+  option.value('allow', _('Only the selected bands'));
+  option.value('deny', _('All except the selected bands'));
+  option.default = 'none';
+  option = section.taboption('carrier', form.MultiValue, 'lteband_list', _('4G bands'));
+  option.depends('lteband_mode', 'allow');
+  option.depends('lteband_mode', 'deny');
+  [[1, '2100 FDD'], [3, '1800 FDD'], [5, '850 FDD'], [7, '2600 FDD'], [8, '900 FDD'], [20, '800 FDD'], [28, '700 FDD'],
+   [32, '1500 SDL'], [38, '2600 TDD'], [40, '2300 TDD'], [41, '2500 TDD'], [42, '3500 TDD'], [43, '3700 TDD']
+  ].forEach(function(b) { option.value(String(b[0]), 'B' + b[0] + ' (' + b[1] + ' MHz)'); });
+  option.rmempty = false;
+  option.validate = function(_section, value) {
+   return (value && value.length > 0) || _('Select at least one band.');
+  };
+  option = section.taboption('carrier', form.DummyValue, 'band5g', _('5G band lock'));
+  option.cfgvalue = function() { return _('Not available yet: this modem does not expose a 5G band mask to the router.'); };
+
+  // Cell lock. The mode is not stored; the UCI option `celllock` is (set = locked).
+  option = section.taboption('carrier', form.ListValue, 'cellmode', _('Cell lock'),
+   _('Lock the modem to one LTE cell. The modem can lock a single cell only (no list, no exclusion) and only on 4G. If the cell has no service the lock is removed.'));
+  option.value('none', _('No lock'));
+  option.value('lock', _('Lock to the selected cell'));
+  option.default = 'none';
+  option.cfgvalue = function(section_id) {
+   return this.map.data.get(this.map.config, section_id, 'celllock') ? 'lock' : 'none';
+  };
+  option.write = function() {};
+  option.remove = function() {};
+  option = section.taboption('carrier', form.ListValue, 'celllock', _('Cell'),
+   _('Cells the modem sees now, as EARFCN:PCI (band, signal). Reload the page to refresh the list.'));
+  option.depends('cellmode', 'lock');
+  option.rmempty = false;
   option.validate = function(_section, value) {
    var m = /^([0-9]{1,5}):([0-9]{1,3})$/.exec(value || '');
-   return !value || (m && +m[1] <= 46589 && +m[2] <= 511) || _('Enter EARFCN:PCI, EARFCN up to 46589 and PCI up to 511.');
+   return (m && +m[1] <= 46589 && +m[2] <= 511) || _('Select a cell.');
   };
   option.load = function(section_id) {
+   this.value('', _('-- select a cell --'));
    return modemStatus().then(L.bind(function(st) {
     st.cells.forEach(L.bind(function(c) {
      this.value(c.id, '%s (band %s, %s dBm)%s'.format(c.id, c.band, c.rsrp, c.serving ? ' ' + _('serving') : ''));
     }, this));
+    var cur = this.map.data.get(this.map.config, section_id, 'celllock');
+    if (cur && this.keylist.indexOf(cur) < 0) this.value(cur, cur);
    }, this)).then(L.bind(form.Value.prototype.load, this, section_id));
   };
   option = section.taboption('advanced', form.Value, 'mtu', _('MTU'));
