@@ -105,26 +105,39 @@ x28_mipc_operator() {
  return 1
 }
 
+# "<earfcn>:<pci>", no leading zeros, EARFCN up to 46589 and PCI up to 511.
+x28_mipc_cell_ok() {
+ case "$1" in ''|:*|*:|*:*:*|*[!0-9:]*|0[0-9]*|*:0[0-9]*) return 1 ;; *:*) ;; *) return 1 ;; esac
+ x28_mipc_uint "${1%:*}" 46589 && x28_mipc_uint "${1#*:}" 511
+}
+
 # LTE cell lock "<earfcn>:<pci>" (AT+EMMCHLCK; its range excludes NR on this modem), empty = off. Locking re-selects the
-# cell and drops the bearer, so it is applied before the data call. A lock that does not hold or does not register is undone.
+# cell and drops the bearer, so it is applied before the data call. Only a positive read counts: "off" for
+# +EMMCHLCK: 0, the cell for a lock, empty when unreadable (the CLI sometimes crashes). A lock that does not hold or has
+# no service is undone, also when it was already set by an earlier, interrupted attempt.
 x28_mipc_celllock() {
- local want="$1" i=0 cur
- cur() { mipc_wan_cli --at_cmd 'at+emmchlck?' 2>/dev/null | sed -n 's/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1; }
- [ "$(cur)" = "$want" ] && return 0
- if [ -n "$want" ]; then
-  mipc_wan_cli --at_cmd "at+emmchlck=1,7,0,${want%:*},${want#*:}" >/dev/null 2>&1
- else
+ local want="$1" i=0
+ x28_mipc_lockread() {
+  mipc_wan_cli --at_cmd 'at+emmchlck?' 2>/dev/null | sed -n 's/^+EMMCHLCK: *0.*/off/p; s/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1
+ }
+ if [ -z "$want" ]; then
+  [ "$(x28_mipc_lockread)" = off ] && return 0
   mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
+  until [ "$(x28_mipc_lockread)" = off ]; do
+   [ "$i" -ge 10 ] && return 1
+   sleep 1; i=$((i + 1))
+  done
+  return 0
  fi
- until [ "$(cur)" = "$want" ]; do
-  [ "$i" -ge 10 ] && break
-  sleep 1; i=$((i + 1))
- done
- if [ "$i" -lt 10 ]; then
-  [ -z "$want" ] && return 0
+ if [ "$(x28_mipc_lockread)" != "$want" ]; then
+  mipc_wan_cli --at_cmd "at+emmchlck=1,7,0,${want%:*},${want#*:}" >/dev/null 2>&1
+  until [ "$(x28_mipc_lockread)" = "$want" ]; do
+   [ "$i" -ge 10 ] && break
+   sleep 1; i=$((i + 1))
+  done
   sleep 3
-  x28_mipc_wait_reg && return 0
  fi
+ [ "$i" -lt 10 ] && x28_mipc_wait_reg && return 0
  mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
  return 1
 }
@@ -240,7 +253,7 @@ x28_mipc_setup() {
     { [ "$iptype" != 1 ] && [ "$iptype" != 2 ] && [ "$iptype" != 3 ]; } ||
     ! x28_mipc_uint "$mtu" 1500 || [ "$mtu" -lt 576 ] ||
     ! x28_mipc_uint "$metric" 65535 ||
-    { [ -n "$celllock" ] && { case "$celllock" in *[!0-9:]*|*:*:*|:*|*:) true ;; *:*) [ "${celllock%:*}" -gt 46589 ] || [ "${celllock#*:}" -gt 511 ] ;; *) true ;; esac; }; } ||
+    { [ -n "$celllock" ] && ! x28_mipc_cell_ok "$celllock"; } ||
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
@@ -270,7 +283,7 @@ x28_mipc_setup() {
  fi
 
  x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
- x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; return 1; }
+ x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

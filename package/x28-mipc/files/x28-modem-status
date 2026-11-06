@@ -39,13 +39,13 @@ at() { mipc_wan_cli --at_cmd "$1" 2>/dev/null | tr -d '\r'; }
 status() {
 	cops="$(at 'at+cops?' | sed -n 's/^+COPS: *\([0-9]*\),[0-9]*,"\([0-9]*\)".*/\1 \2/p' | head -n 1)"
 	printf 'operator\t%s\n' "${cops#* }"
-	[ "${cops%% *}" = 0 ] && sel=auto || sel=manual
+	case "${cops%% *}" in 0) sel=auto ;; '') sel=unknown ;; *) sel=manual ;; esac
 	printf 'selection\t%s\n' "$sel"
 	reg="$(at 'at+cereg?' | sed -n 's/^+CEREG: *[0-9]*,\([0-9]*\).*/\1/p' | head -n 1)"
 	case "$reg" in 1) r=home ;; 5) r=roaming ;; *) r=none ;; esac
 	printf 'registration\t%s\n' "$r"
-	lock="$(at 'at+emmchlck?' | sed -n 's/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1)"
-	printf 'lock\t%s\n' "${lock:-off}"
+	lock="$(at 'at+emmchlck?' | sed -n 's/^+EMMCHLCK: *0.*/off/p; s/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1)"
+	printf 'lock\t%s\n' "${lock:-unknown}"
 	printf 'apn\t%s\n' "$(mipc_wan_cli --apn_ia_get 2>/dev/null | sed -n 's/^IA apn:\([^ ]*\) .*/\1/p' | head -n 1)"
 	at 'at+ecell' | cells
 }
