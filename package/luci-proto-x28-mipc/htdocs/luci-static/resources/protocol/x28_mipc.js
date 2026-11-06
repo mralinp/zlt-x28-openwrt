@@ -2,6 +2,7 @@
 'use strict';
 'require form';
 'require fs';
+'require ui';
 'require network';
 
 network.registerPatternVirtual(/^ccmni[0-9]+$/);
@@ -75,7 +76,10 @@ return network.registerProtocol('x28_mipc', {
      else if (f[0]) out.info.push(f);
     });
     return out;
-   }).catch(function() { return { info: [], cells: [] }; }));
+   }).catch(function(e) {
+    ui.addNotification(null, E('p', _('Could not read the modem state: %s').format(e.message || e)), 'danger');
+    return { info: [], cells: [] };
+   }));
   };
   modemStatus.cache = null;
   option = section.taboption('carrier', form.DummyValue, 'x28status', _('Modem status'));
@@ -121,7 +125,9 @@ return network.registerProtocol('x28_mipc', {
      return new Promise(function(resolve) { window.setTimeout(resolve, 3000); }).then(poll);
     });
    };
-   return fs.exec('/sbin/x28-plmn-scan', ['--start']).then(poll);
+   return fs.exec('/sbin/x28-plmn-scan', ['--start']).then(poll).catch(function(e) {
+    ui.addNotification(null, E('p', _('The network search could not be started: %s').format(e.message || e)), 'danger');
+   });
   };
   option = section.taboption('carrier', form.ListValue, 'plmn', _('Network'),
    _('Networks found by the last search. Search first if the list is empty.'));

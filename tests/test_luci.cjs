@@ -79,4 +79,10 @@ assert.equal(options.defaultroute.default, '1');
 assert.equal(options.peerdns.default, '1');
 assert(errors.VENDOR_WAN_ACTIVE && errors.OWNERSHIP_MISMATCH && errors.CLEANUP_FAILED && errors.NO_SIM_APN && !errors.IPV4_ONLY);
 assert(!script.includes('vendorbridge') && !script.includes('http.cgi') && !script.includes('fetch('));
+// Every command the page runs through fs.exec must be allowed by the rpcd ACL (a missing entry fails silently in LuCI).
+const acl = JSON.parse(fs.readFileSync(path.join(__dirname, '../package/luci-proto-x28-mipc/root/usr/share/rpcd/acl.d/luci-proto-x28-mipc.json'), 'utf8'))['luci-proto-x28-mipc'];
+const used = [...script.matchAll(/fs\.exec\('([^']+)'/g)].map(m => m[1]);
+assert(used.length >= 3, 'expected the status, scan and apn commands');
+for (const cmd of used) assert.deepEqual(acl.read.file[cmd], ['exec'], cmd + ' missing from the ACL read section');
+assert.deepEqual(acl.write.file['/sbin/x28-plmn-scan'], ['exec'], 'starting a scan needs write access');
 console.log('PASS: native LuCI protocol registration, dynamic device, APN (auto/list/manual) and IP type, routing/DNS fields and error messages');
