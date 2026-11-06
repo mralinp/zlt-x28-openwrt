@@ -27,8 +27,21 @@ void mipc_deinit(void);
 
 static int result(mipc_msg_t *cnf)
 {
-	uint32_t *r = cnf ? mipc_msg_get_val_ptr(cnf, 0, NULL) : NULL;
-	return r ? (int)*r : -1;
+	uint16_t len = 0;
+	uint32_t *r = cnf ? mipc_msg_get_val_ptr(cnf, 0, &len) : NULL;
+	return r && len == 4 ? (int)*r : -1;
+}
+
+/* 1 to 8 hex digits and nothing else */
+static int word(const char *s, uint32_t *w)
+{
+	char *end;
+	size_t n = strlen(s);
+
+	if (n < 1 || n > 8 || strspn(s, "0123456789abcdefABCDEF") != n)
+		return -1;
+	*w = (uint32_t)strtoul(s, &end, 16);
+	return *end ? -1 : 0;
 }
 
 static int get_nr(uint8_t option, uint32_t *w)
@@ -71,7 +84,10 @@ int main(int argc, char **argv)
 		mipc_msg_t *req, *cnf;
 		memset(want, 0, sizeof(want));
 		for (int i = 0; i < 3; i++)
-			want[i] = (uint32_t)strtoul(argv[2 + i], NULL, 16);
+			if (word(argv[2 + i], &want[i])) {
+				puts("error=mask");
+				goto out;
+			}
 		if (!(want[0] | want[1] | want[2]) || (want[0] & ~support[0]) || (want[1] & ~support[1]) || (want[2] & ~support[2])) {
 			puts("error=mask");
 			goto out;

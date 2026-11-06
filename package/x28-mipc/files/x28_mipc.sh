@@ -155,12 +155,13 @@ x28_mipc_bandlock() {
 x28_mipc_nrband() {
  local mode="$1" list="$2" sup cur want w0 w1 w2 c0 c1 c2 s0 s1 s2 l0=0 l1=0 l2=0 b i=0 out
  local tool="${X28_MIPC_NRBAND:-x28-nrband}"
- command -v "$tool" >/dev/null 2>&1 || return 1
- out="$(timeout 20 "$tool" get 2>/dev/null)" || return 1
+ # "No lock" must never cost the WAN: without a working tool there is nothing to undo, so only allow/deny fail.
+ command -v "$tool" >/dev/null 2>&1 || { [ "$mode" = none ]; return; }
+ out="$(timeout 20 "$tool" get 2>/dev/null)" || { [ "$mode" = none ]; return; }
  sup="$(echo "$out" | sed -n 's/^support=//p')"; cur="$(echo "$out" | sed -n 's/^current=//p')"
  set -- $sup; s0="$1" s1="$2" s2="$3"
  set -- $cur; c0="$1" c1="$2" c2="$3"
- [ -n "$s0" ] && [ -n "$s1" ] && [ -n "$s2" ] && [ -n "$c0" ] && [ -n "$c1" ] && [ -n "$c2" ] || return 1
+ [ -n "$s0" ] && [ -n "$s1" ] && [ -n "$s2" ] && [ -n "$c0" ] && [ -n "$c1" ] && [ -n "$c2" ] || { [ "$mode" = none ]; return; }
  for b in $list; do
   case $(( (b - 1) / 32 )) in 0) l0=$((l0 | (1 << ((b - 1) % 32)))) ;; 1) l1=$((l1 | (1 << ((b - 1) % 32)))) ;; *) l2=$((l2 | (1 << ((b - 1) % 32)))) ;; esac
  done
@@ -181,7 +182,13 @@ x28_mipc_nrband() {
   sleep 3
   x28_mipc_wait_reg && return 0
  fi
+ # Put the previous mask back and check it took; if it did not, the manual undo is in docs/NATIVE-CELLULAR.md.
  timeout 30 "$tool" set $cur >/dev/null 2>&1
+ i=0
+ until [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$cur" ]; do
+  [ "$i" -ge 5 ] && break
+  sleep 1; i=$((i + 1))
+ done
  return 1
 }
 

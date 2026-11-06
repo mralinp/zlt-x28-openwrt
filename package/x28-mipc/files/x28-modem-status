@@ -57,6 +57,7 @@ status() {
 	printf 'registration\t%s\n' "$r"
 	lock="$(at 'at+emmchlck?' | sed -n 's/^+EMMCHLCK: *0.*/off/p; s/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1)"
 	printf 'lock\t%s\n' "${lock:-unknown}"
+	[ -x /usr/sbin/x28-nrband ] && printf 'nrband_tool\tpresent\n' || printf 'nrband_tool\tmissing\n'
 	printf 'apn\t%s\n' "$(mipc_wan_cli --apn_ia_get 2>/dev/null | sed -n 's/^IA apn:\([^ ]*\) .*/\1/p' | head -n 1)"
 	at 'at+ecell' | cells
 }

@@ -57,7 +57,7 @@ timeout() {
 mock_nrband() {
  printf 'x28-nrband %s\n' "$*" >> "$TRACE"
  case "$1" in
-  get) printf 'support=080800d5 000001a0 00003000\ncurrent=%s\n' "$(cat "$case_dir/nrcur")" ;;
+  get) [ ! -e "$case_dir/nr_getfail" ] || return 1; printf 'support=080800d5 000001a0 00003000\ncurrent=%s\n' "$(cat "$case_dir/nrcur")" ;;
   set) shift; [ "$(cat "$case_dir/nr_noop")" = 1 ] || echo "$*" > "$case_dir/nrcur" ;;
  esac
 }

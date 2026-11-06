@@ -100,6 +100,10 @@ def cases():
              no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000", "x28-nrband set 080800d5 000001a0 00003000"]),
         case("nr-missing-helper", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_missing=1, error="NRBAND_LOCK_FAILED",
              no_activate_call=True),
+        case("nr-none-missing-helper", config={"nrband_mode": "none"}, nr_missing=1),
+        case("nr-none-helper-broken", config={"nrband_mode": "none"}, nr_getfail=1),
+        case("nr-allow-helper-broken", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_getfail=1,
+             error="NRBAND_LOCK_FAILED", no_activate_call=True),
         case("nr-bad-mode", config={"nrband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("nr-unsupported-band", config={"nrband_mode": "allow", "nrband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-no-pci", config={"celllock": "42090"}, error="INVALID_CONFIG", no_cli=True),
@@ -283,6 +287,8 @@ def main():
             (d / "cops_noop").write_text(str(item.get("cops_noop", 0)))
             (d / "nrcur").write_text(item.get("nrcur", "080800d5 000001a0 00003000"))
             (d / "nr_noop").write_text(str(item.get("nr_noop", 0)))
+            if item.get("nr_getfail"):
+                (d / "nr_getfail").write_text("1")
             if item.get("nr_missing"):
                 (d / "nr_missing").write_text("1")
             (d / "epbse").write_text(item.get("epbse", "154,145,2282225877,1952,0,0,0,0,0,0"))

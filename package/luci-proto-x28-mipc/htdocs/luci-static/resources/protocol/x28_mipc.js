@@ -169,6 +169,12 @@ return network.registerProtocol('x28_mipc', {
   option.value('allow', _('Only the selected bands'));
   option.value('deny', _('All except the selected bands'));
   option.default = 'none';
+  option.load = function(section_id) {
+   return modemStatus().then(L.bind(function(st) {
+    if (st.info.some(function(f) { return f[0] == 'nrband_tool' && f[1] == 'missing'; }))
+     this.description = _('The band tool (x28-nrband) is not installed on this router: a 5G band lock will fail until it is. No lock is always safe.');
+   }, this)).then(L.bind(form.Value.prototype.load, this, section_id));
+  };
   option = section.taboption('carrier', form.MultiValue, 'nrband_list', _('5G bands'));
   option.depends('nrband_mode', 'allow');
   option.depends('nrband_mode', 'deny');
