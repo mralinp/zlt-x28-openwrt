@@ -21,6 +21,7 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
  ['CELL_LOCK_FAILED', 'The cell lock did not hold or the cell has no service; it was removed'],
  ['BAND_LOCK_FAILED', 'The band lock did not hold or left no service; the previous bands were restored'],
+ ['NRBAND_LOCK_FAILED', 'The 5G band lock did not hold, left no service or the band tool is missing; the previous bands were restored'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],
@@ -70,7 +71,7 @@ return network.registerProtocol('x28_mipc', {
     var out = { info: [], cells: [] };
     (res.stdout || '').split('\n').forEach(function(line) {
      var f = line.split('\t');
-     if (f[0] == 'serving' || f[0] == 'cell') out.cells.push({ serving: f[0] == 'serving', id: f[1], band: f[2], rsrp: f[3], rsrq: f[4] });
+     if (f[0] == 'serving' || f[0] == 'cell' || f[0] == 'nrcell') out.cells.push({ serving: f[0] == 'serving', nr: f[0] == 'nrcell', id: f[1], band: f[2], rsrp: f[3], rsrq: f[4] });
      else if (f[0]) out.info.push(f);
     });
     return out;
@@ -84,7 +85,7 @@ return network.registerProtocol('x28_mipc', {
     var esc = function(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
     var text = st.info.map(function(f) { return '%s: %s'.format(f[0], f[1] || '-'); });
     st.cells.forEach(function(c) {
-     text.push('%s: EARFCN:PCI %s, band %s, RSRP %s dBm, RSRQ %s dB'.format(c.serving ? 'serving cell' : 'cell', c.id, c.band, c.rsrp, c.rsrq));
+     text.push('%s: %s %s, band %s, RSRP %s dBm, RSRQ %s dB'.format(c.serving ? 'serving cell' : (c.nr ? '5G cell' : 'cell'), c.nr ? 'NR-ARFCN:PCI' : 'EARFCN:PCI', c.id, c.band, c.rsrp, c.rsrq));
     });
     this.status = '<pre>' + esc(text.join('\n') || _('Modem status unavailable')) + '</pre>';
    }, this));
@@ -161,9 +162,23 @@ return network.registerProtocol('x28_mipc', {
   option.validate = function(_section, value) {
    return (value && value.length > 0) || _('Select at least one band.');
   };
-  option = section.taboption('carrier', form.DummyValue, 'band5g', _('5G band lock'));
-  option.default = _('Not available yet: the 5G band mask needs a vendor call that is not wired in.');
-  option.cfgvalue = function() { return this.default; };
+  // 5G band lock (x28-nrband over MIPC). The list is this modem's supported NR bands.
+  option = section.taboption('carrier', form.ListValue, 'nrband_mode', _('5G band lock'),
+   _('Restrict which 5G (NR) bands the modem may use. 5G NSA also needs its 4G anchor band. The modem re-registers when this changes, and the change is undone if it has no service.'));
+  option.value('none', _('No lock'));
+  option.value('allow', _('Only the selected bands'));
+  option.value('deny', _('All except the selected bands'));
+  option.default = 'none';
+  option = section.taboption('carrier', form.MultiValue, 'nrband_list', _('5G bands'));
+  option.depends('nrband_mode', 'allow');
+  option.depends('nrband_mode', 'deny');
+  [[1, '2100 FDD'], [3, '1800 FDD'], [5, '850 FDD'], [7, '2600 FDD'], [8, '900 FDD'], [20, '800 FDD'], [28, '700 FDD'],
+   [38, '2600 TDD'], [40, '2300 TDD'], [41, '2500 TDD'], [77, '3700 TDD'], [78, '3500 TDD']
+  ].forEach(function(b) { option.value(String(b[0]), 'n' + b[0] + ' (' + b[1] + ' MHz)'); });
+  option.rmempty = false;
+  option.validate = function(_section, value) {
+   return (value && value.length > 0) || _('Select at least one band.');
+  };
 
   // Cell lock. The mode is not stored; the UCI option `celllock` is (set = locked).
   option = section.taboption('carrier', form.ListValue, 'cellmode', _('Cell lock'),
@@ -187,7 +202,7 @@ return network.registerProtocol('x28_mipc', {
   option.load = function(section_id) {
    this.value('', _('-- select a cell --'));
    return modemStatus().then(L.bind(function(st) {
-    st.cells.forEach(L.bind(function(c) {
+    st.cells.filter(function(c) { return !c.nr; }).forEach(L.bind(function(c) {
      this.value(c.id, '%s (band %s, %s dBm)%s'.format(c.id, c.band, c.rsrp, c.serving ? ' ' + _('serving') : ''));
     }, this));
     var cur = this.map.data.get(this.map.config, section_id, 'celllock');

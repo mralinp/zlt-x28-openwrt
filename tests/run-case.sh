@@ -54,6 +54,15 @@ timeout() {
  [ "$(cat "$case_dir/act_hang")" = 1 ] && return 124
  return $rc
 }
+mock_nrband() {
+ printf 'x28-nrband %s\n' "$*" >> "$TRACE"
+ case "$1" in
+  get) printf 'support=080800d5 000001a0 00003000\ncurrent=%s\n' "$(cat "$case_dir/nrcur")" ;;
+  set) shift; [ "$(cat "$case_dir/nr_noop")" = 1 ] || echo "$*" > "$case_dir/nrcur" ;;
+ esac
+}
+export X28_MIPC_NRBAND=mock_nrband
+[ ! -e "$case_dir/nr_missing" ] || X28_MIPC_NRBAND=no_such_tool
 ubus() {
  if [ "$1" = call ] && [ "$2" = network.interface ] && [ "$3" = notify_proto ]; then
   printf '%s\n' "$4" >> "$NOTIFICATIONS"

@@ -65,7 +65,13 @@ assert.deepEqual(options.lteband_list.deps, [['lteband_mode', 'allow'], ['lteban
 assert.deepEqual(Object.keys(options.lteband_list.choices), ['1', '3', '5', '7', '8', '20', '28', '32', '38', '40', '41', '42', '43']);
 assert.equal(typeof options.lteband_list.validate(null, ''), 'string');
 assert.equal(options.lteband_list.validate(null, ['42']), true);
-assert.equal(options.band5g.tab, 'carrier');
+assert.deepEqual(Object.keys(options.nrband_mode.choices), ['none', 'allow', 'deny']);
+assert.equal(options.nrband_mode.default, 'none');
+assert.deepEqual(options.nrband_list.deps, [['nrband_mode', 'allow'], ['nrband_mode', 'deny']]);
+assert.deepEqual(Object.keys(options.nrband_list.choices), ['1', '3', '5', '7', '8', '20', '28', '38', '40', '41', '77', '78']);
+assert.equal(typeof options.nrband_list.validate(null, ''), 'string');
+assert.equal(options.nrband_list.validate(null, ['78']), true);
+assert(errors.NRBAND_LOCK_FAILED);
 assert(errors.CONNECT_TIMEOUT && errors.ROAMING_DISABLED && errors.ATTACH_FAILED);
 assert.equal(options.mtu.datatype, 'range(576,1500)');
 assert.equal(options.metric.datatype, 'range(0,65535)');

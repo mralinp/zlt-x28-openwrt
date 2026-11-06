@@ -84,6 +84,24 @@ def cases():
              no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0", "--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0"]),
         case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
+        case("nr-allow", config={"nrband_mode": "allow", "nrband_list": [78]},
+             expect_cmds=["x28-nrband set 00000000 00000000 00002000", "--data_call_act"]),
+        case("nr-deny", config={"nrband_mode": "deny", "nrband_list": [77]},
+             expect_cmds=["x28-nrband set 080800d5 000001a0 00002000", "--data_call_act"]),
+        case("nr-none-unchanged", config={"nrband_mode": "none"}, no_nr_set=True),
+        case("nr-unset-untouched", no_nr_any=True),
+        case("nr-none-restores", config={"nrband_mode": "none"}, nrcur="00000000 00000000 00002000",
+             expect_cmds=["x28-nrband set 080800d5 000001a0 00003000", "--data_call_act"]),
+        case("nr-nothing-left", config={"nrband_mode": "deny", "nrband_list": [1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78]},
+             error="NRBAND_LOCK_FAILED", no_activate_call=True, no_nr_set=True),
+        case("nr-not-applied", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_noop=1, error="NRBAND_LOCK_FAILED",
+             no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000", "x28-nrband set 080800d5 000001a0 00003000"]),
+        case("nr-no-service", config={"nrband_mode": "allow", "nrband_list": [78]}, reg=0, error="NRBAND_LOCK_FAILED",
+             no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000", "x28-nrband set 080800d5 000001a0 00003000"]),
+        case("nr-missing-helper", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_missing=1, error="NRBAND_LOCK_FAILED",
+             no_activate_call=True),
+        case("nr-bad-mode", config={"nrband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
+        case("nr-unsupported-band", config={"nrband_mode": "allow", "nrband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-no-pci", config={"celllock": "42090"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-big-earfcn", config={"celllock": "46590:258"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-big-pci", config={"celllock": "42090:512"}, error="INVALID_CONFIG", no_cli=True),
@@ -171,6 +189,10 @@ def verify(item, directory):
         assert not activations, commands
     if item.get("no_cops_set"):
         assert not any(c.startswith("--at_cmd at+cops=1") or c.startswith("--at_cmd at+cops=0") for c in commands), commands
+    if item.get("no_nr_set"):
+        assert not any(c.startswith("x28-nrband set") for c in commands), commands
+    if item.get("no_nr_any"):
+        assert not any(c.startswith("x28-nrband") for c in commands), commands
     if item.get("no_epbse_set"):
         assert not any(c.startswith("--at_cmd at+epbse=") for c in commands), commands
     if item.get("no_epbse_any"):
@@ -259,6 +281,10 @@ def main():
             (d / "cops_set_ok").write_text(str(item.get("cops_set_ok", 1)))
             (d / "cops_err_applied").write_text(str(item.get("cops_err_applied", 0)))
             (d / "cops_noop").write_text(str(item.get("cops_noop", 0)))
+            (d / "nrcur").write_text(item.get("nrcur", "080800d5 000001a0 00003000"))
+            (d / "nr_noop").write_text(str(item.get("nr_noop", 0)))
+            if item.get("nr_missing"):
+                (d / "nr_missing").write_text("1")
             (d / "epbse").write_text(item.get("epbse", "154,145,2282225877,1952,0,0,0,0,0,0"))
             (d / "epbse_noop").write_text(str(item.get("epbse_noop", 0)))
             (d / "lock").write_text(item.get("lock", "0"))

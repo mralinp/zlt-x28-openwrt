@@ -6,7 +6,8 @@
 # Cells come from AT+ECELL (LTE only; quarter-dB units). Values are what the modem reports, nothing is written.
 
 cells() {
-	# +ECELL: <n>,<rat>,<serving: cellid,tac,mcc,mnc,pci,x,y,rsrp,rsrq,,,,,earfcn,rat,mask,mask,,>, then 15 fields per neighbour
+	# +ECELL: <n>,<rat 7|13>,<serving: cellid,tac,mcc,mnc,pci,x,y,rsrp,rsrq,,,,,earfcn,rat,mask,mask,,>, then 15 fields per neighbour.
+	# An ARFCN above the LTE range is an NR cell (5G NSA); its signal reads 255 when the modem has none.
 	tr -d '\r' | sed -n 's/^+ECELL: *//p' | head -n 1 | awk -F, '
 		function band(e) {
 			if (e <= 599) return 1; if (e >= 1200 && e <= 1949) return 3; if (e >= 2750 && e <= 3449) return 7
@@ -14,11 +15,21 @@ cells() {
 			if (e >= 37750 && e <= 38249) return 38; if (e >= 38650 && e <= 39649) return 40; if (e >= 39650 && e <= 41589) return 41
 			if (e >= 41590 && e <= 43589) return 42; if (e >= 43590 && e <= 45589) return 43; return "?"
 		}
-		function emit(key, pci, rsrp, rsrq, earfcn) {
-			if (pci !~ /^[0-9]+$/ || earfcn !~ /^[0-9]+$/ || rsrp !~ /^-?[0-9]+$/ || rsrq !~ /^-?[0-9]+$/) return
-			printf "%s\t%s:%s\t%s\t%.1f\t%.1f\n", key, earfcn, pci, band(earfcn), rsrp / 4, rsrq / 4
+		function nrband(e) {
+			if (e >= 620000 && e <= 653333) return "n78"; if (e > 653333 && e <= 680000) return "n77"
+			if (e >= 514000 && e <= 524000) return "n38"; if (e >= 499200 && e <= 537999) return "n41"; if (e >= 460000 && e <= 480000) return "n40"
+			if (e >= 422000 && e <= 434000) return "n1"; if (e >= 361000 && e <= 376000) return "n3"; if (e >= 173800 && e <= 178800) return "n5"
+			if (e >= 185000 && e <= 192000) return "n8"; if (e >= 158200 && e <= 164200) return "n20"; if (e >= 151600 && e < 158200) return "n28"
+			return "n?"
 		}
-		$2 == 7 {
+		function emit(key, pci, rsrp, rsrq, earfcn,   nr, sig) {
+			if (pci !~ /^[0-9]+$/ || earfcn !~ /^[0-9]+$/ || rsrp !~ /^-?[0-9]+$/ || rsrq !~ /^-?[0-9]+$/) return
+			nr = earfcn + 0 > 46589
+			if (nr) key = "nrcell"
+			if (rsrp + 0 == 255) { sig = "?\t?" } else { sig = sprintf("%.1f\t%.1f", rsrp / 4, rsrq / 4) }
+			printf "%s\t%s:%s\t%s\t%s\n", key, earfcn, pci, nr ? nrband(earfcn) : band(earfcn), sig
+		}
+		$2 == 7 || $2 == 13 {
 			emit("serving", $7, $10, $11, $16)
 			for (i = 22; i <= NF; i += 15) emit("cell", $i, $(i + 3), $(i + 4), $(i + 9))
 		}'
@@ -26,10 +37,10 @@ cells() {
 
 selftest() {
 	got=$(cat <<'EOS' | cells | tr '\t\n' '|;'
-+ECELL: 3,7,"0018B230B","2715",432,44,258,38,19,-412,-42,8,10,,0,42090,7,"00FFFFFFF","FFFF",,,311,34,9,-428,-62,,10,,,41890,7,"00FFFFFFF","FFFF",,,105,31,3,-440,-74,,10,,,2850,7,"00FFFFFFF","FFFF",,,
++ECELL: 4,13,"0016AC80C","ACBC",432,11,496,59,20,-328,-40,5,20,,0,1500,13,"00FFFFFFF","FFFF",,,134,52,5,-356,-70,,20,,,1500,13,"00FFFFFFF","FFFF",,,134,79,63,255,255,11,59,255,,650000,11,"00FFFFFFF","FFFFFFF",,,105,31,3,-440,-74,,10,,,2850,7,"00FFFFFFF","FFFF",,,
 EOS
 )
-	want='serving|42090:258|42|-103.0|-10.5;cell|41890:311|42|-107.0|-15.5;cell|2850:105|7|-110.0|-18.5;'
+	want='serving|1500:496|3|-82.0|-10.0;cell|1500:134|3|-89.0|-17.5;nrcell|650000:134|n78|?|?;cell|2850:105|7|-110.0|-18.5;'
 	[ "$got" = "$want" ] || { echo "got $got"; return 1; }
 	echo "selftest ok"
 }
