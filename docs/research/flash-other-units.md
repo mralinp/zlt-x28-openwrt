@@ -2,6 +2,9 @@
 
 The guarded flash tools (`slot_entry.py`, `slot_session.py`, `restore_entry.py`) are pinned to the first unit. A second unit
 (X28 PRO, board `TZ7.823.805A`, stock 8.6.8 built 2024-02-20, no SSH, no UART wanted) was backed up over USB on 2026-11-05.
+Update: SSH access was later gained on stock 8.6.8, and works up to 8.6.28, for both the unlock and OpenWrt, on the X28, X28 Pro,
+X28 V-Pro and X28 Pro (Ooredoo). The no-SSH path below stays as the fallback for units where that does not work.
+
 Comparing its 51 images with the first unit's backup:
 
 - **Identical (32):** `boot_a/b`, `lk_a/b`, `tee_a/b`, `rootfs_sig_a/b`, the modem and firmware images (`md1img`, `md1dsp`, `spmfw`,

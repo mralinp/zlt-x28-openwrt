@@ -40,6 +40,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   vendor threads in uninterruptible sleep, harmless ([TESTING 33](TESTING.md)).
 - SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
 - One unit, one SIM, one carrier. Hardware revision differences are unknown.
+- Stock SSH access (needed to change the boot order) works on firmware 1.5 and on 8.6.8 up to 8.6.28, on the X28, X28 Pro, X28 V-Pro and X28 Pro (Ooredoo). The native image is flashed and booted on one unit only; the other models are not verified.
 
 ## Known limits of the base
 
