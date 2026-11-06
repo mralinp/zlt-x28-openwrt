@@ -162,7 +162,8 @@ return network.registerProtocol('x28_mipc', {
    return (value && value.length > 0) || _('Select at least one band.');
   };
   option = section.taboption('carrier', form.DummyValue, 'band5g', _('5G band lock'));
-  option.cfgvalue = function() { return _('Not available yet: this modem does not expose a 5G band mask to the router.'); };
+  option.default = _('Not available yet: the 5G band mask needs a vendor call that is not wired in.');
+  option.cfgvalue = function() { return this.default; };
 
   // Cell lock. The mode is not stored; the UCI option `celllock` is (set = locked).
   option = section.taboption('carrier', form.ListValue, 'cellmode', _('Cell lock'),
