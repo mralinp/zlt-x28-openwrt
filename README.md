@@ -28,6 +28,13 @@
 > UART. It is not a consumer installer. Read [docs/RECOVERY.md](docs/RECOVERY.md) before touching anything.
 > Not affiliated with ZLT, Tozed, MediaTek or Quectel.
 
+> [!NOTE]
+> **Tested on stock firmware 1.5 only.** The image was verified and flashed on the old unit running 1.5. To boot slot A
+> you must change the boot order, which needs SSH or telnet on the stock system; firmware 1.5 lets you get that. A
+> newer unit on firmware 8.6.8 runs the image, but I could not change its boot order yet; I am looking for a universal
+> way that works on every version. The [x28-flasher](https://github.com/mralinp/x28-flasher) repo is **private for
+> now** because it needs major changes for 8.6.8, so the flashing steps below are reference, not something you can run.
+
 ## Why
 
 The ZLT X28 (MediaTek MT6890/T750, Quectel RG500L modem) ships a locked-down OpenWrt 19.07 with a vendor web
