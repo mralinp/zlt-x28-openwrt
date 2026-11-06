@@ -1,6 +1,6 @@
 # Tasks — native OpenWrt on the ZLT X28
 
-Status as of 2026-10-29 (release `v0.22.0`). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
+Status as of 2026-11-07 (release `v0.57.2`; the checklist below was last ticked at v0.22, see STATUS and the changelog for later work). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
 stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list is the overview.
 
 ## A. Hardware boundary

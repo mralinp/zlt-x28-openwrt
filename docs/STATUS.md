@@ -1,4 +1,4 @@
-# Project status — 2026-10-29
+# Project status — 2026-11-07
 
 The older status snapshot (stock-firmware overlay era, 2026-10-21) is kept in
 [archive/2026-10-21-STATUS.md](archive/2026-10-21-STATUS.md). Evidence for everything below is in
@@ -12,7 +12,7 @@ adapter. Preserve the working modem, board calibration and recoverability.
 
 ## Where it stands
 
-Release `v0.22.0`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+Release `v0.57.2`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
 is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
 **Working on that unit**
@@ -28,7 +28,10 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
-  The image build ships it; that image has not been flashed yet.
+  Every image build ships it.
+- LuCI Carrier tab on the `x28_mipc` protocol: operator (automatic or manual, with a network scan), 4G and 5G band lock, cell lock, roaming (default off) and modem status (v0.54 – v0.57).
+- WPS push button, one Wi-Fi network per band (v0.38.6 – v0.39.1).
+- The flasher, backup and image assembly moved to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which is private for now; releases here publish the `x28-overlay` asset it consumes (v0.55).
 
 **Open or unproven**
 - Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.

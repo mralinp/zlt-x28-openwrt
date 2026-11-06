@@ -44,7 +44,7 @@ recovery first: back up everything, prove a way back, then build and flash.
 
 ## Status
 
-Last updated 2026-11-02 (release `v0.37.0`). One unit, one SIM, one carrier.
+Last updated 2026-11-07 (release `v0.57.2`). One unit, one SIM, one carrier.
 
 | Area | State |
 |---|---|
@@ -169,6 +169,7 @@ UART path (a shifter or 1.8 V adapter on the 3-hole footprint: RX, GND, TX from 
 on macOS.
 
 ```bash
+# Steps 1, 2, 4 and 5 run from the x28-flasher repo, where tools/recovery/ and the stage/first_boot/package tools live now.
 # 1. Back up and verify every NAND partition (router reachable as `ssh router`)
 python3 tools/recovery/dump_partitions.py
 python3 tools/recovery/verify_backup.py private/backups/<date>
