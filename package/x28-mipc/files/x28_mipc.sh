@@ -112,7 +112,8 @@ x28_mipc_operator() {
 # LTE band lock via AT+EPBSE=<gsm>,<umts>,<lte 1-32>,<lte 33-64>,<4 more> (the last four read 0 here; GSM, UMTS and those are
 # kept as read). Supported LTE bands of this modem (RG500L-EU): 1 3 5 7 8 20 28 32 and 38 40 41 42 43.
 # lteband_mode: none | allow (only the listed bands) | deny (all but the listed). A change re-registers the modem, so it
-# is applied before the data call; a mask that does not read back or has no service is put back as it was.
+# is applied before the data call and read back. Strict: a mask that took effect stays even if there is no service (the owner
+# removes the lock); only a mask that did not take effect is an error.
 X28_MIPC_LTE_LO=2282225877
 X28_MIPC_LTE_HI=1952
 
@@ -121,7 +122,7 @@ x28_mipc_epbse() {
 }
 
 x28_mipc_bandlock() {
- local mode="$1" list="$2" cur lo hi b lo_l=0 hi_l=0 want i=0 old
+ local mode="$1" list="$2" cur lo hi b lo_l=0 hi_l=0 want i=0
  cur="$(x28_mipc_epbse 'at+epbse?')"
  case "$cur" in [0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*) ;; *) return 1 ;; esac
  for b in $list; do
@@ -133,25 +134,25 @@ x28_mipc_bandlock() {
   *) lo=$X28_MIPC_LTE_LO; hi=$X28_MIPC_LTE_HI ;;
  esac
  [ $((lo | hi)) -ne 0 ] || return 1
- old="$cur"
  want="$(echo "$cur" | cut -d, -f1,2),$lo,$hi,$(echo "$cur" | cut -d, -f5-)"
  [ "$cur" = "$want" ] && return 0
  mipc_wan_cli --at_cmd "at+epbse=$want" >/dev/null 2>&1
- until [ "$(x28_mipc_epbse 'at+epbse?')" = "$want" ]; do
-  [ "$i" -ge 10 ] && break
+ while [ "$i" -le 10 ]; do
+  [ "$(x28_mipc_epbse 'at+epbse?')" = "$want" ] && {
+   # Strict: the choice stays. No service afterwards is for the owner to fix by removing the lock.
+   sleep 3
+   x28_mipc_wait_reg || logger -t x28_mipc "no service after the 4G band lock ($want); remove the lock to get it back"
+   return 0
+  }
   sleep 1; i=$((i + 1))
  done
- if [ "$i" -lt 10 ]; then
-  sleep 3
-  x28_mipc_wait_reg && return 0
- fi
- mipc_wan_cli --at_cmd "at+epbse=$old" >/dev/null 2>&1
+ [ "$mode" = none ] && { logger -t x28_mipc "4G band mask could not be widened to $want"; return 0; }
  return 1
 }
 
 # 5G band lock via x28-nrband (MIPC; AT has no NR band control here). Supported NR bands of this modem (RG500L-EU):
 # n1 n3 n5 n7 n8 n20 n28 n38 n40 n41 n77 n78; NR band n is bit n-1 of three 32-bit words. nrband_mode: none | allow | deny,
-# like the 4G lock: applied before the data call, verified by read-back and restored when it does not hold or has no service.
+# like the 4G lock: applied before the data call and read back; strict, it is never undone for lack of service.
 x28_mipc_nrband() {
  local mode="$1" list="$2" sup cur want w0 w1 w2 c0 c1 c2 s0 s1 s2 l0=0 l1=0 l2=0 b i=0 out
  local tool="${X28_MIPC_NRBAND:-x28-nrband}"
@@ -175,23 +176,15 @@ x28_mipc_nrband() {
  want="$(printf '%08x %08x %08x' "$w0" "$w1" "$w2")"
  [ "$cur" = "$want" ] && return 0
  timeout 30 "$tool" set $want >/dev/null 2>&1
- held=0
  while [ "$i" -le 10 ]; do
-  [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$want" ] && { held=1; break; }
+  [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$want" ] && {
+   # Strict: the choice stays. No service afterwards is for the owner to fix by removing the lock.
+   sleep 3
+   x28_mipc_wait_reg || logger -t x28_mipc "no service after the 5G band lock ($want); remove the lock to get it back"
+   return 0
+  }
   sleep 1; i=$((i + 1))
  done
- if [ "$held" = 1 ]; then
-  sleep 3
-  x28_mipc_wait_reg && return 0
- fi
- # Put the previous mask back and check it took; if it did not, the manual undo is in docs/NATIVE-CELLULAR.md.
- timeout 30 "$tool" set $cur >/dev/null 2>&1
- i=0
- until [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$cur" ]; do
-  [ "$i" -ge 5 ] && { logger -t x28_mipc "NR band mask restore did not hold (wanted $cur)"; break; }
-  sleep 1; i=$((i + 1))
- done
- # A failed widen with mode none is logged, not fatal: a restricted mask costs 5G at most, stopping the WAN costs everything.
  [ "$mode" = none ] && { logger -t x28_mipc "NR band mask could not be widened to $want"; return 0; }
  return 1
 }

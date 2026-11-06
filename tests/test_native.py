@@ -79,9 +79,10 @@ def cases():
         case("band-nothing-left", config={"lteband_mode": "deny", "lteband_list": [1, 3, 5, 7, 8, 20, 28, 32, 38, 40, 41, 42, 43]}, error="BAND_LOCK_FAILED",
              no_activate_call=True, no_epbse_set=True),
         case("band-not-applied", config={"lteband_mode": "allow", "lteband_list": [42]}, epbse_noop=1, error="BAND_LOCK_FAILED",
-             no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0", "--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0"]),
-        case("band-no-service", config={"lteband_mode": "allow", "lteband_list": [42]}, reg=0, error="BAND_LOCK_FAILED",
-             no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0", "--at_cmd at+epbse=154,145,2282225877,1952,0,0,0,0,0,0"]),
+             no_activate_call=True, one_epbse_set=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0"]),
+        # reg=0 means no registration at all, so setup later stops at the attach step; the lock was set once and not undone.
+        case("band-no-service-kept", config={"lteband_mode": "allow", "lteband_list": [42]}, reg=0, one_epbse_set=True,
+             error="ATTACH_FAILED", no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0"]),
         case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("nr-allow", config={"nrband_mode": "allow", "nrband_list": [78]},
@@ -95,9 +96,9 @@ def cases():
         case("nr-nothing-left", config={"nrband_mode": "deny", "nrband_list": [1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78]},
              error="NRBAND_LOCK_FAILED", no_activate_call=True, no_nr_set=True),
         case("nr-not-applied", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_noop=1, error="NRBAND_LOCK_FAILED",
-             no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000", "x28-nrband set 080800d5 000001a0 00003000"]),
-        case("nr-no-service", config={"nrband_mode": "allow", "nrband_list": [78]}, reg=0, error="NRBAND_LOCK_FAILED",
-             no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000", "x28-nrband set 080800d5 000001a0 00003000"]),
+             no_activate_call=True, one_nr_set=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000"]),
+        case("nr-no-service-kept", config={"nrband_mode": "allow", "nrband_list": [78]}, reg=0, one_nr_set=True,
+             error="ATTACH_FAILED", no_activate_call=True, expect_cmds=["x28-nrband set 00000000 00000000 00002000"]),
         case("nr-missing-helper", config={"nrband_mode": "allow", "nrband_list": [78]}, nr_missing=1, error="NRBAND_LOCK_FAILED",
              no_activate_call=True),
         case("nr-none-missing-helper", config={"nrband_mode": "none"}, nr_missing=1),
@@ -107,8 +108,8 @@ def cases():
         case("nr-none-garbage-helper", config={"nrband_mode": "none"}, nrcur="zz zz zz"),
         case("nr-allow-garbage-helper", config={"nrband_mode": "allow", "nrband_list": [78]}, nrcur="zz zz zz",
              error="NRBAND_LOCK_FAILED", no_activate_call=True, no_nr_set=True),
-        case("nr-none-widen-fails", config={"nrband_mode": "none"}, nrcur="00000000 00000000 00002000", nr_noop=1,
-             expect_cmds=["x28-nrband set 080800d5 000001a0 00003000", "x28-nrband set 00000000 00000000 00002000", "--data_call_act"]),
+        case("nr-none-widen-fails", config={"nrband_mode": "none"}, nrcur="00000000 00000000 00002000", nr_noop=1, one_nr_set=True,
+             expect_cmds=["x28-nrband set 080800d5 000001a0 00003000", "--data_call_act"]),
         case("nr-bad-mode", config={"nrband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("nr-unsupported-band", config={"nrband_mode": "allow", "nrband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-no-pci", config={"celllock": "42090"}, error="INVALID_CONFIG", no_cli=True),
@@ -198,6 +199,10 @@ def verify(item, directory):
         assert not activations, commands
     if item.get("no_cops_set"):
         assert not any(c.startswith("--at_cmd at+cops=1") or c.startswith("--at_cmd at+cops=0") for c in commands), commands
+    if item.get("one_nr_set"):
+        assert sum(c.startswith("x28-nrband set") for c in commands) == 1, commands
+    if item.get("one_epbse_set"):
+        assert sum(c.startswith("--at_cmd at+epbse=") for c in commands) == 1, commands
     if item.get("no_nr_set"):
         assert not any(c.startswith("x28-nrband set") for c in commands), commands
     if item.get("no_nr_any"):

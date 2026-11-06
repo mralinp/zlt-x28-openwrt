@@ -20,8 +20,8 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['CONNECT_TIMEOUT', 'The modem did not answer the data call; the radio was restarted and it will retry'],
  ['OPERATOR_FAILED', 'The chosen operator did not register; the modem was set back to automatic'],
  ['CELL_LOCK_FAILED', 'The cell lock did not hold or the cell has no service; it was removed'],
- ['BAND_LOCK_FAILED', 'The band lock did not hold or left no service; the previous bands were restored'],
- ['NRBAND_LOCK_FAILED', 'The 5G band lock did not hold, left no service or the band tool is missing; the previous bands were restored'],
+ ['BAND_LOCK_FAILED', 'The band lock did not take effect on the modem'],
+ ['NRBAND_LOCK_FAILED', 'The 5G band lock did not take effect on the modem, or the band tool (x28-nrband) is missing'],
  ['INVALID_REPLY', 'The modem returned an invalid bearer response'],
  ['LINK_NOT_READY', 'The reported bearer device is not up'],
  ['NOTIFY_FAILED', 'The connection could not be reported to netifd'],
@@ -147,7 +147,7 @@ return network.registerProtocol('x28_mipc', {
   };
   // 4G band lock (AT+EPBSE). The list is this modem's supported LTE bands.
   option = section.taboption('carrier', form.ListValue, 'lteband_mode', _('4G band lock'),
-   _('Restrict which LTE bands the modem may use. The modem re-registers when this changes, and the change is undone if it has no service.'));
+   _('Restrict which LTE bands the modem may use. The modem re-registers when this changes. If there is no service afterwards, remove the lock: it is not undone for you.'));
   option.value('none', _('No lock'));
   option.value('allow', _('Only the selected bands'));
   option.value('deny', _('All except the selected bands'));
@@ -164,7 +164,7 @@ return network.registerProtocol('x28_mipc', {
   };
   // 5G band lock (x28-nrband over MIPC). The list is this modem's supported NR bands.
   option = section.taboption('carrier', form.ListValue, 'nrband_mode', _('5G band lock'),
-   _('Restrict which 5G (NR) bands the modem may use. 5G NSA also needs its 4G anchor band. The modem re-registers when this changes, and the change is undone if it has no service.'));
+   _('Restrict which 5G (NR) bands the modem may use. 5G NSA also needs its 4G anchor band. The modem re-registers when this changes. If there is no service afterwards, remove the lock: it is not undone for you.'));
   option.value('none', _('No lock'));
   option.value('allow', _('Only the selected bands'));
   option.value('deny', _('All except the selected bands'));
