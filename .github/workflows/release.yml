@@ -76,7 +76,7 @@ jobs:
           cp userspace/*-rootfs.tar.gz "assets/x28-userspace-v${VERSION}-openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
           cp userspace/*.manifest "assets/x28-userspace-v${VERSION}.manifest"
           # The package files the flasher's image assembly reads (x28-flasher first_boot.py, X28_OVERLAY).
-          COPYFILE_DISABLE=1 tar --uid 0 --gid 0 -czf "assets/x28-overlay-v${VERSION}.tar.gz" package/luci-proto-x28-mipc package/x28-bootok/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files
+          tar --owner=0 --group=0 --numeric-owner -czf "assets/x28-overlay-v${VERSION}.tar.gz" package/luci-proto-x28-mipc package/x28-bootok/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files
           (cd assets && sha256sum -- * > SHA256SUMS)
           cat assets/SHA256SUMS
 
