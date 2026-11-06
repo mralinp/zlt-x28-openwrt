@@ -64,6 +64,9 @@ def cases():
              one_lock_set=True, no_lock_clear=True, expect_cmds=["--at_cmd at+emmchlck=1,7,0,42090,258"]),
         case("cell-lock-stale-kept", config={"celllock": "42090:258"}, lock="1,7,0,42090,258,0", reg=0,
              error="ATTACH_FAILED", no_activate_call=True, no_lock_set=True, no_lock_clear=True),
+        # an operator that fails must not hide the clearing of a lock that is still on the modem
+        case("cell-clear-despite-operator-failure", config={"plmn": "43235"}, cops_set_ok=0, lock="1,7,0,42090,258,0",
+             error="OPERATOR_FAILED", no_activate_call=True, expect_cmds=["--at_cmd at+emmchlck=0", '--at_cmd at+cops=1,2,"43235"']),
         case("cell-lock-off-unreadable", lock="garbage", expect_cmds=["--at_cmd at+emmchlck=0", "--data_call_act"]),
         case("cell-lock-leading-zero", config={"celllock": "042090:258"}, error="INVALID_CONFIG", no_cli=True),
         case("cell-lock-pci-leading-zero", config={"celllock": "42090:0258"}, error="INVALID_CONFIG", no_cli=True),

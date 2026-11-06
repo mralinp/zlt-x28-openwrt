@@ -216,7 +216,7 @@ x28_mipc_cell_ok() {
 # the cell for a lock, empty when unreadable (the CLI sometimes crashes). Strict (owner decision): a lock that took effect is
 # never undone for lack of service, only a lock that did not take effect is an error.
 x28_mipc_celllock() {
- local want="$1" i=0
+ local want="$1" i=0 held=0
  x28_mipc_lockread() {
   mipc_wan_cli --at_cmd 'at+emmchlck?' 2>/dev/null | sed -n 's/^+EMMCHLCK: *0.*/off/p; s/^+EMMCHLCK: *1,7,0,\([0-9]*\),\([0-9]*\).*/\1:\2/p' | head -n 1
  }
@@ -393,8 +393,9 @@ x28_mipc_setup() {
   case "$apn" in ''|-*|*[!a-zA-Z0-9._-]*) proto_notify_error "$interface" NO_SIM_APN; return 1 ;; esac
  fi
 
- x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
+# The cell lock runs first so that clearing it can never be hidden by a later step that fails (strict locks stay until the owner removes them).
  x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
+ x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
  [ -z "$nrband_mode" ] || x28_mipc_nrband "$nrband_mode" "$nrbands" || { proto_notify_error "$interface" NRBAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  [ -z "$lteband_mode" ] || x28_mipc_bandlock "$lteband_mode" "$bands" || { proto_notify_error "$interface" BAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
