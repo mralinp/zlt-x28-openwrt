@@ -17,7 +17,7 @@
 ![Status](https://img.shields.io/badge/status-beta%20%C2%B7%20pre--release-yellow)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-[Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash-overview) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
+[Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
 
 </div>
 
@@ -44,14 +44,14 @@ recovery first: back up everything, prove a way back, then build and flash.
 
 ## Status
 
-Last updated 2026-11-07 (release `v0.57.2`). One unit, one SIM, one carrier.
+One unit, one SIM, one carrier. Current release: see the badge above; the full state is in [docs/STATUS.md](docs/STATUS.md).
 
 | Area | State |
 |---|---|
 | Full NAND backup (51 partitions, hash-verified) | ✅ done |
 | USB recovery: preloader + download agent | ✅ all 51 partitions read over USB; `rootfs_a` and `rootfs_sig_a` written and restored with guarded tools |
 | Native OpenWrt 23.05.5 on slot A (vendor 4.19.205 kernel, fw3 + iptables-legacy) | ✅ boots; stock slot B untouched |
-| 5G data as a normal netifd interface (`x28_mipc`: IPv4, IPv6, IPv4v6, APN from the SIM) | ✅ works, with its own LuCI protocol page |
+| 5G data as a normal netifd interface (`x28_mipc`: IPv4, IPv6, IPv4v6, APN from the SIM) | ✅ works, with its own LuCI protocol page and Carrier tab (operator and scan, band and cell lock, roaming, modem status) |
 | LuCI over HTTPS (self-signed, HTTP redirected), LAN bridge (4 sockets), DHCP/DNS, IPv6 on the LAN, firewall and NAT | ✅ works; root has an empty password until you set one |
 | WireGuard (our module for the vendor kernel) | ✅ up to 715 Mbit/s sending, CPU not saturated ([below](#vpn-and-passwall2)) |
 | OpenVPN client | ✅ about 100 Mbit/s, one CPU core is the limit |
@@ -119,7 +119,7 @@ The target layout is simpler than today's two full firmwares:
   OpenWrt on slot A, and put the stock firmware back if you want it. This frees the flash that now holds a second
   full firmware and removes the need for the download agent and a UART in everyday recovery.
 
-Steps, roughly in order ([docs/PROJECT-PLAN.md](docs/PROJECT-PLAN.md) has the detail):
+Roughly in order ([PROJECT-PLAN](docs/PROJECT-PLAN.md) has the detail):
 
 1. Soak and test the slot-A image: 48 h without unexplained reboots, Wi-Fi client and throughput tests, more LED
    states, the idle CPU and RAM baseline.
@@ -158,74 +158,28 @@ flowchart LR
 - **Guarded flashing.** The tools in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/` there) write only the targets they were built for, check the other
   slot and neighbouring partitions before and after every write, and need a typed phrase from the owner.
 
-## Build and flash overview
+## Build and flash
 
-Backup, USB, image assembly and flash steps (1, 2, 4 and 5) belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which does not depend on this repo: it downloads the latest release's assembly bundle (`x28-assembly-*`: userspace, package files, kernel modules, extra packages) and assembles locally from your own backup. The commands below name its `tools/` paths and are kept for reference.
-
-Everything is detailed, with expected output, in [docs/BUILD.md](docs/BUILD.md) and
-[docs/TESTING.md](docs/TESTING.md). Hardware: a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work), a **1.8 V**
-UART path (a shifter or 1.8 V adapter on the 3-hole footprint: RX, GND, TX from left to right; see
-[RECOVERY](docs/RECOVERY.md#uart-debug-console-2-read-side-confirmed)), and a second internet path while the X28 is offline. Tools: Python 3.10+, Docker, `gh`, Homebrew `libusb`
-on macOS.
-
-```bash
-# Steps 1, 2, 4 and 5 run from the x28-flasher repo, where tools/recovery/ and the stage/first_boot/package tools live now.
-# 1. Back up and verify every NAND partition (router reachable as `ssh router`)
-python3 tools/recovery/dump_partitions.py
-python3 tools/recovery/verify_backup.py private/backups/<date>
-
-# 2. Install the pinned mtkclient and read the unit over USB (modem unpowered at start)
-/opt/homebrew/bin/python3.14 tools/recovery/setup_mtkclient.py
-python3 tools/recovery/read_all.py
-
-# 3. Build the open userspace (Linux x86_64; or take the CI release)
-tools/build/userspace.sh out
-
-# 4. Assemble the native image from your backup (details and flags in docs/BUILD.md)
-python3 tools/build/stage_native.py   --stock <stock rootfs.tar.gz> --modern <userspace rootfs.tar.gz> ... --output private/build/native-stage-N
-docker run --rm -v x28-kbuild:/k -v "$PWD/package/x28-kmods:/src:ro" -v "$PWD/private/kmods:/out" debian:bookworm bash /src/build.sh
-gh release download feed-2 -D private/feed-2 -p 'ipset_*' -p 'libipset13_*' -p 'x28-ipset-kernel_*'
-python3 tools/build/first_boot.py     --stage private/build/native-stage-N --public-key ~/.ssh/router.pub --stock <stock rootfs.tar.gz> --output private/build/native-management-N --kmods private/kmods --ipk private/feed-2/*.ipk
-docker run ... x28-firmware-tools:ubi python3 /tools/build/package_ubi.py --profile /profile --output /out/native-ubi-N
-
-# 5. Flash slot A with the guarded session tool (dry run first; --write needs approval, UART and a second backup copy)
-python3 tools/recovery/slot_entry.py rootfs_a write --candidate-dir private/build/native-ubi-N ...
-```
-
-The flash step, its gates and the typed approvals are described in
-[docs/research/rootfs-a-write-plan.md](docs/research/rootfs-a-write-plan.md) and
-[docs/RECOVERY.md](docs/RECOVERY.md). Read both first.
+Backup, USB access, image assembly and flashing belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher)
+(private for now). It downloads the latest release's `x28-assembly-*` bundle from here and assembles the image locally
+from your own unit's backup. You need a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work) and a **1.8 V** UART
+path ([RECOVERY](docs/RECOVERY.md#uart-debug-console-2-read-side-confirmed)). The steps, gates and typed approvals are in
+[docs/BUILD.md](docs/BUILD.md), [docs/RECOVERY.md](docs/RECOVERY.md) and
+[docs/research/rootfs-a-write-plan.md](docs/research/rootfs-a-write-plan.md). Read them first.
 
 ## Documentation
 
-| Doc | What |
-|---|---|
-| [CHANGELOG.md](CHANGELOG.md) | Milestones and every release |
-| [docs/STATUS.md](docs/STATUS.md) | Where the project stands today |
-| [docs/TESTING.md](docs/TESTING.md) | **Start here for evidence.** Every test: result, commands, what is not proven |
-| [docs/PROJECT-PLAN.md](docs/PROJECT-PLAN.md) | Goal, strategy, phases, roadmap and risks |
-| [docs/BUILD.md](docs/BUILD.md) | Building the native image: open half in CI, vendor half locally |
-| [docs/RECOVERY.md](docs/RECOVERY.md) | Backup, USB recovery, flash sessions, UART |
-| [docs/BOOT-FLOW.md](docs/BOOT-FLOW.md) | A/B slots, the preloader boot counter, the rootfs signature check |
-| [docs/NATIVE-CELLULAR.md](docs/NATIVE-CELLULAR.md) | The `x28_mipc` cellular protocol |
-| [docs/HARDWARE.md](docs/HARDWARE.md) | CPU, RAM and flash use, the root filesystem tree and the device tree |
-| [docs/THERMAL.md](docs/THERMAL.md) | Heat baseline, the 12 V fan, current readings |
-| [docs/PASSWALL2.md](docs/PASSWALL2.md) | Passwall2 on TPROXY modules for the vendor kernel, unit state, tunnel speed results |
-| [docs/research/kernel-module-crc.md](docs/research/kernel-module-crc.md) | TPROXY module CRCs vs the stock kernel, and how they load anyway |
-| [docs/research/vendor-ipset-packaging.md](docs/research/vendor-ipset-packaging.md) | ipset packages for the vendor kernel's module subset |
-| [docs/research/signed-package-feed.md](docs/research/signed-package-feed.md) | The signed X28 opkg feed: what's in it, how it's signed and hosted |
-| [docs/research/x28-flasher-binary.md](docs/research/x28-flasher-binary.md) | x28-flasher as a single PyInstaller binary: what changes in the guards, identity without git, CI (#272) |
-| [docs/research/rust-flasher-design.md](docs/research/rust-flasher-design.md) | Dropped Rust flasher (#270): kept for its protocol and DA findings |
-| [docs/research/reset-wps-buttons.md](docs/research/reset-wps-buttons.md) | Reset and WPS button pins, records and boot-time behaviour: no layer wipes flash |
-| [docs/FIRMWARE-INVENTORY.md](docs/FIRMWARE-INVENTORY.md) | Kernel, modules, vendor packages, runtime deps |
-| [docs/WORKFLOW.md](docs/WORKFLOW.md) | Issues, branches, commits, automatic releases |
-| [docs/README.md](docs/README.md) | Full documentation tree and code map |
+Start with [docs/TESTING.md](docs/TESTING.md) for evidence and [docs/STATUS.md](docs/STATUS.md) for the current state.
+[docs/README.md](docs/README.md) is the full index and code map; the main ones:
+[PROJECT-PLAN](docs/PROJECT-PLAN.md), [BUILD](docs/BUILD.md), [RECOVERY](docs/RECOVERY.md), [BOOT-FLOW](docs/BOOT-FLOW.md),
+[NATIVE-CELLULAR](docs/NATIVE-CELLULAR.md), [PASSWALL2](docs/PASSWALL2.md), [THERMAL](docs/THERMAL.md),
+[WORKFLOW](docs/WORKFLOW.md) and the [CHANGELOG](CHANGELOG.md).
 
 ## Releases
 
-Every merge to `main` is released automatically. The version comes from the PR title (Conventional Commits:
-`feat` → minor, `type!` → major, otherwise patch); 0.x releases are pre-releases. Assets are the open
-userspace rootfs, its package manifest and `SHA256SUMS`. A release alone does not boot the X28 (the vendor half is
+A merge to `main` that changes shippable files is released automatically (docs-only and CI-only merges are not). The version comes from the PR title (Conventional Commits:
+`feat` → minor, `type!` → major, otherwise patch); 0.x releases are pre-releases. Each release publishes one
+`x28-assembly-vX.Y.Z.tar.gz` bundle (userspace, package files, kernel modules, extra packages). A release alone does not boot the X28 (the vendor half is
 added locally); see [docs/BUILD.md](docs/BUILD.md). What changed, release by release: [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
