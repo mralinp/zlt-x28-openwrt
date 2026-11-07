@@ -24,6 +24,7 @@ import os
 import pathlib
 import re
 import sys
+import time
 import tarfile
 import urllib.request
 
@@ -100,10 +101,21 @@ def parse_index(text):
     return out
 
 
+def fetch(url, tries=5):
+    """The mirror drops connections now and then; a plain retry is enough."""
+    for i in range(tries):
+        try:
+            return urllib.request.urlopen(url, timeout=120).read()
+        except OSError:
+            if i == tries - 1:
+                raise
+            time.sleep(3 * (i + 1))
+
+
 def feed_kmods():
     """The feed's index has no file lists, so read them from the packages. Only tar listings; nothing is run."""
     def get(path):
-        return urllib.request.urlopen(FEED + path, timeout=120).read()
+        return fetch(FEED + path)
 
     def entry(pkg):
         outer = tarfile.open(fileobj=io.BytesIO(get(pkg['Filename'])), mode='r:gz')

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Classify every kmod of the official 23.05.5 core feed for the X28's 4.19.205 kernel (#394). Read-only.
 
-  A  stub: every module is on the unit or built in (package/x28-kmod-stubs/stubs.txt)
+  A  nothing to build: every module is on the unit or built in (stubs.txt lists the ones that have a stub)
   B  buildable: every missing module has 4.19 source and setting just its CONFIG option =m changes no other built-in symbol
   C  blocked: source exists but the option stays off, or enabling it also changes built-in symbols (needs a kernel config change)
   D  no 4.19 source: the module is newer than the kernel or out of tree (needs a backport)
@@ -24,7 +24,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import kmod_stub_feed as ks  # noqa: E402
@@ -66,8 +65,9 @@ def classify(kmods, have, stubs, objects, final):
         if name in stubs:
             own[name] = ('A', [])
             continue
-        why, worst = [], 'B'
+        why, worst = [], 'A'
         for m in sorted(ks.missing(k['ko'], have)):
+            worst = max(worst, 'B')
             opts = objects.get(ks.norm(m), ())
             if not opts:
                 why.append(f'{m}: no 4.19 source')
@@ -99,7 +99,7 @@ def dependents(kmods):
     """kmod -> sorted user packages (from base, packages, luci) that depend on it directly."""
     out = collections.defaultdict(set)
     for repo in ('base', 'packages', 'luci'):
-        data = urllib.request.urlopen(f'{REPO}{repo}/Packages.gz', timeout=120).read()
+        data = ks.fetch(f'{REPO}{repo}/Packages.gz')
         for name, p in ks.parse_index(gzip.decompress(data).decode() + '\n').items():
             for d in p.get('Depends', '').split(','):
                 d = d.strip().split(' ')[0]
@@ -128,11 +128,11 @@ def report(result, deps_of):
 def selftest():
     kmods = {'kmod-a': {'ko': {'a'}, 'depends': []}, 'kmod-b': {'ko': {'b'}, 'depends': ['kmod-a']},
              'kmod-c': {'ko': {'c'}, 'depends': []}, 'kmod-d': {'ko': {'d'}, 'depends': []},
-             'kmod-e': {'ko': {'e'}, 'depends': ['kmod-d']}, 'kmod-s': {'ko': {'s'}, 'depends': []}}
-    r = classify(kmods, set(), {'kmod-s'}, {'a': {'CONFIG_A'}, 'b': {'CONFIG_B'}, 'c': {'CONFIG_C'}},
+             'kmod-e': {'ko': {'e'}, 'depends': ['kmod-d']}, 'kmod-s': {'ko': {'s'}, 'depends': []}, 'kmod-z': {'ko': {'z'}, 'depends': []}}
+    r = classify(kmods, {'z'}, {'kmod-s'}, {'a': {'CONFIG_A'}, 'b': {'CONFIG_B'}, 'c': {'CONFIG_C'}},
                  {'CONFIG_A': 'm', 'CONFIG_B': 'm', 'CONFIG_C': 'n'})
     got = {k: v[0] for k, v in r.items()}
-    assert got == {'kmod-a': 'B', 'kmod-b': 'B', 'kmod-c': 'C', 'kmod-d': 'D', 'kmod-e': 'D', 'kmod-s': 'A'}, got
+    assert got == {'kmod-a': 'B', 'kmod-b': 'B', 'kmod-c': 'C', 'kmod-d': 'D', 'kmod-e': 'D', 'kmod-s': 'A', 'kmod-z': 'A'}, got
     print('selftest ok')
 
 
@@ -149,13 +149,17 @@ def main():
     kmods = ks.feed_kmods()
     on_unit = {ks.norm(pathlib.PurePath(x).stem) for x in a.modules.read_text().split()}
     builtin = {ks.norm(pathlib.PurePath(x).stem) for x in (a.tree / 'modules.builtin').read_text().split()}
-    have = on_unit | builtin
     objects = ks.builtin_objects(a.tree)
+    # modules.builtin is incomplete (net/sched is missing from it), so also trust =y in the config.
+    cfg = dict(re.findall(r'^(CONFIG_\w+)=(.*)$', (a.config or a.tree / '.config').read_text(), re.M))
+    have = on_unit | builtin | {m for m, opts in objects.items() if any(cfg.get(o) == 'y' for o in opts)}
     stubs = set(STUBS.read_text().split())
     want = {o for k, v in kmods.items() if k not in stubs for m in ks.missing(v['ko'], have) for o in objects.get(ks.norm(m), ())}
     final = resolve(a.tree, a.config or a.tree / '.config', want)
     result = classify(kmods, have, stubs, objects, final)
     text = report(result, dependents(kmods))
+    new = sorted(n for n, (c, _) in result.items() if c == 'A' and n not in stubs)
+    text += f'\nclass A but not in stubs.txt yet ({len(new)}), stub candidates:\n' + ', '.join(new) + '\n'
     (a.out.write_text(text) if a.out else print(text, end=''))
 
 
