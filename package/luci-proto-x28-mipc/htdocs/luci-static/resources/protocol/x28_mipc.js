@@ -45,6 +45,9 @@ return network.registerProtocol('x28_mipc', {
   return device != null && network.getIfnameOf(ifname) === device;
  },
  renderFormOptions: function(section) {
+  // LuCI can call this again for a section that already has our options (closing and reopening the interface dialog);
+  // form.js throws on a second section.tab('carrier'), so stop once the tab is there.
+  if (section.tabs && section.tabs.carrier) return;
   var option = section.taboption('general', form.Value, 'apn', _('APN'),
    _('Leave empty to use the SIM\'s APN automatically, pick one of the SIM\'s APNs, or type one. No PAP/CHAP.'));
   option.placeholder = _('Automatic (from SIM)');

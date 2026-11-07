@@ -29,6 +29,10 @@ assert.equal(protocol.containsDevice('ccmni7'), true);
 assert.equal(protocol.containsDevice('ccmni1'), false);
 const tabs = {};
 protocol.renderFormOptions({tab: (key, title) => tabs[key] = title, taboption: (tab, _type, key) => options[key] = {tab, deps: [], depends(k, v){this.deps.push([k, v]);}, choices: {}, keylist: [], value(k, v){this.choices[k] = v; this.keylist.push(k);}}});
+// A second render on the same section (dialog closed and reopened) must not declare the tab again: form.js throws.
+{ let n = 0, opts = 0; const sec = {tab(k) { if (this.tabs && this.tabs[k]) throw 'Tab already declared'; n++; (this.tabs = this.tabs || [])[k] = {}; }, taboption() { opts++; return {depends() {}, value() {}}; }};
+  protocol.renderFormOptions(sec); const first = opts; protocol.renderFormOptions(sec);
+  if (n !== 1 || opts !== first) throw new Error('second render redeclared the Carrier tab or repeated options'); }
 assert.equal(options.apn.validate(null, 'example.invalid'), true);
 assert.equal(typeof options.apn.validate(null, 'x;bad'), 'string');
 assert.equal(options.apn.validate(null, ''), true);
