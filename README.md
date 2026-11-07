@@ -160,7 +160,7 @@ flowchart LR
 
 ## Build and flash overview
 
-Backup, USB, image assembly and flash steps (1, 2, 4 and 5) belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which does not depend on this repo: it downloads the releases (userspace, feed, `x28-overlay-*`) and assembles locally from your own backup. The commands below name its `tools/` paths and are kept for reference.
+Backup, USB, image assembly and flash steps (1, 2, 4 and 5) belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which does not depend on this repo: it downloads the latest release's assembly bundle (`x28-assembly-*`: userspace, package files, kernel modules, extra packages) and assembles locally from your own backup. The commands below name its `tools/` paths and are kept for reference.
 
 Everything is detailed, with expected output, in [docs/BUILD.md](docs/BUILD.md) and
 [docs/TESTING.md](docs/TESTING.md). Hardware: a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work), a **1.8 V**

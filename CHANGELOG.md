@@ -6,6 +6,9 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Releases publish one `x28-assembly-vX.Y.Z.tar.gz` (userspace, package files, the eight kernel modules, extra packages)
+  instead of loose userspace, manifest and overlay assets; the modules are published as release `kmods-4.19.205`.
+  The x28-flasher must switch to the bundle (#352).
 - Docs and README aligned with the working native image; this changelog added (#147).
 
 ## Milestones
