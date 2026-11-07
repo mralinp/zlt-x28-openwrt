@@ -153,9 +153,9 @@ def build(names, out, real=()):
     index = []
     pkgs = [('kernel', '', f'Marks the vendor {KERNEL} kernel as installed.')]
     pkgs += [(n, f'kernel (= {VERSION})', 'Provided by the vendor kernel; installs no files.') for n in names]
-    pkgs += [(n, f'kernel (= {VERSION})', f'Modules the vendor kernel lacks, built for it: {" ".join(m)}.', [
+    pkgs += [(n, ', '.join([f'kernel (= {VERSION})'] + d), f'Modules the vendor kernel lacks, built for it: {" ".join(m)}.', [
         (f'./lib/modules/x28/{x}.ko', (kmods / f'{x}.ko').read_bytes()) for x in m], 'aarch64_generic')
-        for n, m, kmods in real]
+        for n, m, kmods, d in real]
     for name, depends, description, *rest in pkgs:
         control, ipk = stub(name, depends, description, *rest)
         filename = f'{name}_{KERNEL}_{"all" if not rest else rest[1]}.ipk'
@@ -198,7 +198,12 @@ def main():
         print('every stub module is on the unit or built in' if not bad else 'unproven: ' + ' '.join(bad))
         return 1 if bad else 0
     if a.cmd == 'build':
-        real = [(w[0], w[1:], a.kmods) for w in (l.split() for l in a.real.read_text().splitlines()) if w and w[0][0] != '#']
+        real = []
+        for line in a.real.read_text().splitlines():
+            names, _, deps = line.partition('|')
+            w = names.split()
+            if w and w[0][0] != '#':
+                real.append((w[0], w[1:], a.kmods, deps.split()))
         print(build(a.stubs.read_text().split(), a.out, real), 'packages in', a.out)
         return 0
     have = {norm(pathlib.PurePath(x).stem) for f in (a.modules, a.builtin) for x in f.read_text().split()}

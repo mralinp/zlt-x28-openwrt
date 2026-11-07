@@ -16,6 +16,9 @@ v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` list
 | Module | Source | Package | Why |
 |---|---|---|---|
 | `act_gact` | `src/feed/act_gact.c` (`net/sched/act_gact.c`) | `kmod-sched-core` | the only module of that package the vendor kernel lacks; `tc-full` needs the package |
+| `veth` | `src/feed/veth.c` (`drivers/net/veth.c`) | `kmod-veth` | virtual Ethernet pairs (containers, tests) |
+| `macvlan` | `src/feed/macvlan.c` (`drivers/net/macvlan.c`) | `kmod-macvlan` | `keepalived` |
+| `sch_cake` | `src/feed/sch_cake.c` (`net/sched/sch_cake.c`) | `kmod-sched-cake` | SQM (`sqm-scripts`) |
 
 The patch drops wireguard-linux-compat's `ktime_get_coarse_boottime_ns()`, which the vendor tree already defines.
 
