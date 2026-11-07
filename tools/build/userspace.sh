@@ -44,7 +44,7 @@ cp "$(dirname "$0")/../../package/x28-feed/files/passwall.pub" "$WORK/$IB/keys/$
 mkdir -p "$WORK/$IB/packages"
 cp "$WORK"/sdk/*.ipk "$WORK/$IB/packages/"
 
-make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" BIN_DIR="$OUT"
+make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" FILES="$(cd "$(dirname "$0")" && pwd)/files" BIN_DIR="$OUT"
 
 # The rootfs carries armsr's 5.15 kernel modules from dependencies; the X28 assembly replaces them.
 ls -l "$OUT"

@@ -5,8 +5,8 @@ The repository is the source of truth for original packages, tests, plans and ev
 ## Layout
 
 - `package/`: the OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol) and its LuCI page, `x28-modem`, `x28-wifi`, `x28-leds`, `x28-bootok`.
-- `tools/x28-flasher/`: guided front end (UART picker, capture, read, flash) over the guarded recovery tools; no flash logic of its own (#272).
-- `tools/build/`, `tools/recovery/`, `tools/firmware/`: image assembly, guarded flash sessions and firmware analysis, each with host tests.
+- `tools/build/`, `tools/firmware/`: userspace build, package feed and firmware analysis, each with host tests.
+- The guided flasher, the guarded recovery tools (`tools/recovery/`) and the image assembly live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) since #343.
 - `tests/`, `examples/`: shell tests of the init scripts, mocked protocol tests and a disabled configuration.
 - `docs/PROJECT-PLAN.md`, `TASKS.md`, `STATUS.md`, `TESTING.md`, `../CHANGELOG.md`: plan, progress, evidence and history.
 - `experiments/`: historical OEM UI work and unfinished genuine stock-LuCI preview.
