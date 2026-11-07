@@ -199,7 +199,9 @@ vendor kernel. OpenWrt and LuCI belong to their projects.
 
 ## Support
 
-Made with love by mralinp. If this project helps you, please give it a star on GitHub, and donations are welcome on any EVM chain: `0x6743d8fe71f18b3101f3086e8d9f8d272d0f7618`
+Made with ❤️ by mralinp. If this project helps you, please give it a star on GitHub, and donations are welcome on any EVM chain: `0x6743d8fe71f18b3101f3086e8d9f8d272d0f7618`
+
+<img src="docs/support-qr.svg" alt="QR code of the support address" width="160">
 
 ## License
 
