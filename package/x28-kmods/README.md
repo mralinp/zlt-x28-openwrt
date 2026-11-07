@@ -9,6 +9,14 @@ them safely at boot (`files/x28-kmods.init`).
 | `nf_socket_ipv4/6`, `nf_tproxy_ipv4/6`, `xt_socket`, `xt_TPROXY` | `src/tproxy`: unchanged files from Linux v4.19.205 (`net/ipv4/netfilter`, `net/ipv6/netfilter`, `net/netfilter`) | TPROXY for Passwall2 (#198) |
 | `x28_udp_lookup` | `src/tproxy/x28_udp_lookup.c` (ours) | exports `udp4_lib_lookup`/`udp6_lib_lookup`, which the stock kernel never exported |
 
+`src/feed` holds modules that are not part of the image but ship as real packages in the X28 feed (#395): unchanged Linux
+v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` lists the package each one belongs to, and
+`kmod_stub_feed.py build --kmods DIR/feed` packs them into `/lib/modules/x28`, where `x28-kmods` loads them after boot.
+
+| Module | Source | Package | Why |
+|---|---|---|---|
+| `act_gact` | `src/feed/act_gact.c` (`net/sched/act_gact.c`) | `kmod-sched-core` | the only module of that package the vendor kernel lacks; `tc-full` needs the package |
+
 The patch drops wireguard-linux-compat's `ktime_get_coarse_boottime_ns()`, which the vendor tree already defines.
 
 Build (needs the private SDK tree in the `x28-kbuild` volume, see [BUILD](../../docs/BUILD.md)):

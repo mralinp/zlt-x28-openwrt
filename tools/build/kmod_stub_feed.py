@@ -6,7 +6,7 @@ package for the running kernel and an empty package for each feed kmod the kerne
 outrank the 5.15 packages, so a kmod the kernel lacks fails to install instead of pulling in something unloadable.
 
   kmod_stub_feed.py map --modules FILE --builtin FILE [--check] [--out package/x28-kmod-stubs/stubs.txt]
-  kmod_stub_feed.py build --out DIR [--stubs package/x28-kmod-stubs/stubs.txt]
+  kmod_stub_feed.py build --out DIR [--stubs package/x28-kmod-stubs/stubs.txt] [--kmods DIR]   (--kmods: built .ko files for real.txt)
   kmod_stub_feed.py verify --modules FILE --config FILE --sysmodule FILE --kernel-tree DIR [--stubs FILE]
 
 --modules: one name per line, `ls /lib/modules/4.19.205/*.ko` on the unit, without the suffix.
@@ -32,6 +32,7 @@ FEED = 'https://downloads.openwrt.org/releases/23.05.5/targets/armsr/armv8/packa
 KERNEL = '4.19.205-x28'
 VERSION = '1:' + KERNEL
 STUBS = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmod-stubs/stubs.txt'
+REAL = STUBS.with_name('real.txt')
 
 # Same code under another name in 4.19.
 RENAMED = {'nf_log_syslog': ('nf_log_common', 'nf_log_ipv4', 'nf_log_ipv6'),
@@ -138,23 +139,26 @@ def tar_gz(files):
     return buf.getvalue()
 
 
-def stub(name, depends, description):
+def stub(name, depends, description, files=(), arch='all'):
     control = ''.join(f'{k}: {v}\n' for k, v in (
-        ('Package', name), ('Version', VERSION), ('Depends', depends), ('Section', 'kernel'), ('Architecture', 'all'),
-        ('Installed-Size', '0'), ('Description', description)) if v)
-    ipk = tar_gz([('./debian-binary', b'2.0\n'), ('./data.tar.gz', tar_gz([])),
+        ('Package', name), ('Version', VERSION), ('Depends', depends), ('Section', 'kernel'), ('Architecture', arch),
+        ('Installed-Size', str(sum(len(d) for _, d in files))), ('Description', description)) if v)
+    ipk = tar_gz([('./debian-binary', b'2.0\n'), ('./data.tar.gz', tar_gz(list(files))),
                   ('./control.tar.gz', tar_gz([('./control', control.encode())]))])
     return control, ipk
 
 
-def build(names, out):
+def build(names, out, real=()):
     out.mkdir(parents=True, exist_ok=True)
     index = []
     pkgs = [('kernel', '', f'Marks the vendor {KERNEL} kernel as installed.')]
     pkgs += [(n, f'kernel (= {VERSION})', 'Provided by the vendor kernel; installs no files.') for n in names]
-    for name, depends, description in pkgs:
-        control, ipk = stub(name, depends, description)
-        filename = f'{name}_{KERNEL}_all.ipk'
+    pkgs += [(n, f'kernel (= {VERSION})', f'Modules the vendor kernel lacks, built for it: {" ".join(m)}.', [
+        (f'./lib/modules/x28/{x}.ko', (kmods / f'{x}.ko').read_bytes()) for x in m], 'aarch64_generic')
+        for n, m, kmods in real]
+    for name, depends, description, *rest in pkgs:
+        control, ipk = stub(name, depends, description, *rest)
+        filename = f'{name}_{KERNEL}_{"all" if not rest else rest[1]}.ipk'
         (out / filename).write_bytes(ipk)
         head = control[:control.index('Description: ')]
         index.append(f'{head}Filename: {filename}\nSize: {len(ipk)}\nSHA256sum: {hashlib.sha256(ipk).hexdigest()}\n'
@@ -177,6 +181,8 @@ def main():
     b = sub.add_parser('build')
     b.add_argument('--out', required=True, type=pathlib.Path)
     b.add_argument('--stubs', default=STUBS, type=pathlib.Path)
+    b.add_argument('--real', default=REAL, type=pathlib.Path, help='manifest of packages that carry our built modules')
+    b.add_argument('--kmods', type=pathlib.Path, help='directory with the built .ko files, needed for --real')
     v = sub.add_parser('verify')
     v.add_argument('--modules', required=True, type=pathlib.Path)
     v.add_argument('--config', required=True, type=pathlib.Path)
@@ -192,7 +198,8 @@ def main():
         print('every stub module is on the unit or built in' if not bad else 'unproven: ' + ' '.join(bad))
         return 1 if bad else 0
     if a.cmd == 'build':
-        print(build(a.stubs.read_text().split(), a.out), 'packages in', a.out)
+        real = [(w[0], w[1:], a.kmods) for w in (l.split() for l in a.real.read_text().splitlines()) if w and w[0][0] != '#']
+        print(build(a.stubs.read_text().split(), a.out, real), 'packages in', a.out)
         return 0
     have = {norm(pathlib.PurePath(x).stem) for f in (a.modules, a.builtin) for x in f.read_text().split()}
     text = '\n'.join(covered(feed_kmods(), have)) + '\n'

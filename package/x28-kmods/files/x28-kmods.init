@@ -9,7 +9,7 @@ START=97
 # before the tries are reset or past the marker.
 DIR=/lib/modules/x28
 # Load order: each module's dependencies first. Missing files are skipped, so an image may carry any subset.
-MODS='wireguard x28_udp_lookup nf_socket_ipv4 nf_socket_ipv6 nf_tproxy_ipv4 nf_tproxy_ipv6 xt_socket xt_TPROXY'
+MODS='wireguard x28_udp_lookup nf_socket_ipv4 nf_socket_ipv6 nf_tproxy_ipv4 nf_tproxy_ipv6 xt_socket xt_TPROXY act_gact'
 MARK=/etc/x28-kmods.loading
 MAXTRY=3
 
