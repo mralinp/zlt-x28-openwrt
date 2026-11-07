@@ -15,7 +15,18 @@ k() { make -C /k/linux ARCH=arm64 CC=gcc-11 HOSTCC=gcc-11 KCFLAGS='-w -fcommon -
 k M=/tmp/src/tproxy
 k M=/tmp/src/wireguard CONFIG_WIREGUARD=m
 k M=/tmp/src/feed $(sed "s/\$/=m/" /tmp/src/feed/configs)
+# The vendor kernel has the 5.x crypto library rework (crypto/chacha.h, lib/crypto/), so vanilla 4.19.205 sources do not
+# build for it. These come from the private SDK tree, copied only into this container; the repo holds just src/sdk/Kbuild.
+mkdir -p /tmp/sdk
+for f in crypto/chacha_generic crypto/poly1305_generic crypto/chacha20poly1305 lib/crypto/libchacha lib/crypto/poly1305-donna64 lib/crypto/poly1305; do
+	cp "/k/linux/$f.c" /tmp/sdk/
+done
+cp /k/linux/crypto/internal.h /src/src/sdk/Kbuild /tmp/sdk/
+k M=/tmp/sdk CONFIG_CRYPTO_CHACHA20POLY1305=m CONFIG_CRYPTO_CHACHA20=m CONFIG_CRYPTO_POLY1305=m CONFIG_CRYPTO_LIB_CHACHA_GENERIC=m CONFIG_CRYPTO_LIB_POLY1305_GENERIC=m
 mkdir -p /out/feed
+for f in /tmp/sdk/*.ko; do
+	strip --strip-debug -o "/out/feed/$(basename "$f")" "$f"
+done
 for f in /tmp/src/feed/*.ko; do
 	strip --strip-debug -o "/out/feed/$(basename "$f")" "$f"
 done

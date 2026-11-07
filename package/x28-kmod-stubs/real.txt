@@ -23,3 +23,4 @@ kmod-sched-flower cls_flower | kmod-sched-core
 kmod-leds-uleds uleds
 kmod-usb-ledtrig-usbport ledtrig-usbport | kmod-usb-core
 kmod-dummy dummy
+kmod-crypto-chacha20poly1305 libchacha libpoly1305 chacha_generic poly1305_generic chacha20poly1305 | kmod-crypto-aead kmod-crypto-manager

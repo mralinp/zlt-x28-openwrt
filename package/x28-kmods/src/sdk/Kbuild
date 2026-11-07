@@ -1,0 +1,3 @@
+# Built from the private SDK tree (see build.sh): its crypto library differs from vanilla 4.19.205.
+obj-m += libchacha.o libpoly1305.o chacha_generic.o poly1305_generic.o chacha20poly1305.o
+libpoly1305-y := poly1305-donna64.o poly1305.o

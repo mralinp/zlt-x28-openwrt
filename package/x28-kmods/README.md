@@ -39,8 +39,14 @@ v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` list
 | `ledtrig-usbport` | `src/feed/ledtrig-usbport.c` (`drivers/usb/core/`) | `kmod-usb-ledtrig-usbport` | `luci-app-ledtrig-usbport` |
 | `dummy` | `src/feed/dummy.c` (`drivers/net/`) | `kmod-dummy` | netifd `dummy` interfaces |
 
+| `libchacha`, `libpoly1305`, `chacha_generic`, `poly1305_generic`, `chacha20poly1305` | **private SDK tree** (`crypto/`, `lib/crypto/`); only `src/sdk/Kbuild` is here | `kmod-crypto-chacha20poly1305` | `strongswan-mod-chapoly` |
+
+The vendor kernel has the 5.x crypto library rework backported (`crypto/chacha.h`, `lib/crypto/`), so vanilla 4.19.205 files do not build
+for it. `build.sh` copies those files from the SDK tree into its container only; they never enter the repository, and only the built
+`.ko` files are published (as for the native image, #254). Load order matters: the two libraries first.
+
 `kmod-sched-connmark` has no module to build (`act_connmark` is on the unit) and is only a package that depends on `kmod-sched-core`.
-Not done: `kmod-ipt-ipset` (the vendor-ipset path in `docs/research/vendor-ipset-packaging.md` covers it), `kmod-iscsi-initiator`, `kmod-ipt-quota2` (its source, `xt_quota2`, exists only in the vendor SDK tree, not in Linux 4.19.205) and `kmod-hwmon-*`/`kmod-thermal` (no user package depends on them).
+Not done: `kmod-ipt-ipset` (the vendor-ipset path in `docs/research/vendor-ipset-packaging.md` covers it), `kmod-iscsi-initiator`, `kmod-ipt-quota2` (its source, `xt_quota2`, exists only in the vendor SDK tree, not in Linux 4.19.205, and is not used) and `kmod-hwmon-*`/`kmod-thermal` (no user package depends on them).
 
 `algif_*` link against the vendor `af_alg.ko`, `xt_hashlimit` against `x_tables.ko`, `ip6table_raw` against `ip6_tables.ko` and `nfnetlink_log` against `nfnetlink.ko`, so `x28-kmods` loads those first.
 
