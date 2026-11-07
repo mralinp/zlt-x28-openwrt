@@ -7,7 +7,7 @@
 L1=${L1:-/etc/wireless/l1profile.dat}
 PCI=${PCI:-/sys/bus/pci/devices}
 
-chips=$(cat "$PCI"/*/class 2>/dev/null | grep -c '^0x0280')  # network controller; the PCIe root port is not
+chips=$(cat "$PCI"/*/class 2>/dev/null | grep -c '^0x0280\|^0x000280')  # network controller (this kernel prints the class as 0x000280); the PCIe root port is not
 cards=$(grep -c '^INDEX[0-9]*=' "$L1" 2>/dev/null)
 [ "$chips" = 1 ] && [ "${cards:-0}" -ge 2 ] || exit 0
 
