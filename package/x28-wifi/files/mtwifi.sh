@@ -13,6 +13,7 @@
 MTWIFI_DIR=${MTWIFI_DIR:-/etc/wireless/mediatek}
 MTWIFI_REGIONS=${MTWIFI_REGIONS:-/usr/share/x28-wifi/regions}
 MTWIFI_CHANNELS5=${MTWIFI_CHANNELS5:-/usr/share/x28-wifi/channels5}
+MTWIFI_L1=${MTWIFI_L1:-/etc/wireless/l1profile.dat}
 
 # mtwifi_band <band> <radio section>: prints the band's main interface and profile, e.g. "rai0 .../mt7915.dbdc.b1.dat".
 # LuCI's frequency widget needs iwinfo, which mt_wifi lacks, so saving a radio there deletes band, channel and htmode
@@ -23,6 +24,17 @@ mtwifi_band() {
 		5g|*_5g) echo "rai0 $MTWIFI_DIR/mt7915.dbdc.b1.dat" ;;
 		*) return 1 ;;
 	esac
+}
+
+# Prints the hardware-capability keys of a board whose Wi-Fi is two separate MT7915 chips, one per band (l1profile.dat lists two cards:
+# INDEX0 and INDEX1; a single combined chip lists one). The stock profile in the ROM is the single-chip template (DBDC_MODE=1, 2 streams);
+# with two chips it makes the 5 GHz firmware assert when its network starts (FWCmdTimeout, a 30 s stall of the network stack, no 5 GHz). The vendor
+# firmware's own lan_mgr writes these values for such a board. Prints nothing for a single-chip board.
+mtwifi_caps() {
+	local cards
+	cards="$(grep -c '^INDEX[0-9]*=' "$MTWIFI_L1" 2>/dev/null)"
+	[ "${cards:-0}" -ge 2 ] || return 0
+	echo "DBDC_MODE=0 HT_TxStream=4 HT_RxStream=4 MaxDLMuMimo=4 MaxULMuMimo=4 MaxRuOfdma=16 Disable160RuMu=0x38 PERCENTAGEenable=1"
 }
 
 # mtwifi_render <profile> KEY=value...: rewrite those keys in a fresh copy of the stock profile.
@@ -166,7 +178,7 @@ drv_mtwifi_setup() {
 		"NoForwarding=$vif_isolate" "Channel=$channel" "CountryCode=$7" "CountryRegion=$8" "CountryRegionABand=$9" \
 		"HT_BW=$3" "VHT_BW=$4" "PMFMFPC=$5" "PMFMFPR=$6" "WmmCapable=$vif_wmm" "DtimPeriod=$vif_dtim" \
 		"AccessPolicy0=$vif_policy" "AccessControlList0=$vif_acl" "TxPower=${txpower_pct:-100}" \
-		"BeaconPeriod=${beacon_int:-100}" || { wireless_setup_failed PROFILE_WRITE; return 1; }
+		"BeaconPeriod=${beacon_int:-100}" $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
 	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
 	# sets up both radios at once; with 2g disabled ra0 then carries the hidden, locked network above.
 	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null

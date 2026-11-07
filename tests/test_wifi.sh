@@ -21,6 +21,14 @@ mtwifi_auth wep-open && exit 1
 [ "$(grep -c . "$MTWIFI_REGIONS")" -gt 150 ] && ! grep -qv '^[A-Z][A-Z] [01] [0-9]*$' "$MTWIFI_REGIONS" || exit 1
 [ "$(mtwifi_channel rai0 auto 1 4)" = 149 ] && [ "$(mtwifi_channel rai0 36 1 4)" = 149 ] && [ "$(mtwifi_channel rai0 157 1 4)" = 157 ] && [ "$(mtwifi_channel rai0 auto 0 13)" = 36 ] || exit 1
 [ "$(mtwifi_channel ra0 auto 1 4)" = 1 ] && [ "$(mtwifi_channel ra0 13 1 4)" = 13 ] && [ "$(mtwifi_channel ra0 13 0 13)" = 1 ] && [ "$(mtwifi_channel ra0 '' 0 13)" = 1 ] && [ "$(mtwifi_channel rai0 36 0 99)" = 36 ] || exit 1
+# Two separate chips (two INDEX cards in l1profile.dat) get the vendor's capability keys; one combined chip keeps the stock template.
+printf 'Default\nINDEX0=MT7915\nINDEX0_main_ifname=rai0\nINDEX1=MT7915\nINDEX1_main_ifname=ra0\n' > "$dir/l1.two"
+printf 'Default\nINDEX0=MT7915D\nINDEX0_main_ifname=ra0;rai0\n' > "$dir/l1.one"
+[ "$(MTWIFI_L1=$dir/l1.two mtwifi_caps)" = "DBDC_MODE=0 HT_TxStream=4 HT_RxStream=4 MaxDLMuMimo=4 MaxULMuMimo=4 MaxRuOfdma=16 Disable160RuMu=0x38 PERCENTAGEenable=1" ] || exit 1
+[ -z "$(MTWIFI_L1=$dir/l1.one mtwifi_caps)" ] && [ -z "$(MTWIFI_L1=$dir/missing mtwifi_caps)" ] || exit 1
+printf 'Default\nDBDC_MODE=1\nHT_TxStream=2\nChannel=36\n' > "$dir/c.dat"
+mtwifi_render "$dir/c.dat" Channel=149 $(MTWIFI_L1=$dir/l1.two mtwifi_caps)
+grep -q '^DBDC_MODE=0$' "$dir/c.dat" && grep -q '^HT_TxStream=4$' "$dir/c.dat" && grep -q '^Channel=149$' "$dir/c.dat" && grep -q '^MaxRuOfdma=16$' "$dir/c.dat" || { cat "$dir/c.dat"; exit 1; }
 # Every 5 GHz region a country maps to has its channel list.
 for r in $(cut -d' ' -f3 "$MTWIFI_REGIONS" | sort -un); do grep -q "^$r " "$MTWIFI_CHANNELS5" || { echo "no channels for region $r"; exit 1; }; done
-echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy and country mapping"
+echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-chip capability keys"
