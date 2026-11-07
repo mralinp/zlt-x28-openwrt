@@ -32,6 +32,7 @@ docs/
 ├── research/kernel-module-crc.md  TPROXY module CRCs vs the stock kernel, and how they load anyway
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting
+├── research/kmod-gap.md      all 976 official kmods sorted by what it takes to run them on 4.19.205 (#394)
 ├── research/x28-flasher-binary.md  x28-flasher as a single binary: guard changes, identity, CI (#272)
 ├── research/rust-flasher-design.md  dropped Rust flasher (#270), kept for protocol and DA findings
 ├── research/reset-wps-buttons.md  reset and WPS button pins, records and boot-time behaviour (no layer wipes flash)
@@ -56,7 +57,7 @@ docs/
 | Path | What |
 |---|---|
 | `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter) |
-| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
+| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
 | (moved) | the backup, USB and guarded flash tools live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/`, `tools/x28-flasher/`) |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |

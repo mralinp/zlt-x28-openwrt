@@ -197,7 +197,7 @@ Start with [docs/TESTING.md](docs/TESTING.md) for evidence and [docs/STATUS.md](
 [docs/README.md](docs/README.md) is the full index and code map; the main ones:
 [PROJECT-PLAN](docs/PROJECT-PLAN.md), [BUILD](docs/BUILD.md), [RECOVERY](docs/RECOVERY.md), [BOOT-FLOW](docs/BOOT-FLOW.md),
 [NATIVE-CELLULAR](docs/NATIVE-CELLULAR.md), [PASSWALL2](docs/PASSWALL2.md), [THERMAL](docs/THERMAL.md),
-[WORKFLOW](docs/WORKFLOW.md) and the [CHANGELOG](CHANGELOG.md).
+[WORKFLOW](docs/WORKFLOW.md), the [kmod gap analysis](docs/research/kmod-gap.md) (what it takes to carry every official package) and the [CHANGELOG](CHANGELOG.md).
 
 ## Releases
 
