@@ -32,10 +32,17 @@ v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` list
 | `cdc-acm` | `src/feed/cdc-acm.[ch]` (`drivers/usb/class/`) | `kmod-usb-acm` | USB serial modems |
 | `bonding` | `src/feed/bond_*.c` (`drivers/net/bonding/`) | `kmod-bonding` | `proto-bonding` |
 
-`kmod-sched-connmark` has no module to build (`act_connmark` is on the unit) and is only a package that depends on `kmod-sched-core`.
-Not done: `kmod-ipt-ipset` (the vendor-ipset path in `docs/research/vendor-ipset-packaging.md` covers it) and `kmod-iscsi-initiator`.
+| `ip6table_raw` | `src/feed/ip6table_raw.c` (`net/ipv6/netfilter/`) | `kmod-ipt-raw6` | `shorewall6` |
+| `nfnetlink_log` | `src/feed/nfnetlink_log.c` (`net/netfilter/`; needs `src/bridge/br_private.h`) | `kmod-nfnetlink-log` | `libnetfilter-log1` |
+| `act_vlan`, `cls_flower` | `src/feed/` (`net/sched/`) | `kmod-sched-act-vlan`, `kmod-sched-flower` | `bridger` |
+| `uleds` | `src/feed/uleds.c` (`drivers/leds/`) | `kmod-leds-uleds` | `bluld` |
+| `ledtrig-usbport` | `src/feed/ledtrig-usbport.c` (`drivers/usb/core/`) | `kmod-usb-ledtrig-usbport` | `luci-app-ledtrig-usbport` |
+| `dummy` | `src/feed/dummy.c` (`drivers/net/`) | `kmod-dummy` | netifd `dummy` interfaces |
 
-`algif_*` link against the vendor `af_alg.ko` and `xt_hashlimit` against `x_tables.ko`, so `x28-kmods` loads those first.
+`kmod-sched-connmark` has no module to build (`act_connmark` is on the unit) and is only a package that depends on `kmod-sched-core`.
+Not done: `kmod-ipt-ipset` (the vendor-ipset path in `docs/research/vendor-ipset-packaging.md` covers it), `kmod-iscsi-initiator`, `kmod-ipt-quota2` (its source, `xt_quota2`, exists only in the vendor SDK tree, not in Linux 4.19.205) and `kmod-hwmon-*`/`kmod-thermal` (no user package depends on them).
+
+`algif_*` link against the vendor `af_alg.ko`, `xt_hashlimit` against `x_tables.ko`, `ip6table_raw` against `ip6_tables.ko` and `nfnetlink_log` against `nfnetlink.ko`, so `x28-kmods` loads those first.
 
 The patch drops wireguard-linux-compat's `ktime_get_coarse_boottime_ns()`, which the vendor tree already defines.
 

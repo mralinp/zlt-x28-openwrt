@@ -16,3 +16,10 @@ kmod-bonding bonding
 kmod-sched-bpf act_bpf
 kmod-sched-connmark | kmod-sched-core kmod-ipt-core kmod-ipt-conntrack-extra
 kmod-usb-acm cdc-acm | kmod-usb-core
+kmod-ipt-raw6 ip6table_raw | kmod-ipt-core kmod-ip6tables
+kmod-nfnetlink-log nfnetlink_log | kmod-nfnetlink
+kmod-sched-act-vlan act_vlan | kmod-sched-core
+kmod-sched-flower cls_flower | kmod-sched-core
+kmod-leds-uleds uleds
+kmod-usb-ledtrig-usbport ledtrig-usbport | kmod-usb-core
+kmod-dummy dummy
