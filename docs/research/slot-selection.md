@@ -70,3 +70,38 @@ Priority alone orders the slots; tries and success are what the preloader's retr
 - Know that a power cut between the four `misc` copies leaves mixed records; the preloader's choice among
   mismatched copies is unknown.
 - No unconfirmed claim of fallback may appear in the PR that flashes: it must say "expected, unverified".
+
+## Swapping which slot boots, from the running system (X28 PRO, 2026-11-07)
+
+`misc` is a 1 MiB partition (`mtd3`, flash offset `0x700000`) of raw bytes, not a file system: four identical copies of the 16-byte
+record above, one per 256 KiB erase block. The preloader reads it at every power-up and boots the slot with the higher priority
+(`0f` over `0e`). It cannot be written over USB (TESTING 28, reproduced on this unit with a purpose-built tool: the first block write
+was not acknowledged and the download agent then stopped answering until a power cycle), so it is changed from the running system with
+the stock `dd-nand`, which the native image ships in `/sbin`.
+
+The X28 PRO unit's record before the change, after a flash of the native image to slot A (checked over SSH with
+`dd if=/dev/mtd3ro bs=4096 count=1 | dd bs=1 skip=2048 count=16 | hexdump -C`):
+
+```text
+00414230 ffffffff | A: 0f 00 00 00 | B: 0e 00 01 01      A first; B good (success 1, flag 1)
+```
+
+A's tries are 0 and its success 0 because `x28-bootok` writes the tries byte back to 0 once the system is up (TESTING 27), not because the
+tries ran out: the unit booted slot A (`bootslot=a`) with exactly this record, so a slot with tries 0 and success 0 boots when it has the
+higher priority. Priority alone chose it.
+
+To boot slot B (the vendor firmware) only the two priority bytes change; tries, success and flags stay as they are. For each copy
+`k` = 3, 2, 1, 0 (last to first, so copy 0, the one the preloader most likely reads first, still says "boot A" if anything stops early),
+with `off = 2048 + 262144 * k`, one call rewrites A's four bytes and B's priority together, so no copy ever holds two equal priorities:
+
+```sh
+printf '\x0e\x00\x00\x00\x0f' | dd-nand of=/dev/mtd3 seek=$((off+8)) bs=1 count=5
+dd if=/dev/mtd3ro bs=1 skip=$((off+8)) count=8 | hexdump -v -e '1/1 "%02x"'    # expect 0e0000000f000101
+```
+
+Result: `A: 0e 00 00 00 | B: 0f 00 01 01` in all four copies, read back after each; the whole 1 MiB compared with the saved copy differs in
+exactly 8 bytes (`0x808`, `0x80c` in each block). Save the whole partition first (`cat /dev/mtd3ro > misc.bin`, sha256 before:
+`9aaf725e...`); the undo is the same call with `\x0f\x00\x00\x00\x0e`. Each call is a read-erase-write of one 256 KiB block, so
+the unit should be on stable power. Do not run `dd-nand --help`: it waits for input.
+
+Not yet observed: the boot into slot B after this change (recorded in TESTING 42 when it has been seen).

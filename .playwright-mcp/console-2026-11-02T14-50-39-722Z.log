@@ -1,0 +1,12 @@
+[    6201ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ https://192.168.70.1/cgi-bin/luci/admin/services/passwall2:0
+[    6385ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://192.168.70.1/ubus/?1793631046065:0
+[   11200ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://192.168.70.1/ubus/?1793631050806:0
+[ 2072742ms] [ERROR] Failed to load resource: net::ERR_ADDRESS_INVALID @ https://192.168.70.1/cgi-bin/luci/admin/services/passwall2/index_status?1793633112458:0
+[ 2072744ms] Error: XHR request aborted by browser
+    at Object.handleReadyStateChange (https://192.168.70.1/luci-static/resources/luci.js?v=git-25.222.75657-7ce34fe-ae5ea60f705d:70:20)
+[ 2077737ms] [ERROR] Failed to load resource: net::ERR_ADDRESS_INVALID @ https://192.168.70.1/cgi-bin/luci/admin/services/passwall2/index_status?1793633117457:0
+[ 2077738ms] Error: XHR request aborted by browser
+    at Object.handleReadyStateChange (https://192.168.70.1/luci-static/resources/luci.js?v=git-25.222.75657-7ce34fe-ae5ea60f705d:70:20)
+[ 2082737ms] [ERROR] Failed to load resource: net::ERR_ADDRESS_INVALID @ https://192.168.70.1/cgi-bin/luci/admin/services/passwall2/index_status?1793633122458:0
+[ 2082737ms] Error: XHR request aborted by browser
+    at Object.handleReadyStateChange (https://192.168.70.1/luci-static/resources/luci.js?v=git-25.222.75657-7ce34fe-ae5ea60f705d:70:20)
