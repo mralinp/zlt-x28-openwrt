@@ -1,0 +1,43 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# dnsmasq can start before netifd reports the LAN address (it starts at S19, the network at S20) or while netifd is busy with the
+# cellular link; its init script then skips the DHCP range without a word, dnsmasq serves DNS but no DHCP, and nothing retries.
+# For the first 20 minutes after boot, once the LAN has its address, if dnsmasq's running config has no DHCP range, restart dnsmasq
+# (at most 3 times). Nothing happens when DHCP is fine or when dhcp.lan.ignore is 1.
+# X28_DRY_RUN=1 only prints; X28_CONF_GLOB points the check at other config files; X28_SLEEP is the pause between checks.
+GLOB="${X28_CONF_GLOB:-/var/etc/dnsmasq.conf.*}"
+
+has_range() {
+	# shellcheck disable=SC2086
+	cat $GLOB 2>/dev/null | grep -q '^dhcp-range='
+}
+
+selftest() {
+	d=$(mktemp -d) || exit 1
+	GLOB="$d/dnsmasq.conf.*"
+	printf 'domain-needed\n' > "$d/dnsmasq.conf.a"
+	has_range && { echo "FAIL: a range was found in a config without one"; exit 1; }
+	printf 'dhcp-range=set:lan,192.168.70.100,192.168.70.249,255.255.255.0,12h\n' >> "$d/dnsmasq.conf.a"
+	has_range || { echo "FAIL: the range was not found"; exit 1; }
+	rm -rf "$d"
+	echo "x28-dhcp-guard selftest ok"
+	exit 0
+}
+
+[ "$1" = selftest ] && selftest
+
+tries=0
+i=0
+while [ "$i" -lt 120 ] && [ "$tries" -lt 3 ]; do
+	sleep "${X28_SLEEP:-10}"
+	i=$((i + 1))
+	[ "$(uci -q get dhcp.lan.ignore)" = 1 ] && exit 0
+	ip -4 addr show dev br-lan 2>/dev/null | grep -q 'inet ' || continue
+	pidof dnsmasq >/dev/null || continue
+	has_range && continue
+	tries=$((tries + 1))
+	logger -t x28-dhcp "${X28_DRY_RUN:+[dry run] }dnsmasq has no DHCP range for lan; restarting it ($tries of 3)"
+	[ -n "$X28_DRY_RUN" ] && { echo "would restart dnsmasq ($tries)"; continue; }
+	/etc/init.d/dnsmasq restart
+	sleep 20
+done

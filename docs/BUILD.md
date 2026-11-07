@@ -484,6 +484,13 @@ success byte, priorities or any other partition; a boot that never reaches it ke
 port 22 (LAN only, key-only), like standard OpenWrt; update `~/.ssh/config` and the known_hosts entry when you flash it.
 If one write fails, earlier copies stay at 0 and later ones keep their tries (a mixed record, which the preloader's handling of is unverified); the next boot retries.
 
+**DHCP at boot (`x28-dhcp`, START=96).** `dnsmasq` starts at S19, before the network (S20), and its init script adds the DHCP range only if netifd can
+already report the LAN address; otherwise it skips the range without a message, so `dnsmasq` answers DNS but not DHCP and nothing retries (seen on
+the X28 PRO unit: the boot log has no `DHCP, IP range` line for the first two `dnsmasq` starts, and only a restart of the bridge fixed it).
+`x28-dhcp` runs `/usr/libexec/x28-dhcp-guard` for the first 20 minutes after boot: once `br-lan` has its address, if the running `dnsmasq` config has no
+`dhcp-range`, it restarts `dnsmasq` (at most 3 times) and logs `x28-dhcp: dnsmasq has no DHCP range for lan; restarting it`. It does nothing when DHCP is
+fine or `dhcp.lan.ignore` is 1. `sh package/x28-dhcp/files/x28-dhcp-guard selftest` checks the range test.
+
 ## opkg feed for the vendor kernel (#200)
 
 Userspace packages install from the official feeds, but their kmods need kernel 5.15 and no `kernel` package is installed, so anything depending on a kmod fails. `tools/build/kmod_stub_feed.py` builds a feed with a `kernel` package for the running kernel and an empty package for each feed kmod the kernel already has. It installs no files.

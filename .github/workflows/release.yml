@@ -13,6 +13,7 @@ on:
       - "package/iwinfo-mtwifi/**"
       - "package/x28-feed/**"
       - "package/x28-bootok/**"
+      - "package/x28-dhcp/**"
       - "package/x28-kmods/**"
       - "package/x28-leds/**"
       - "package/x28-mipc/**"
@@ -79,7 +80,7 @@ jobs:
           cp userspace/*-rootfs.tar.gz "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
           cp userspace/*.manifest "$B/userspace.manifest"
           # The package files first_boot.py reads (X28_OVERLAY).
-          tar -cf - package/luci-proto-x28-mipc package/x28-bootok/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files | tar -xf - -C "$B/overlay"
+          tar -cf - package/luci-proto-x28-mipc package/x28-bootok/files package/x28-dhcp/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files | tar -xf - -C "$B/overlay"
           # Built against the private SDK tree, so not built here: taken from the kmods release (#352).
           gh release download kmods-4.19.205 -D "$B/kmods"
           (cd "$B/kmods" && sha256sum -c SHA256SUMS)
