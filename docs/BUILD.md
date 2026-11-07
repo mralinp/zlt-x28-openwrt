@@ -466,8 +466,7 @@ that procd creates `/dev/ttyS0` without devtmpfs (stock does the same for its ge
 ## Root password and overlay persistence (#143)
 
 Like stock OpenWrt, root starts with an **empty password**: LuCI accepts it and asks you to set one (Network is LAN only; the
-`wan` firewall zone rejects input). SSH is unchanged: Dropbear stays key-only (`PasswordAuth` and `RootPasswordAuth` off), so an
-empty or any password never works over SSH. The image also enables `S95done` (`mount_root done`); without it `mount_root`
+`wan` firewall zone rejects input). Dropbear is started with `-B` (`tools/build/files/etc/uci-defaults/90-x28-dropbear-blank` patches its init script at first boot), so SSH also accepts the empty root password (#361) until you set one; no key is baked in. The image also enables `S95done` (`mount_root done`); without it `mount_root`
 reports 'overlay filesystem has not been fully initialized yet' and discards the overlay at every boot, losing passwords, host
 keys and settings. Set the password in LuCI (System > Administration) or with `passwd` over SSH.
 The image also writes stock OpenWrt's NTP section (`*.openwrt.pool.ntp.org`) and enables `S98sysntpd` (#169): the unit

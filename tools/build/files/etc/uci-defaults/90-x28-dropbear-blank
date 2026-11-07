@@ -1,0 +1,5 @@
+#!/bin/sh
+# A clean image has an empty root password (#361): dropbear refuses it unless started with -B,
+# and its init script has no option for that.
+sed -i 's/command "\$PROG" -F/command "$PROG" -B -F/' /etc/init.d/dropbear
+grep -q 'PROG" -B -F' /etc/init.d/dropbear

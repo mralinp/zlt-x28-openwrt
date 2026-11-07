@@ -38,7 +38,7 @@ def main():
         for setting in ("PasswordAuth='on'","RootPasswordAuth='on'","RootLogin='on'","Port='22'","Interface='lan'"):
             check(setting in config.stdout,'unexpected authentication policy: '+setting)
         root_account=next(row for row in (root/'etc/shadow').read_text().splitlines() if row.startswith('root:'))
-        check(root_account.split(':')[1]=='','expected an empty root password (stock OpenWrt; dropbear never accepts an empty password)')
+        check(root_account.split(':')[1]=='','expected an empty root password (stock OpenWrt; SSH accepts it only with dropbear -B, #361)')
         (root/'tmp').mkdir(exist_ok=True);(root/'root').mkdir(exist_ok=True)
         keydir=root/'etc/dropbear';keydir.mkdir(exist_ok=True)
         for name in ('host','client','wrong'):
@@ -48,7 +48,7 @@ def main():
         key=next(line for line in pub.stdout.splitlines() if line.startswith('ssh-ed25519 '))
         authorized=keydir/'authorized_keys';authorized.write_text(key+'\n');authorized.chmod(0o600)
         # Same authentication flags as parsed config; override LAN binding to isolated loopback.
-        server=subprocess.Popen(['chroot',str(root),'/usr/sbin/dropbear','-F','-E','-s','-g',
+        server=subprocess.Popen(['chroot',str(root),'/usr/sbin/dropbear','-F','-E','-s','-g','-B',
                                  '-r','/tmp/host','-p','127.0.0.1:2222'],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
         try:
             time.sleep(0.3)
