@@ -1,0 +1,32 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# mt_wifi reads /etc/wireless/l1profile.dat once, when the module loads. The image carries the X28 PRO's file (two cards,
+# one MT7915 chip per band, PCIe slots 0 and 1); the original X28 has ONE combined MT7915D chip, and with the PRO's file
+# neither band comes up. Count the Wi-Fi chips on PCI and, on a single-chip board, swap in the single-card file.
+# Run before the module loads (S05, kmodloader is S10). Does nothing when the file already fits.
+L1=${L1:-/etc/wireless/l1profile.dat}
+PCI=${PCI:-/sys/bus/pci/devices}
+
+chips=$(cat "$PCI"/*/class 2>/dev/null | grep -c '^0x0280')  # network controller; the PCIe root port is not
+cards=$(grep -c '^INDEX[0-9]*=' "$L1" 2>/dev/null)
+[ "$chips" = 1 ] && [ "${cards:-0}" -ge 2 ] || exit 0
+
+cat > "$L1.new" <<'DAT' && mv "$L1.new" "$L1" && logger -t x28-wifi-l1 "one Wi-Fi chip: single-card l1profile.dat"
+Default
+INDEX0=MT7915D
+INDEX0_profile_path=/etc/wireless/mediatek/mt7915.dbdc.b0.dat;/etc/wireless/mediatek/mt7915.dbdc.b1.dat
+INDEX0_init_script=/lib/wifi/mt7615e.lua;/lib/wifi/mt7615e.lua
+INDEX0_init_compatible=mt7615e;mt7615e
+INDEX0_EEPROM_offset=0x0
+INDEX0_EEPROM_size=0x20000
+INDEX0_EEPROM_name=e2p
+INDEX0_main_ifname=ra0;rai0
+INDEX0_ext_ifname=ra;rai
+INDEX0_wds_ifname=wds;wdsi
+INDEX0_apcli_ifname=apcli;apclii
+INDEX0_mesh_ifname=mesh;meshi
+INDEX0_nvram_zone=dev1;dev2
+INDEX0_single_sku_path=/rom/etc/wireless/mediatek/mt7615e-sku.dat
+INDEX0_bf_sku_path=/rom/etc/wireless/mediatek/mt7615e-sku-bf.dat
+INDEX0_pcie_slot=0000
+DAT

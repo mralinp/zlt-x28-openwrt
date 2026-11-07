@@ -1,0 +1,4 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+START=05
+start() { /sbin/x28-wifi-l1; }

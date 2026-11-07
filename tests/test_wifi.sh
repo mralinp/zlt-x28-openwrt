@@ -29,6 +29,13 @@ printf 'Default\nINDEX0=MT7915D\nINDEX0_main_ifname=ra0;rai0\n' > "$dir/l1.one"
 printf 'Default\nDBDC_MODE=1\nHT_TxStream=2\nChannel=36\n' > "$dir/c.dat"
 mtwifi_render "$dir/c.dat" Channel=149 $(MTWIFI_L1=$dir/l1.two mtwifi_caps)
 grep -q '^DBDC_MODE=0$' "$dir/c.dat" && grep -q '^HT_TxStream=4$' "$dir/c.dat" && grep -q '^Channel=149$' "$dir/c.dat" && grep -q '^MaxRuOfdma=16$' "$dir/c.dat" || { cat "$dir/c.dat"; exit 1; }
+# A single-chip board (one PCI network controller) gets the single-card l1profile; two chips keep the PRO's file.
+x28l1="$(dirname "$0")/../package/x28-wifi/files/x28-wifi-l1"
+mkdir -p "$dir/pci/a" "$dir/pci/b" "$dir/pci/c"; echo 0x060400 > "$dir/pci/a/class"; echo 0x028000 > "$dir/pci/b/class"
+cp "$dir/l1.two" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null
+[ "$(grep -c '^INDEX[0-9]*=' "$dir/l1.run")" = 1 ] && grep -q '^INDEX0=MT7915D$' "$dir/l1.run" || { cat "$dir/l1.run"; exit 1; }
+echo 0x028000 > "$dir/pci/c/class"; cp "$dir/l1.two" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null
+cmp -s "$dir/l1.two" "$dir/l1.run" || exit 1
 # Every 5 GHz region a country maps to has its channel list.
 for r in $(cut -d' ' -f3 "$MTWIFI_REGIONS" | sort -un); do grep -q "^$r " "$MTWIFI_CHANNELS5" || { echo "no channels for region $r"; exit 1; }; done
 echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-chip capability keys"
