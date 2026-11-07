@@ -81,7 +81,7 @@ jobs:
           # Built against the private SDK tree, so not built here: taken from the kmods release (#352).
           mkdir kmods && gh release download kmods-4.19.205 -D kmods
           (cd kmods && sha256sum -c SHA256SUMS)
-          tar --owner=0 --group=0 --numeric-owner -czf "assets/x28-kmods-v${VERSION}.tar.gz" -C kmods $(cd kmods && ls *.ko)
+          tar --owner=0 --group=0 --numeric-owner -czf "assets/x28-kmods-v${VERSION}.tar.gz" -C kmods .
           (cd assets && sha256sum -- * > SHA256SUMS)
           cat assets/SHA256SUMS
 

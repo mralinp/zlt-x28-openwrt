@@ -552,9 +552,10 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   modules are published as built, once per kernel rather than per release, because they change only with the sources or
   the kernel: release `kmods-4.19.205` (as `feed-2` is for ipset) with the eight `.ko` files and `SHA256SUMS`.
   Publish after a rebuild with `gh release create kmods-4.19.205 private/kmods/*.ko private/kmods/SHA256SUMS`
-  (`gh release upload --clobber` to replace). The image build in CI (#254) downloads that release as its `--kmods` input, checks it against `SHA256SUMS`, and
-  bakes the modules into the flashable image, so users get them with the image and never fetch them. The flasher's
-  folder prompt goes away with the downloadable image.
+  (`gh release upload --clobber` to replace). Every `vX.Y.Z` release carries them as `x28-kmods-vX.Y.Z.tar.gz` (the eight `.ko` files and their `SHA256SUMS`, taken
+  from `kmods-4.19.205` and checked in CI), beside the userspace and overlay tarballs. This repo only supplies the
+  inputs; the flasher downloads the latest release and assembles the image from those tarballs, with `--kmods` pointing at
+  the unpacked modules.
 - **HTTPS for LuCI:** `libustream-mbedtls` and `px5g-mbedtls`; `first_boot.py` sets `redirect_https` and the certificate
   name `x28`. uhttpd makes a self-signed EC certificate on its first start, so each unit has its own, and browsers warn
   about it once.
