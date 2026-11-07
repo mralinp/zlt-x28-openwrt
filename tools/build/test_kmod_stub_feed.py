@@ -84,6 +84,30 @@ class Build(unittest.TestCase):
         data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
         self.assertEqual(data.getnames(), [])
 
+    def test_real_packages_carry_the_module_and_a_revision(self):
+        with tempfile.TemporaryDirectory() as d:
+            kmods, out, manifest = Path(d) / 'ko', Path(d) / 'out', Path(d) / 'real.txt'
+            kmods.mkdir()
+            (kmods / 'a.ko').write_bytes(b'module')
+            manifest.write_text('# comment\nkmod-r a | kmod-a\nkmod-only | kmod-r\n')
+            real = f.read_real(manifest, kmods)
+            self.assertEqual(real, [('kmod-r', ['a'], kmods, ['kmod-a']), ('kmod-only', [], kmods, ['kmod-r'])])
+            self.assertEqual(f.build(['kmod-a'], out, real), 4)
+            index = f.parse_index((out / 'Packages').read_text())
+            self.assertEqual(index['kmod-a']['Version'], f.VERSION)  # stubs keep the plain version
+            for name in ('kmod-r', 'kmod-only'):
+                self.assertEqual(index[name]['Version'], f'{f.VERSION}-r{f.REV}')
+                self.assertTrue(index[name]['Depends'].startswith(f'kernel (= {f.VERSION})'))
+                self.assertNotIn(':', index[name]['Filename'])
+            self.assertEqual(index['kmod-r']['Depends'], f'kernel (= {f.VERSION}), kmod-a')
+
+            def files(name):
+                outer = tarfile.open(out / index[name]['Filename'], 'r:gz')
+                data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+                return {m.name: data.extractfile(m).read() for m in data if m.isfile()}
+            self.assertEqual(files('kmod-r'), {'./lib/modules/x28/a.ko': b'module'})
+            self.assertEqual(files('kmod-only'), {})
+
     def test_epoch_keeps_the_stub_above_the_feed(self):
         self.assertTrue(f.VERSION.startswith('1:'))
 

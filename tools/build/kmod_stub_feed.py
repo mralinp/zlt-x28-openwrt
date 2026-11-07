@@ -31,6 +31,8 @@ import urllib.request
 FEED = 'https://downloads.openwrt.org/releases/23.05.5/targets/armsr/armv8/packages/'
 KERNEL = '4.19.205-x28'
 VERSION = '1:' + KERNEL
+# Bump when the content of any package built from real.txt changes: opkg only upgrades to a higher version.
+REV = 1
 STUBS = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmod-stubs/stubs.txt'
 REAL = STUBS.with_name('real.txt')
 
@@ -139,13 +141,24 @@ def tar_gz(files):
     return buf.getvalue()
 
 
-def stub(name, depends, description, files=(), arch='all'):
+def stub(name, depends, description, files=(), arch='all', version=VERSION):
     control = ''.join(f'{k}: {v}\n' for k, v in (
-        ('Package', name), ('Version', VERSION), ('Depends', depends), ('Section', 'kernel'), ('Architecture', arch),
+        ('Package', name), ('Version', version), ('Depends', depends), ('Section', 'kernel'), ('Architecture', arch),
         ('Installed-Size', str(sum(len(d) for _, d in files))), ('Description', description)) if v)
     ipk = tar_gz([('./debian-binary', b'2.0\n'), ('./data.tar.gz', tar_gz(list(files))),
                   ('./control.tar.gz', tar_gz([('./control', control.encode())]))])
     return control, ipk
+
+
+def read_real(manifest, kmods):
+    """real.txt lines are `package module... [| dependency...]`; the modules are read from the kmods directory."""
+    out = []
+    for line in manifest.read_text().splitlines():
+        names, _, deps = line.partition('|')
+        w = names.split()
+        if w and w[0][0] != '#':
+            out.append((w[0], w[1:], kmods, deps.split()))
+    return out
 
 
 def build(names, out, real=()):
@@ -157,8 +170,9 @@ def build(names, out, real=()):
         (f'./lib/modules/x28/{x}.ko', (kmods / f'{x}.ko').read_bytes()) for x in m], 'aarch64_generic')
         for n, m, kmods, d in real]
     for name, depends, description, *rest in pkgs:
-        control, ipk = stub(name, depends, description, *rest)
-        filename = f'{name}_{KERNEL}_{"all" if not rest else rest[1]}.ipk'
+        version = VERSION if not rest else f'{VERSION}-r{REV}'
+        control, ipk = stub(name, depends, description, *rest, version=version)
+        filename = f'{name}_{version.split(":")[1]}_{"all" if not rest else rest[1]}.ipk'
         (out / filename).write_bytes(ipk)
         head = control[:control.index('Description: ')]
         index.append(f'{head}Filename: {filename}\nSize: {len(ipk)}\nSHA256sum: {hashlib.sha256(ipk).hexdigest()}\n'
@@ -198,13 +212,7 @@ def main():
         print('every stub module is on the unit or built in' if not bad else 'unproven: ' + ' '.join(bad))
         return 1 if bad else 0
     if a.cmd == 'build':
-        real = []
-        for line in a.real.read_text().splitlines():
-            names, _, deps = line.partition('|')
-            w = names.split()
-            if w and w[0][0] != '#':
-                real.append((w[0], w[1:], a.kmods, deps.split()))
-        print(build(a.stubs.read_text().split(), a.out, real), 'packages in', a.out)
+        print(build(a.stubs.read_text().split(), a.out, read_real(a.real, a.kmods)), 'packages in', a.out)
         return 0
     have = {norm(pathlib.PurePath(x).stem) for f in (a.modules, a.builtin) for x in f.read_text().split()}
     text = '\n'.join(covered(feed_kmods(), have)) + '\n'
