@@ -158,6 +158,26 @@ flowchart LR
 - **Guarded flashing.** The tools in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/` there) write only the targets they were built for, check the other
   slot and neighbouring partitions before and after every write, and need a typed phrase from the owner.
 
+## The flasher app
+
+[x28-flasher](https://github.com/mralinp/x28-flasher) is the companion app that gets this firmware onto a unit: one window for backup, building the image
+and flashing, with every guard and typed confirmation of the recovery procedure built in. It is private until it is ready, then public.
+
+![X28 Flasher](docs/images/x28-flasher.png)
+
+| Step | What it is for |
+|---|---|
+| Connect | Finds the modem over USB and reads what it is. One connection serves every step: no power cycle between them. |
+| Backup | Saves every partition to your computer, hash-checked. Always first. |
+| Root access | Once on a fresh unit: key-only SSH on the stock firmware (slot B), from a fresh read of it. |
+| Build image | Assembles the image for your own unit from a release's `x28-assembly-*` bundle and your backup. |
+| Flash OpenWrt | Writes slot A behind a rehearsal and a phrase you type yourself. Slot B (stock) is left as the fallback. |
+| Boot order | A switch between slot A (OpenWrt) and slot B (stock), over SSH on the running modem. |
+| Read & verify | Reads a partition back and compares it with your backup. |
+
+It runs as a native window on macOS (Apple silicon), and as installers for Linux and Windows built by its CI. The screenshot hides the unit's
+identifiers. Read [Build and flash](#build-and-flash) and the recovery docs before you use it.
+
 ## Build and flash
 
 Backup, USB access, image assembly and flashing belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher)
