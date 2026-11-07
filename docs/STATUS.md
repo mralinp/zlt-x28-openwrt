@@ -31,7 +31,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   Every image build ships it.
 - LuCI Carrier tab on the `x28_mipc` protocol: operator (automatic or manual, with a network scan), 4G and 5G band lock, cell lock, roaming (default off) and modem status (v0.54 – v0.57).
 - WPS push button, one Wi-Fi network per band (v0.38.6 – v0.39.1).
-- The flasher, backup and image assembly moved to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which is private for now; releases here publish the `x28-overlay` asset it consumes (v0.55).
+- The flasher, backup and image assembly moved to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which is private for now; releases here publish the `x28-assembly` bundle it consumes (the `x28-overlay` asset until v0.57).
 
 **Open or unproven**
 - Slot A is not marked successful (success byte 0). Deliberate: it keeps the preloader's fall-back to stock B.
