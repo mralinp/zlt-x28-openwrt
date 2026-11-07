@@ -153,7 +153,7 @@ def build(names, out, real=()):
     index = []
     pkgs = [('kernel', '', f'Marks the vendor {KERNEL} kernel as installed.')]
     pkgs += [(n, f'kernel (= {VERSION})', 'Provided by the vendor kernel; installs no files.') for n in names]
-    pkgs += [(n, ', '.join([f'kernel (= {VERSION})'] + d), f'Modules the vendor kernel lacks, built for it: {" ".join(m)}.', [
+    pkgs += [(n, ', '.join([f'kernel (= {VERSION})'] + d), (f'Modules the vendor kernel lacks, built for it: {" ".join(m)}.' if m else 'Provided by the vendor kernel; installs no files.'), [
         (f'./lib/modules/x28/{x}.ko', (kmods / f'{x}.ko').read_bytes()) for x in m], 'aarch64_generic')
         for n, m, kmods, d in real]
     for name, depends, description, *rest in pkgs:

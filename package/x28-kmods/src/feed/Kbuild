@@ -1,4 +1,9 @@
 obj-m += act_gact.o veth.o macvlan.o sch_cake.o algif_aead.o algif_rng.o xt_hashlimit.o raw_diag.o netlink_diag.o usbip-core.o
+obj-m += act_csum.o act_pedit.o act_simple.o act_bpf.o em_cmp.o em_meta.o em_nbyte.o em_text.o
+obj-m += sch_codel.o sch_fq.o sch_gred.o sch_multiq.o sch_sfq.o sch_teql.o
+obj-m += xt_policy.o xt_esp.o ipt_ah.o nbd.o spidev.o cdc-acm.o bonding.o
 usbip-core-y := usbip_common.o usbip_event.o
+bonding-objs := bond_main.o bond_3ad.o bond_alb.o bond_sysfs.o bond_sysfs_slave.o bond_debugfs.o bond_netlink.o bond_options.o bond_procfs.o
+# usbip: the module loader refuses common symbols, which build.sh's -fcommon (for the vendor headers) would create.
 CFLAGS_usbip_common.o := -fno-common
 CFLAGS_usbip_event.o := -fno-common

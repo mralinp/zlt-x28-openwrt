@@ -24,6 +24,16 @@ v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` list
 | `raw_diag` | `src/feed/raw_diag.c` (`net/ipv4/`) | `kmod-inet-diag` | `sing-box` |
 | `netlink_diag` | `src/feed/netlink_diag.c` (`net/netlink/diag.c`, renamed; needs `af_netlink.h`) | `kmod-netlink-diag` | `ss` |
 | `usbip-core` | `src/feed/usbip_*.c` (`drivers/usb/usbip/`) | `kmod-usbip` | `usbip` |
+| `act_csum`, `act_pedit`, `act_simple`, `em_cmp`, `em_meta`, `em_nbyte`, `em_text`, `sch_codel`, `sch_fq`, `sch_gred`, `sch_multiq`, `sch_sfq`, `sch_teql` | `src/feed/` (`net/sched/`) | `kmod-sched` | `luci-app-splash`, `tunneldigger-broker` |
+| `act_bpf` | `src/feed/act_bpf.c` | `kmod-sched-bpf` | `bridger`, `uspot` (`cls_bpf` is built in) |
+| `ipt_ah`, `xt_esp`, `xt_policy` | `src/feed/` (`net/ipv4/netfilter/`, `net/netfilter/`) | `kmod-ipt-ipsec` | `strongswan`, `libreswan` helpers |
+| `nbd` | `src/feed/nbd.c` (`drivers/block/`) | `kmod-nbd` | `nbd`, `qemu-nbd` |
+| `spidev` | `src/feed/spidev.c` (`drivers/spi/`) | `kmod-spi-dev` | `spidev-test` |
+| `cdc-acm` | `src/feed/cdc-acm.[ch]` (`drivers/usb/class/`) | `kmod-usb-acm` | USB serial modems |
+| `bonding` | `src/feed/bond_*.c` (`drivers/net/bonding/`) | `kmod-bonding` | `proto-bonding` |
+
+`kmod-sched-connmark` has no module to build (`act_connmark` is on the unit) and is only a package that depends on `kmod-sched-core`.
+Not done: `kmod-ipt-ipset` (the vendor-ipset path in `docs/research/vendor-ipset-packaging.md` covers it) and `kmod-iscsi-initiator`.
 
 `algif_*` link against the vendor `af_alg.ko` and `xt_hashlimit` against `x_tables.ko`, so `x28-kmods` loads those first.
 
