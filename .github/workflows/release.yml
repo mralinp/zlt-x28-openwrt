@@ -73,15 +73,25 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir assets
-          cp userspace/*-rootfs.tar.gz "assets/x28-userspace-v${VERSION}-openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
-          cp userspace/*.manifest "assets/x28-userspace-v${VERSION}.manifest"
-          # The package files the flasher's image assembly reads (x28-flasher first_boot.py, X28_OVERLAY).
-          tar --owner=0 --group=0 --numeric-owner -czf "assets/x28-overlay-v${VERSION}.tar.gz" package/luci-proto-x28-mipc package/x28-bootok/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files
+          # One bundle with everything the flasher needs to assemble the image; see docs/BUILD.md.
+          B="x28-assembly-v${VERSION}"
+          mkdir -p assets "$B/overlay" "$B/kmods" "$B/ipk"
+          cp userspace/*-rootfs.tar.gz "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
+          cp userspace/*.manifest "$B/userspace.manifest"
+          # The package files first_boot.py reads (X28_OVERLAY).
+          tar -cf - package/luci-proto-x28-mipc package/x28-bootok/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files | tar -xf - -C "$B/overlay"
           # Built against the private SDK tree, so not built here: taken from the kmods release (#352).
-          mkdir kmods && gh release download kmods-4.19.205 -D kmods
-          (cd kmods && sha256sum -c SHA256SUMS)
-          tar --owner=0 --group=0 --numeric-owner -czf "assets/x28-kmods-v${VERSION}.tar.gz" -C kmods .
+          gh release download kmods-4.19.205 -D "$B/kmods"
+          (cd "$B/kmods" && sha256sum -c SHA256SUMS)
+          # ipset from the feed-2 release; alsa-lib and libstdcpp6 from OpenWrt 23.05.5, pinned by hash.
+          gh release download feed-2 -D "$B/ipk" -p 'ipset_*' -p 'libipset13_*' -p 'x28-ipset-kernel_*'
+          R=https://downloads.openwrt.org/releases/23.05.5
+          curl -fsSL -o "$B/ipk/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk" "$R/packages/aarch64_cortex-a53/packages/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk"
+          curl -fsSL -o "$B/ipk/libstdcpp6_12.3.0-4_aarch64_generic.ipk" "$R/targets/armsr/armv8/packages/libstdcpp6_12.3.0-4_aarch64_generic.ipk"
+          echo "4cca89805578f18778b5da41221256c2f87ea33cd1dfd083d151ed936cd9db37  $B/ipk/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk
+          3f174e78dead3941736971da0bd99a2b4dd0b3411bbd6ea4870ae677c49dfef4  $B/ipk/libstdcpp6_12.3.0-4_aarch64_generic.ipk" | sha256sum -c
+          (cd "$B" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          tar --owner=0 --group=0 --numeric-owner -czf "assets/$B.tar.gz" "$B"
           (cd assets && sha256sum -- * > SHA256SUMS)
           cat assets/SHA256SUMS
 
@@ -104,9 +114,9 @@ jobs:
           PRE=""
           case "$VERSION" in 0.*) PRE="--prerelease" ;; esac
           cat > notes.md <<'EOF'
-          **Beta pre-release.** The attached rootfs is the open OpenWrt 23.05.5 userspace only. It does not boot
-          the X28 by itself: the stock kernel, modules and vendor binaries are added locally from your own
-          unit's backup. The native image has been flashed to slot A and boots on one tested unit; flashing it
+          **Beta pre-release.** The attached assembly bundle holds the open OpenWrt 23.05.5 userspace, our package
+          files, kernel modules and extra packages. It does not boot the X28 by itself: the stock kernel and vendor
+          binaries are added by the flasher from your own unit's backup. The native image has been flashed to slot A and boots on one tested unit; flashing it
           is a guarded, owner-approved procedure that needs UART and a verified backup. The flasher is the
           separate mralinp/x28-flasher repo. See docs/BUILD.md,
           docs/RECOVERY.md and CHANGELOG.md.

@@ -552,10 +552,12 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   modules are published as built, once per kernel rather than per release, because they change only with the sources or
   the kernel: release `kmods-4.19.205` (as `feed-2` is for ipset) with the eight `.ko` files and `SHA256SUMS`.
   Publish after a rebuild with `gh release create kmods-4.19.205 private/kmods/*.ko private/kmods/SHA256SUMS`
-  (`gh release upload --clobber` to replace). Every `vX.Y.Z` release carries them as `x28-kmods-vX.Y.Z.tar.gz` (the eight `.ko` files and their `SHA256SUMS`, taken
-  from `kmods-4.19.205` and checked in CI), beside the userspace and overlay tarballs. This repo only supplies the
-  inputs; the flasher downloads the latest release and assembles the image from those tarballs, with `--kmods` pointing at
-  the unpacked modules.
+  (`gh release upload --clobber` to replace). Every `vX.Y.Z` release carries one assembly asset, `x28-assembly-vX.Y.Z.tar.gz`, plus `SHA256SUMS`. It holds
+  everything the flasher needs to assemble the image except the vendor files from the unit's own backup: the OpenWrt
+  userspace rootfs and its manifest, `overlay/` (the package files `first_boot.py` reads), `kmods/` (the eight modules,
+  taken from `kmods-4.19.205` and checked in CI), `ipk/` (ipset from `feed-2`; `alsa-lib` and `libstdcpp6` from OpenWrt
+  23.05.5, pinned by hash in `release.yml`) and its own `SHA256SUMS`. The flasher downloads the latest release, unpacks
+  that one file and runs the assembly with `--kmods kmods --ipk ipk/*.ipk`.
 - **HTTPS for LuCI:** `libustream-mbedtls` and `px5g-mbedtls`; `first_boot.py` sets `redirect_https` and the certificate
   name `x28`. uhttpd makes a self-signed EC certificate on its first start, so each unit has its own, and browsers warn
   about it once.
