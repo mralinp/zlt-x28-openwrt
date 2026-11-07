@@ -197,6 +197,10 @@ Tool package with Quectel's download agent. [bkerler/mtkclient](https://github.c
 USB work. [gaglians/zlt-x28-openwrt2305](https://github.com/gaglians/zlt-x28-openwrt2305) explored 23.05 on the
 vendor kernel. OpenWrt and LuCI belong to their projects.
 
+## Support
+
+Made with love by mralinp. If this saved your modem, you can support the work on any EVM chain: `0x6743d8fe71f18b3101f3086e8d9f8d272d0f7618`
+
 ## License
 
 Copyright (C) 2026 Ali Naderi Parizi. The code in this repository is free software under the [GNU GPL v3](LICENSE) (or any later version): anyone may use, modify and redistribute it, but any distributed derivative must be released under the same licence with its complete source, and must keep this copyright notice and credit the original project. OpenWrt, LuCI, mtkclient and vendor components keep their own
