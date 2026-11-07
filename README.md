@@ -199,7 +199,7 @@ vendor kernel. OpenWrt and LuCI belong to their projects.
 
 ## Support
 
-Made with love by mralinp. If this saved your modem, you can support the work on any EVM chain: `0x6743d8fe71f18b3101f3086e8d9f8d272d0f7618`
+Made with love by mralinp. If this project helps you, please give it a star on GitHub, and donations are welcome on any EVM chain: `0x6743d8fe71f18b3101f3086e8d9f8d272d0f7618`
 
 ## License
 
