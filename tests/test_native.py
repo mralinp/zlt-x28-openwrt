@@ -87,6 +87,14 @@ def cases():
         # reg=0 means no registration at all, so setup later stops at the attach step; the lock was set once and not undone.
         case("band-no-service-kept", config={"lteband_mode": "allow", "lteband_list": [42]}, reg=0, one_epbse_set=True,
              error="ATTACH_FAILED", no_activate_call=True, expect_cmds=["--at_cmd at+epbse=154,145,0,512,0,0,0,0,0,0"]),
+        case("netmode-4g", config={"netmode": "4g"}, expect_cmds=["--nw_set_rat 3", "--data_call_act"], one_rat_set=True),
+        case("netmode-5g", config={"netmode": "5g"}, expect_cmds=["--nw_set_rat 15", "--data_call_act"]),
+        case("netmode-auto-restores", config={"netmode": "auto"}, rat="3", expect_cmds=["--nw_set_rat 19", "--data_call_act"]),
+        case("netmode-already-set", config={"netmode": "auto"}, no_rat_set=True),
+        case("netmode-unset-untouched", no_rat_any=True),
+        case("netmode-not-applied", config={"netmode": "4g"}, rat_noop=1, error="NETMODE_FAILED", no_activate_call=True, one_rat_set=True),
+        case("netmode-auto-not-applied-keeps-wan", config={"netmode": "auto"}, rat="3", rat_noop=1, one_rat_set=True, expect_cmds=["--data_call_act"]),
+        case("netmode-bad", config={"netmode": "sa"}, error="INVALID_CONFIG", no_cli=True),
         case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("nr-allow", config={"nrband_mode": "allow", "nrband_list": [78]},
@@ -215,6 +223,12 @@ def verify(item, directory):
         assert not any(c.startswith("x28-nrband set") for c in commands), commands
     if item.get("no_nr_any"):
         assert not any(c.startswith("x28-nrband") for c in commands), commands
+    if item.get("one_rat_set"):
+        assert sum(c.startswith("--nw_set_rat") for c in commands) == 1, commands
+    if item.get("no_rat_set"):
+        assert not any(c.startswith("--nw_set_rat") for c in commands), commands
+    if item.get("no_rat_any"):
+        assert not any("_rat" in c for c in commands), commands
     if item.get("no_epbse_set"):
         assert not any(c.startswith("--at_cmd at+epbse=") for c in commands), commands
     if item.get("no_epbse_any"):
@@ -310,6 +324,8 @@ def main():
             if item.get("nr_missing"):
                 (d / "nr_missing").write_text("1")
             (d / "epbse").write_text(item.get("epbse", "154,145,2282225877,1952,0,0,0,0,0,0"))
+            (d / "rat").write_text(item.get("rat", "19"))
+            (d / "rat_noop").write_text(str(item.get("rat_noop", 0)))
             (d / "epbse_noop").write_text(str(item.get("epbse_noop", 0)))
             (d / "lock").write_text(item.get("lock", "0"))
             (d / "lock_noop").write_text(str(item.get("lock_noop", 0)))

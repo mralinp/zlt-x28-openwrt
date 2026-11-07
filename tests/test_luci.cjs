@@ -59,6 +59,8 @@ assert.equal(options.celllock.validate(null, '42090:258'), true);
 assert.equal(options.celllock.validate(null, '46589:511'), true);
 for (const bad of ['42090', '46590:258', '42090:512', 'a:1', '1:2:3']) assert.equal(typeof options.celllock.validate(null, bad), 'string', bad);
 for (const [cfg, want] of [['42090:258', 'lock'], [undefined, 'none']]) assert.equal(options.cellmode.cfgvalue.call(cfgOf(cfg), 'wan'), want);
+assert.deepEqual(Object.keys(options.netmode.choices), ['auto', '4g', '5g']);
+assert.equal(options.netmode.default, 'auto');
 assert.deepEqual(Object.keys(options.lteband_mode.choices), ['none', 'allow', 'deny']);
 assert.equal(options.lteband_mode.default, 'none');
 assert.deepEqual(options.lteband_list.deps, [['lteband_mode', 'allow'], ['lteband_mode', 'deny']]);

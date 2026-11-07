@@ -21,6 +21,7 @@ proto_x28_mipc_init_config() {
  proto_config_add_array 'lteband_list:uinteger'
  proto_config_add_string nrband_mode
  proto_config_add_array 'nrband_list:uinteger'
+ proto_config_add_string netmode
  proto_config_add_defaults
 }
 
@@ -189,6 +190,33 @@ x28_mipc_nrband() {
  return 1
 }
 
+# Radio technology via mipc_wan_cli nw_set_rat: auto = 4/5G (19, what the vendor's auto gives this modem), 4g = 3, 5g = 15.
+# It reads the label back from nw_get_rat. Applied before the data call; strict, like the band locks: a mode that took
+# effect stays without service (the owner picks auto again). "auto" never costs the WAN when the modem cannot be read.
+x28_mipc_netmode() {
+ local mode="$1" rat label cur i=0
+ case "$mode" in
+  auto) rat=19; label="4/5G" ;;
+  4g) rat=3; label="4G only" ;;
+  5g) rat=15; label="5G only" ;;
+  *) return 1 ;;
+ esac
+ cur="$(mipc_wan_cli --nw_get_rat 2>/dev/null | sed -n 's/^Current: //p' | head -n 1)"
+ [ "$cur" = "$label" ] && return 0
+ [ -n "$cur" ] || { [ "$mode" = auto ]; return; }
+ mipc_wan_cli --nw_set_rat "$rat" >/dev/null 2>&1
+ while [ "$i" -le 10 ]; do
+  [ "$(mipc_wan_cli --nw_get_rat 2>/dev/null | sed -n 's/^Current: //p' | head -n 1)" = "$label" ] && {
+   sleep 3
+   x28_mipc_wait_reg || logger -t x28_mipc "no service after network mode $mode; set it to auto to get it back"
+   return 0
+  }
+  sleep 1; i=$((i + 1))
+ done
+ [ "$mode" = auto ] && { logger -t x28_mipc "network mode could not be set back to auto"; return 0; }
+ return 1
+}
+
 # Every listed 5G band must be one the modem supports.
 x28_mipc_nrbands_ok() {
  local b
@@ -346,9 +374,9 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode defaultroute peerdns metric sim rc reply result cid ifname
+ local interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric
  local bands="" b
  json_get_values bands lteband_list
  local nrbands=""
@@ -365,6 +393,7 @@ x28_mipc_setup() {
     ! x28_mipc_bands_ok "$bands" ||
     { [ -n "$nrband_mode" ] && [ "$nrband_mode" != none ] && [ "$nrband_mode" != allow ] && [ "$nrband_mode" != deny ]; } ||
     ! x28_mipc_nrbands_ok "$nrbands" ||
+    { [ -n "$netmode" ] && [ "$netmode" != auto ] && [ "$netmode" != 4g ] && [ "$netmode" != 5g ]; } ||
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
@@ -398,6 +427,7 @@ x28_mipc_setup() {
  x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
  [ -z "$nrband_mode" ] || x28_mipc_nrband "$nrband_mode" "$nrbands" || { proto_notify_error "$interface" NRBAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  [ -z "$lteband_mode" ] || x28_mipc_bandlock "$lteband_mode" "$bands" || { proto_notify_error "$interface" BAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
+ [ -z "$netmode" ] || x28_mipc_netmode "$netmode" || { proto_notify_error "$interface" NETMODE_FAILED; proto_block_restart "$interface"; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

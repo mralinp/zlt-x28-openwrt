@@ -21,6 +21,8 @@ mipc_wan_cli() {
   --data_call_act) cat "$case_dir/reply"; return "$(cat "$case_dir/activate_rc")" ;;
   --data_call_deact) return "$(cat "$case_dir/deactivate_rc")" ;;
   --data_call_get) [ -s "$case_dir/get" ] && cat "$case_dir/get" ;;
+  --nw_get_rat) case "$(cat "$case_dir/rat")" in 3) echo 'Current: 4G only' ;; 15) echo 'Current: 5G only' ;; 19) echo 'Current: 4/5G' ;; *) echo "Current: $(cat "$case_dir/rat")" ;; esac ;;
+  --nw_set_rat) [ "$(cat "$case_dir/rat_noop")" = 1 ] || echo "$2" > "$case_dir/rat"; echo "nw_set_rat success, rat = $2" ;;
   --apn_ia_get) cat "$case_dir/ia" ;;
   --apn_ia_set) [ "$(cat "$case_dir/ia_set_noop")" = 1 ] || printf 'IA apn:%s pdp_type:%s roaming_type:%s bearer_bitmask:0xffffffff\n' "$2" "$3" "$4" > "$case_dir/ia" ;;
   --at_cmd)

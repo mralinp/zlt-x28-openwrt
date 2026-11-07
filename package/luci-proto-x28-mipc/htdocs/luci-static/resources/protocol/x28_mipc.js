@@ -151,6 +151,13 @@ return network.registerProtocol('x28_mipc', {
     return form.Value.prototype.load.call(this, section_id);
    }, this));
   };
+  // Radio technology (mipc_wan_cli nw_set_rat). SA/NSA and TDD/FDD are separate controls and not offered yet.
+  option = section.taboption('carrier', form.ListValue, 'netmode', _('Network mode'),
+   _('Which radio technologies the modem may use. The modem re-registers when this changes. If there is no service afterwards, set it back to Automatic: it is not undone for you.'));
+  option.value('auto', _('Automatic (4G and 5G)'));
+  option.value('4g', _('4G only'));
+  option.value('5g', _('5G only'));
+  option.default = 'auto';
   // 4G band lock (AT+EPBSE). The list is this modem's supported LTE bands.
   option = section.taboption('carrier', form.ListValue, 'lteband_mode', _('4G band lock'),
    _('Restrict which LTE bands the modem may use. The modem re-registers when this changes. If there is no service afterwards, remove the lock: it is not undone for you.'));
