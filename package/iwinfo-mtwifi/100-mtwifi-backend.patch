@@ -51,7 +51,7 @@ new file mode 100644
 index 0000000..d6f8343
 --- /dev/null
 +++ b/iwinfo_mtwifi.c
-@@ -0,0 +1,525 @@
+@@ -0,0 +1,541 @@
 +/*
 + * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
 + *
@@ -117,7 +117,23 @@ index 0000000..d6f8343
 +
 +static int mtwifi_mode(const char *n, int *b)    { IFN(n); return wext_ops.mode(ifn, b); }
 +static int mtwifi_channel(const char *n, int *b) { IFN(n); return wext_ops.channel(ifn, b); }
-+static int mtwifi_bitrate(const char *n, int *b) { IFN(n); return wext_ops.bitrate(ifn, b); }
++
++/*
++ * The driver keeps the rate in bits per second in a signed 32-bit field. A 4-stream Wi-Fi 6 rate on 80 MHz (2.40 Gbit/s) wraps negative, which
++ * wext_ops.bitrate rejects ("unknown", "?" in LuCI), so the value is read as unsigned: it stays below 4.29 Gbit/s.
++ */
++static int mtwifi_bitrate(const char *n, int *b)
++{
++	struct iwreq wrq = {};
++
++	IFN(n);
++	strncpy(wrq.ifr_name, ifn, IFNAMSIZ - 1);
++	if (iwinfo_ioctl(SIOCGIWRATE, &wrq) < 0 || !wrq.u.bitrate.value)
++		return -1;
++	*b = (int)((uint32_t)wrq.u.bitrate.value / 1000);
++	return 0;
++}
++
 +static int mtwifi_ssid(const char *n, char *b)   { IFN(n); return wext_ops.ssid(ifn, b); }
 +static int mtwifi_bssid(const char *n, char *b)  { IFN(n); return wext_ops.bssid(ifn, b); }
 +

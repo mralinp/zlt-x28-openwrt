@@ -396,7 +396,7 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   profiles keep `WscConfMode=0`, so nothing offers WPS between presses. Not verified: pairing with a client (see #262).
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
-  ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate, per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
+  ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate (the rate is read as unsigned: the driver keeps bits per second in a signed 32-bit field, and the X28 PRO's 4-stream 80 MHz rate of about 2.4 Gbit/s wraps negative, which showed as "?" in LuCI), per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
   (`SIOCIWFIRSTPRIV + 0x1F`, 56-byte entries, the layout stock's `ioctl_helper.so` reads). Tx power, radio signal/noise and
   station data rates stay unknown. On a unit: `iwinfo rai0 info` shows `Type: mtwifi`; `iwinfo rai0 assoclist` lists clients.
 - **Wi-Fi country (#177):** `/usr/share/x28-wifi/regions` maps a country to the driver's `CountryRegion` and `CountryRegionABand`, picked
