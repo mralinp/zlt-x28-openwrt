@@ -104,4 +104,6 @@ exactly 8 bytes (`0x808`, `0x80c` in each block). Save the whole partition first
 `9aaf725e...`); the undo is the same call with `\x0f\x00\x00\x00\x0e`. Each call is a read-erase-write of one 256 KiB block, so
 the unit should be on stable power. Do not run `dd-nand --help`: it waits for input.
 
-Not yet observed: the boot into slot B after this change (recorded in TESTING 42 when it has been seen).
+Observed: after a power cycle the unit booted slot B (`bootslot=b`, OpenWrt 19.07-SNAPSHOT, the vendor firmware) and the key-only SSH on
+port 2222 from `x28-flasher#5` answered (`ssh -p 2222 -i ~/.ssh/router root@192.168.0.1`); `misc` still read
+`A: 0e 00 00 00 | B: 0f 00 01 01`. The way back to slot A is the same call with the two priorities exchanged (`\x0f\x00\x00\x00\x0e`).

@@ -55,7 +55,7 @@ Conventions:
 | 38 | Image with the VPN set on the unit (#230) | 2026-11-02 | ✅ flashed, settings restored, survives a reboot: [section 38](#38-image-with-the-vpn-set-on-the-unit-2026-11-02) |
 | 39 | TPROXY and socket modules, and Passwall2 on them (#198) | 2026-11-02 | ✅ 7 modules loaded; Passwall2 with no warnings carries the router's and a LAN phone's TCP, UDP and IPv6 through the UK node: [section 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02) |
 | 41 | Passwall2 throughput from a LAN client | 2026-11-02 | ✅ 206 Mbit/s down, 40 up, router CPU at most 56%: [section 41](#41-passwall2-throughput-from-a-lan-client-2026-11-02) |
-| 42 | Boot slot switched to B on the X28 PRO unit: the two priority bytes swapped in the four `misc` copies with `dd-nand` | 2026-11-07 | ✅ written and read back, 8 bytes of the 1 MiB differ; ⏳ boot into slot B not yet observed. A USB block write to `misc` was refused again (first block not acknowledged, agent silent afterwards) | [slot-selection](research/slot-selection.md) |
+| 42 | Boot slot switched to B on the X28 PRO unit: the two priority bytes swapped in the four `misc` copies with `dd-nand` | 2026-11-07 | ✅ written and read back, 8 bytes of the 1 MiB differ; the unit then booted slot B (vendor firmware, key-only SSH on 2222 answered). A USB block write to `misc` was refused again (first block not acknowledged, agent silent afterwards) | [slot-selection](research/slot-selection.md) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
