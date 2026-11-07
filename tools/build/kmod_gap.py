@@ -148,11 +148,11 @@ def main():
         return selftest()
     kmods = ks.feed_kmods()
     on_unit = {ks.norm(pathlib.PurePath(x).stem) for x in a.modules.read_text().split()}
-    builtin = {ks.norm(pathlib.PurePath(x).stem) for x in (a.tree / 'modules.builtin').read_text().split()}
     objects = ks.builtin_objects(a.tree)
-    # modules.builtin is incomplete (net/sched is missing from it), so also trust =y in the config.
+    # Not modules.builtin: the SDK tree's copy is stale (it lacks net/sched and lists dummy and hwmon, which the unit's kernel doesn't have).
     cfg = dict(re.findall(r'^(CONFIG_\w+)=(.*)$', (a.config or a.tree / '.config').read_text(), re.M))
-    have = on_unit | builtin | {m for m, opts in objects.items() if any(cfg.get(o) == 'y' for o in opts)}
+    # All options, not any: a file name like dummy.o also exists in other directories, and one of those may be =y.
+    have = on_unit | {m for m, opts in objects.items() if all(cfg.get(o) == 'y' for o in opts)}
     stubs = set(STUBS.read_text().split())
     want = {o for k, v in kmods.items() if k not in stubs for m in ks.missing(v['ko'], have) for o in objects.get(ks.norm(m), ())}
     final = resolve(a.tree, a.config or a.tree / '.config', want)

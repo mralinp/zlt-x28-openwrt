@@ -5,8 +5,8 @@ make it work on the vendor 4.19.205 kernel. Input for #395 (build) and #396 (pub
 
 | Class | Meaning | Count |
 |---|---|---|
-| A | nothing to build: every module is on the unit or built in (180 have a stub; 4 more could) | 184 |
-| B | **buildable out of tree**: 4.19 source exists and setting just its option `=m` changes no built-in symbol | 211 |
+| A | already a stub: every module is on the unit or built in | 180 |
+| B | **buildable out of tree**: 4.19 source exists and setting just its option `=m` changes no built-in symbol | 215 |
 | C | **blocked**: source exists, but the option stays off or enabling it also changes built-in symbols (kernel config change) | 397 |
 | D | **no 4.19 source** (module is newer than the kernel, or out of tree), or it needs a D kmod (backport or kernel change) | 184 |
 
@@ -28,9 +28,12 @@ A kmod takes the worst class of its own modules and of the kmods it depends on.
 - A kmod is B if at least one of its modules is missing, so a B kmod usually has modules that are already built in.
   `kmod-sched-core` has 14 modules; on the unit, 6 are `=y`, 7 are on the unit already or built in, and only `act_gact`
   was built (#395). Check the unit's `/proc/config.gz` per module before building a B kmod.
-- `modules.builtin` in the SDK tree is incomplete (it lacks `net/sched`), so the script also counts `=y` options in the
-  config. A first version missed this (the numbers were A 180, B 215).
-
+- The SDK tree's `modules.builtin` is stale (it lacks `net/sched` and lists `dummy` and `hwmon`, which the unit's kernel doesn't
+  have), so the script does not read it. It counts a module as built in when every option that names its file is `=y` in the
+  config (the SDK `.config` matches the unit's `/proc/config.gz` apart from vendor options and our TPROXY ones). Counting a
+  module as built in when *any* option naming its file was `=y` gave A 184 / B 211, with four wrong stub candidates
+  (`dummy`, `hwmon-core`, `hwmon-pwmfan`, `thermal` are not built in; `dummy.o` also exists in the sound drivers). The numbers
+  above are the checked ones.
 - B is a Kconfig result, not a build or load result. It still needs a compile against the SDK tree and a load test on the
   unit (#395). The SDK tree has no `Module.symvers`, so modules carry no symbol versions ([CRC note](kernel-module-crc.md)).
 - A module can compile and still fail to load if it uses a symbol the vendor kernel doesn't export.
@@ -54,7 +57,7 @@ docker run --rm -v x28-kbuild:/k:ro -v "$PWD:/r:ro" -v "$PWD/out:/o" debian:book
 
 ## Table
 
-976 kmods: A 184, B 211, C 397, D 184
+976 kmods: A 180, B 215, C 397, D 184
 
 | Kmod | Class | Why | User packages that depend on it |
 |---|---|---|---|
@@ -111,6 +114,7 @@ docker run --rm -v x28-kbuild:/k:ro -v "$PWD:/r:ro" -v "$PWD/out:/o" debian:book
 | `kmod-crypto-test` | B | buildable |  |
 | `kmod-dax` | B | buildable |  |
 | `kmod-dnsresolver` | B | buildable |  |
+| `kmod-dummy` | B | buildable |  |
 | `kmod-echo` | B | buildable |  |
 | `kmod-eeprom-93cx6` | B | buildable |  |
 | `kmod-eeprom-at24` | B | buildable |  |
@@ -129,6 +133,8 @@ docker run --rm -v x28-kbuild:/k:ro -v "$PWD:/r:ro" -v "$PWD/out:/o" debian:book
 | `kmod-gpio-beeper` | B | buildable |  |
 | `kmod-gpio-nxp-74hc164` | B | buildable |  |
 | `kmod-gpio-pca953x` | B | buildable |  |
+| `kmod-hwmon-core` | B | buildable |  |
+| `kmod-hwmon-pwmfan` | B | buildable |  |
 | `kmod-i2c-gpio` | B | buildable |  |
 | `kmod-i2c-mux-gpio` | B | buildable |  |
 | `kmod-i2c-mux-pca9541` | B | buildable |  |
@@ -254,6 +260,7 @@ docker run --rm -v x28-kbuild:/k:ro -v "$PWD:/r:ro" -v "$PWD/out:/o" debian:book
 | `kmod-tcp-bbr` | B | buildable |  |
 | `kmod-tcp-hybla` | B | buildable |  |
 | `kmod-tcp-scalable` | B | buildable |  |
+| `kmod-thermal` | B | buildable |  |
 | `kmod-tls` | B | buildable |  |
 | `kmod-usb-cm109` | B | buildable |  |
 | `kmod-usb-printer` | B | buildable |  |
@@ -347,7 +354,7 @@ docker run --rm -v x28-kbuild:/k:ro -v "$PWD:/r:ro" -v "$PWD/out:/o" debian:book
 | `kmod-carl9170` | C | carl9170: CONFIG_CARL9170 off; needs kmod-mac80211 (C); needs kmod-ath (C) |  |
 | `kmod-cc2520` | C | cc2520: CONFIG_IEEE802154_CC2520 off; needs kmod-mac802154 (C) |  |
 | `kmod-cdrom` | C | cdrom: CONFIG_CDROM off |  |
-| `kmod-cfg80211` | C | cfg80211: CONFIG_CFG80211 also sets CONFIG_ASN1=y CONFIG_ASYMMETRIC_KEY_TYPE=y CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE=y |  |
+| `kmod-cfg80211` | C | cfg80211: CONFIG_CFG80211 also sets CONFIG_ASN1=y CONFIG_ASYMMETRIC_KEY_TYPE=y CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE=y; compat: CONFIG_COMPAT off; CONFIG_KEYS_COMPAT off; CONFIG_QUOTACTL_COMPAT off; CONFIG_SYSVIPC_COMPAT off |  |
 | `kmod-crypto-lib-chacha20poly1305` | C | needs kmod-crypto-lib-poly1305 (C) |  |
 | `kmod-crypto-lib-curve25519` | C | libcurve25519-generic: CONFIG_CRYPTO_LIB_CURVE25519_GENERIC off |  |
 | `kmod-crypto-lib-poly1305` | C | poly1305-neon: CONFIG_CRYPTO_POLY1305_NEON off |  |
@@ -855,5 +862,5 @@ user packages with a direct dependency on a C or D kmod: 74
 luci packages with a direct dependency on a C or D kmod: 2
 luci-app-siitwizard, luci-proto-batman-adv
 
-class A but not in stubs.txt yet (4), stub candidates:
-kmod-dummy, kmod-hwmon-core, kmod-hwmon-pwmfan, kmod-thermal
+class A but not in stubs.txt yet (0), stub candidates:
+
