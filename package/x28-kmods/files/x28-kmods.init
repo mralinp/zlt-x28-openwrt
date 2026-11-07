@@ -1,7 +1,7 @@
 #!/bin/sh /etc/rc.common
 # Loads the modules we build for the vendor kernel: WireGuard (#227) and TPROXY/socket for Passwall2 (#198). They have no
 # symbol version check, so this waits until x28-bootok (S96) has reset slot A's boot tries, and a load that never
-# finishes is not retried: a crash here must not become a boot loop or cost boot tries.
+# finishes is retried at most MAXTRY times in a row: a crash here must not become a boot loop or cost boot tries.
 
 START=97
 
@@ -11,6 +11,7 @@ DIR=/lib/modules/x28
 # Load order: each module's dependencies first. Missing files are skipped, so an image may carry any subset.
 MODS='wireguard x28_udp_lookup nf_socket_ipv4 nf_socket_ipv6 nf_tproxy_ipv4 nf_tproxy_ipv6 xt_socket xt_TPROXY'
 MARK=/etc/x28-kmods.loading
+MAXTRY=3
 
 # Slot A's tries byte in the four misc copies, as in x28-bootok.
 tries_reset() {
@@ -37,11 +38,16 @@ start() {
 			[ $n -gt 60 ] && { logger -t x28-kmods "boot tries not reset after 5 min; not loading"; exit 0; }
 			sleep 5
 		done
-		if [ -e "$MARK" ]; then
-			logger -t x28-kmods "previous load did not finish; not loading. Remove $MARK to try again"
+		# The marker holds the number of loads that did not finish. A reboot inside the 120 s window (not a crash) leaves one
+		# behind, so a single stale marker must not disable the modules for good: only MAXTRY in a row stop the loading.
+		fails=$(cat "$MARK" 2>/dev/null); fails=${fails:-0}
+		case $fails in *[!0-9]*) fails=$MAXTRY;; esac
+		if [ "$fails" -ge "$MAXTRY" ]; then
+			logger -t x28-kmods "$fails loads in a row did not finish; not loading. Remove $MARK to try again"
 			exit 0
 		fi
-		touch "$MARK"
+		[ "$fails" -gt 0 ] && logger -t x28-kmods "previous load did not finish ($fails of $MAXTRY); trying again"
+		echo $((fails + 1)) > "$MARK"
 		sync
 		for m in $todo; do
 			insmod "$DIR/$m.ko" || { logger -t x28-kmods "insmod $m failed"; rm -f "$MARK"; exit 1; }
