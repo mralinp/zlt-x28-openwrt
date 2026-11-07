@@ -1,1 +1,2 @@
-obj-m += act_gact.o veth.o macvlan.o sch_cake.o
+obj-m += act_gact.o veth.o macvlan.o sch_cake.o algif_aead.o algif_rng.o xt_hashlimit.o raw_diag.o netlink_diag.o usbip-core.o
+usbip-core-y := usbip_common.o usbip_event.o

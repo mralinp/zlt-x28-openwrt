@@ -3,3 +3,8 @@ kmod-sched-core act_gact
 kmod-veth veth
 kmod-macvlan macvlan
 kmod-sched-cake sch_cake | kmod-sched-core
+kmod-crypto-user algif_aead algif_rng | kmod-crypto-hash kmod-crypto-manager
+kmod-ipt-hashlimit xt_hashlimit | kmod-ipt-core
+kmod-inet-diag raw_diag
+kmod-netlink-diag netlink_diag
+kmod-usbip usbip-core | kmod-usb-core

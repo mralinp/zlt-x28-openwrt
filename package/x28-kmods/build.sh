@@ -14,7 +14,7 @@ cp -R /src/src /tmp/src
 k() { make -C /k/linux ARCH=arm64 CC=gcc-11 HOSTCC=gcc-11 KCFLAGS='-w -fcommon -Wno-error' -j"$(nproc)" "$@" modules; }
 k M=/tmp/src/tproxy
 k M=/tmp/src/wireguard CONFIG_WIREGUARD=m
-k M=/tmp/src/feed CONFIG_NET_ACT_GACT=m CONFIG_VETH=m CONFIG_MACVLAN=m CONFIG_NET_SCH_CAKE=m
+k M=/tmp/src/feed CONFIG_NET_ACT_GACT=m CONFIG_VETH=m CONFIG_MACVLAN=m CONFIG_NET_SCH_CAKE=m CONFIG_CRYPTO_USER_API_AEAD=m CONFIG_CRYPTO_USER_API_RNG=m CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=m CONFIG_INET_RAW_DIAG=m CONFIG_NETLINK_DIAG=m CONFIG_USBIP_CORE=m
 mkdir -p /out/feed
 for f in /tmp/src/feed/*.ko; do
 	strip --strip-debug -o "/out/feed/$(basename "$f")" "$f"

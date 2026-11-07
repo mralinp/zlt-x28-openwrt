@@ -19,6 +19,13 @@ v4.19.205 files, built into `/out/feed/`. `package/x28-kmod-stubs/real.txt` list
 | `veth` | `src/feed/veth.c` (`drivers/net/veth.c`) | `kmod-veth` | virtual Ethernet pairs (containers, tests) |
 | `macvlan` | `src/feed/macvlan.c` (`drivers/net/macvlan.c`) | `kmod-macvlan` | `keepalived` |
 | `sch_cake` | `src/feed/sch_cake.c` (`net/sched/sch_cake.c`) | `kmod-sched-cake` | SQM (`sqm-scripts`) |
+| `algif_aead`, `algif_rng` | `src/feed/` (`crypto/`) | `kmod-crypto-user` | OpenSSL AF_ALG engine, `cryptsetup`; the vendor kernel has the other four modules |
+| `xt_hashlimit` | `src/feed/xt_hashlimit.c` (`net/netfilter/`) | `kmod-ipt-hashlimit` | `shorewall` |
+| `raw_diag` | `src/feed/raw_diag.c` (`net/ipv4/`) | `kmod-inet-diag` | `sing-box` |
+| `netlink_diag` | `src/feed/netlink_diag.c` (`net/netlink/diag.c`, renamed; needs `af_netlink.h`) | `kmod-netlink-diag` | `ss` |
+| `usbip-core` | `src/feed/usbip_*.c` (`drivers/usb/usbip/`) | `kmod-usbip` | `usbip` |
+
+`algif_*` link against the vendor `af_alg.ko` and `xt_hashlimit` against `x_tables.ko`, so `x28-kmods` loads those first.
 
 The patch drops wireguard-linux-compat's `ktime_get_coarse_boottime_ns()`, which the vendor tree already defines.
 
