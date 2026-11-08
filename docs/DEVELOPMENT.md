@@ -18,14 +18,11 @@ The repository is the source of truth for original packages, tests, plans and ev
 ```sh
 for t in tests/test_modem.sh tests/test_bootok.sh tests/test_wifi.sh tests/test_wps.sh; do sh $t; done
 python3 -m unittest discover -s tools/build -p 'test_*.py'
-for t in tools/recovery/test_*.py; do python3 $t; done
-python3 tools/x28-flasher/x28_flasher.py --selftest
-python3 tools/x28-flasher/test_wizard.py
-python3 tools/x28-flasher/test_images.py
 node tests/test_luci.cjs
 sh -n package/x28-mipc/files/x28_mipc.sh tests/run-case.sh
 ```
 
+The flasher and the guarded recovery tools (`tools/recovery/`, `tools/x28-flasher/`) moved to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (private for now); their tests run there.
 
 `python3 tests/test_native.py --router router` executes mock-only tests with installed OpenWrt helpers through SSH. It stages files in /tmp, mocks modem and ubus operations, and cleans up. It still contacts the active router; read its harness first.
 

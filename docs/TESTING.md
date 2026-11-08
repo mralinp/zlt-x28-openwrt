@@ -5,6 +5,7 @@ Written for whoever picks this up later with no memory of the sessions: start he
 anywhere else in the repo.
 
 Conventions:
+- **Tool paths**: commands named `tools/recovery/...` and `tools/x28-flasher/...` ran from this repo until 2026-11-06; those tools now live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (#343, #351). The records below are kept as they were run.
 - **Device**: one ZLT X28, kernel 4.19.205. Tests 1–22 ran on the stock firmware (OEM 1.5.13, OpenWrt 19.07-derived, active slot **B**); tests 23–31 ran on the native image on slot **A**.
 - **Host**: Apple Silicon Mac (macOS), Docker Desktop (arm64 Linux, plus x86_64 emulation).
 - Private outputs (dumps, probe logs, chip IDs, vendor files) live in git-ignored `private/` and are never
