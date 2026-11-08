@@ -63,6 +63,7 @@ Conventions:
 | 47 | WireGuard and TPROXY as feed packages: the live feed updated in place, the test unit upgraded | 2026-11-08 | ✅ 132 container checks, 0 failures against the published URL; the unit's invented records became the signed `-r1` packages with identical module files; WireGuard and the TPROXY/socket matches work, also after a reboot: [section 47](#47-wireguard-and-tproxy-as-feed-packages-on-the-live-feed-and-the-unit-2026-11-08) |
 | 48 | `x28-kmods` as a package, with the module list in the packages | 2026-11-08 | ✅ 148 container checks, 0 failures against the published URL; on the unit the 28 module packages and the loader were upgraded in one go, the forced marker refused, a live load brought 42 modules back in 3 s, and after a real reboot the loader loaded all 51 by itself: [section 48](#48-x28-kmods-as-a-package-with-the-module-list-in-the-packages-2026-11-08) |
 | 49 | The packaged image from the signed feed with 222 packages, on two reflashed units | 2026-11-08 | ✅ both units flashed and boot fast without errors (owner's report); `opkg update` passes every signature; `x28-base` refuses removal of `x28-modem`; 248 container checks, 0 failures: [section 49](#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) |
+| 50 | Rolling back and forward an x28 package on a unit | 2026-11-08 | ✅ `x28-base` 0.1.0-2 to 0.1.0-1 with `--force-downgrade` and back with `opkg upgrade`; installing from a URL does not work: [section 50](#50-rolling-back-and-forward-an-x28-package-on-a-unit-2026-11-08) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -677,5 +678,20 @@ the `-r1` files still on the release (kept until this passed; they are not in th
 | On a flashed unit, `opkg update` passes the signature check on our feed and every other feed | ✅ |
 | On a flashed unit, `opkg remove x28-modem --noaction` is refused: `x28-base` depends on it; `--force-depends` is the named override | ✅ |
 
-**Not verified:** `opkg upgrade` of an x28-* package from the feed on a unit; rolling back with `--force-downgrade`; a reboot after upgrading
-a boot-critical package; the full package list on the flashed units (not collected); the flasher's CI release (its runs were cancelled).
+**Not verified:** (the upgrade and the rollback are now covered by test 50) a reboot after upgrading
+a boot-critical package that is not `x28-kmods`; the full package list on the flashed units (not collected); the flasher's CI release (its runs were cancelled).
+
+## 50. Rolling back and forward an x28 package on a unit (2026-11-08)
+
+- **Question**: does the rollback described in [PACKAGE-FEED](PACKAGE-FEED.md) work, and does `opkg upgrade` of an x28-* package from the live feed work on a unit?
+- **Setup**: the test unit (flashed with the packaged image; `x28-base` 0.1.0-2, `x28-nrband` and `x28-switch` installed by hand from the live feed).
+
+| Step | Result |
+|---|---|
+| `opkg install --force-downgrade <URL of x28-base_0.1.0-1_all.ipk>` | ❌ `wfopen: …: No such file or directory`: this `opkg` cannot install from a URL; the unit was not changed |
+| Download the file to `/tmp` with `uclient-fetch`: SHA-256 equals the release build | ✅ |
+| `opkg install --force-downgrade /tmp/x28-base_0.1.0-1_all.ipk` | ✅ `x28-base` 0.1.0-1, its `Depends` back to the earlier list, `x28-nrband` and `x28-switch` and their files untouched, no reboot |
+| `opkg update && opkg upgrade x28-base` | ✅ offered `0.1.0-1 - 0.1.0-2`, installed `0.1.0-2` from the live feed, `Depends` list with `x28-switch` and `x28-nrband`; nothing left to upgrade |
+| After: no `oops` or `unknown symbol` in `dmesg`; up 1:33, never rebooted | ✅ |
+
+**Not verified:** rolling back a boot-critical package (`x28-bootok`, `x28-modem`) and rebooting; a rollback on the second unit; the band tool itself (not run).

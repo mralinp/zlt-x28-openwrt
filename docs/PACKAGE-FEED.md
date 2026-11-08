@@ -76,8 +76,16 @@ boot-critical ones (`x28-bootok`, `x28-kmods`, `x28-modem`) are replaced on disk
 reboot**, so reboot after upgrading them. A module package never replaces a loaded module until then.
 
 **Rolling back.** The feed keeps one current version per package, but the older `.ipk` files stay on the feed release until we clean them up, and every
-firmware release bundle holds the exact set it was made from. To go back, install the older file by its URL with `opkg install --force-downgrade URL`
-(the `-rN` revisions order correctly), then reboot if the package is a boot-critical one. This has not been tested on a unit yet. What is tested: [TESTING 49](TESTING.md#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) (the packaged image on two units, the `x28-base` protection).
+firmware release bundle holds the exact set it was made from. This `opkg` cannot install from a URL, so download the file first, then install it from `/tmp`:
+
+```sh
+cd /tmp && uclient-fetch -O x28-base_0.1.0-1_all.ipk https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download/x28-base_0.1.0-1_all.ipk
+sha256sum x28-base_0.1.0-1_all.ipk     # compare with the bundle's SHA256SUMS
+opkg install --force-downgrade /tmp/x28-base_0.1.0-1_all.ipk
+```
+
+The `-rN` revisions order correctly. Reboot afterwards if the package is a boot-critical one. `opkg upgrade x28-base` goes forward again. Tested on a unit with `x28-base`
+([TESTING 50](TESTING.md#50-rolling-back-and-forward-an-x28-package-on-a-unit-2026-11-08)); the boot-critical packages were not rolled back.
 
 ## Using it
 
