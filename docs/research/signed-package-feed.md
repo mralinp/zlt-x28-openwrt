@@ -1,6 +1,6 @@
 # Signed package feed (#200)
 
-**Current: `feed-3` (2026-11-08), 209 packages on a stable URL: see the last section and [PACKAGE-FEED](../PACKAGE-FEED.md).** The text up to "Hosting of feed-1 and feed-2" describes the first two feeds (182 and 189 packages).
+**Current: the one feed release (tag `feed-3`, updated in place), 212 packages on a stable URL: see the last section and [PACKAGE-FEED](../PACKAGE-FEED.md).** The text up to "Hosting of feed-1 and feed-2" describes the first two feeds (182 and 189 packages).
 
 **2026-11-02: published and working on the unit ([test 36](../TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)).** The feed holds 182 packages: the `kernel`
 record, 178 kmod stubs and the vendor-ipset set from PR #217. A feed with only the ipset packages would
@@ -88,9 +88,9 @@ limits remain; signing does not add kernel features or make the full official ag
 ## The feed: one rolling release on a stable URL (#396, #415)
 
 **2026-11-08: published and working on the unit** ([test 45](../TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
-The published feed holds 209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built modules
-(`1:4.19.205-x28-r1`) and the 3 vendor ipset packages (pin `1da26cdc…`, in git history). `feed_release.py` now pins the next
-index, 212 packages (adds `kmod-wireguard`, `kmod-ipt-tproxy`, `kmod-ipt-socket`):
+The published feed holds 212 packages: the `kernel` record, 180 stubs, 28 packages that carry our built modules
+(`1:4.19.205-x28-r1`, including `kmod-wireguard`, `kmod-ipt-tproxy` and `kmod-ipt-socket` since 2026-11-08) and the 3 vendor ipset
+packages. `feed_release.py` pins its index (the earlier 209-package pin `1da26cdc…` is in git history):
 `INDEX_SHA256 = caab74a29426156e1a393e05cacbe36a0886cd2aae7533a0e3ce752289c4e481`. The plain listing to review is
 [feed-index.txt](feed-index.txt). Two fresh builds gave byte-identical output.
 

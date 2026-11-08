@@ -64,7 +64,7 @@ One unit, one SIM, one carrier. Current release: see the badge above; the full s
 | Slot A marked successful | ❌ deliberately not: success stays 0 so the fall-back to stock B remains (see [BOOT-FLOW](docs/BOOT-FLOW.md)) |
 | Temperature | ✅ about 40 °C idle on the SoC (stock 65 °C idle without a fan, 46 °C with the 12 V fan) |
 | SMS and voice | 🗓️ worked on the stock-firmware overlay (voice blocked by the SIM); not yet on the native image |
-| `opkg` and LuCI Software with a signed feed for this device line | ✅ 205 of the 976 official kernel packages install (180 stubs and 25 built for this kernel), the rest are refused cleanly; modules load at boot: [Package feed](#package-feed-opkg) |
+| `opkg` and LuCI Software with a signed feed for this device line | ✅ 208 of the 976 official kernel packages install (180 stubs and 28 built for this kernel, WireGuard and TPROXY among them), the rest are refused cleanly; modules load at boot: [Package feed](#package-feed-opkg) |
 | Recovery slot, sysupgrade, fan control, own kernel | 🗓️ planned, see the roadmap |
 
 Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**. The vendor modem
@@ -121,9 +121,9 @@ src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
 
 Images built with the current flasher already have this line and the signing key (`7fec994ab0d15b97`). On a running unit, replace the `x28` line in `/etc/opkg/customfeeds.conf` and run `opkg update`.
 
-- **What installs:** 205 of the 976 official kernel-module packages: 180 stubs for modules the kernel already has, and 25 packages that carry modules we built for it. That covers SQM with `sch_cake`, `tc-full` and traffic-control actions and filters, `veth`, `macvlan`, `bonding`, `nbd`, `ss`, the `iptables` hashlimit and IPsec matches, the IPv6 raw table and ChaCha20-Poly1305 for strongSwan. Built modules are loaded at boot by `x28-kmods` (images built from a current release; on an older image load them with `insmod`).
+- **What installs:** 208 of the 976 official kernel-module packages: 180 stubs for modules the kernel already has, and 28 packages that carry modules we built for it. That covers WireGuard and the TPROXY/socket modules (preinstalled in the image, reinstallable and updatable from the feed), SQM with `sch_cake`, `tc-full` and traffic-control actions and filters, `veth`, `macvlan`, `bonding`, `nbd`, `ss`, the `iptables` hashlimit and IPsec matches, the IPv6 raw table and ChaCha20-Poly1305 for strongSwan. Built modules are loaded at boot by `x28-kmods` (images built from a current release; on an older image load them with `insmod`).
 - **What is refused:** anything that needs a kernel the vendor image does not have (`nftables`/`firewall4`, `ksmbd`, Bluetooth, the Wi-Fi stack and similar) fails with a clear error instead of installing something that cannot load. LuCI itself is not affected.
-- **Trust:** the index is signed; `opkg` checks it. Tested with the image's own `opkg` against the published URL (118 checks) and on a unit, including a reboot.
+- **Trust:** the index is signed; `opkg` checks it. Tested with the image's own `opkg` against the published URL (132 checks) and on a unit, including a reboot.
 - **Scope:** valid for **the ZLT X28 line only** (MT6890, vendor kernel 4.19.205, OpenWrt 23.05.5 userspace), not for other devices or kernels.
 
 Coverage, limits, how a release is made and what is not tested: **[docs/PACKAGE-FEED.md](docs/PACKAGE-FEED.md)**; the evidence is in [TESTING](docs/TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08).

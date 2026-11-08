@@ -25,7 +25,7 @@ This feed makes `opkg` tell the truth about that kernel:
 |---|---|---|
 | `kernel` record | 1 | marks the running kernel as installed, so packages that need `kernel (= …)` resolve |
 | Stubs | 180 | empty `kmod-*` packages for modules the kernel already has (built in or shipped by the vendor), so userspace that depends on them installs |
-| Built modules | 25 | `kmod-*` packages that carry modules the vendor kernel lacks, built for it (version `1:4.19.205-x28-r1`) |
+| Built modules | 28 | `kmod-*` packages that carry modules the vendor kernel lacks, built for it (version `1:4.19.205-x28-r1`) |
 | Vendor ipset | 3 | `ipset`, `libipset13` and a marker, for the vendor kernel's ipset set types |
 
 A package that needs a kernel module the feed has neither stubbed nor built **fails to install with a clear error** instead
@@ -39,7 +39,8 @@ continues.
 
 Of the 976 official 23.05 kmods (see [the gap analysis](research/kmod-gap.md)):
 
-- **205** install: 180 stubs and 25 built modules. This includes SQM (`sqm-scripts`, `sch_cake`), `tc-full`, `veth`, `macvlan`,
+- **208** install: 180 stubs and 28 built modules. This includes WireGuard (`kmod-wireguard`) and the TPROXY/socket modules for
+  Passwall2 (`kmod-ipt-tproxy`, `kmod-ipt-socket`), which the image also preinstalls, SQM (`sqm-scripts`, `sch_cake`), `tc-full`, `veth`, `macvlan`,
   `bonding`, `nbd`, `usbip`, `ss` (netlink/raw diag), `iptables-mod-hashlimit`, `iptables-mod-ipsec`,
   the IPv6 raw table (`kmod-ipt-raw6`), ChaCha20-Poly1305 for strongSwan, flower/vlan/bpf traffic control, `dummy`, `uleds`, and the USB serial driver `cdc-acm`.
   **24 of the 27** kmods that some user package depends on are covered. The other three: `kmod-ipt-ipset` (covered by the vendor
@@ -47,8 +48,8 @@ Of the 976 official 23.05 kmods (see [the gap analysis](research/kmod-gap.md)):
   (skipped; needs a SCSI transport module for one niche package).
 - **About 190** more are buildable out of tree but not built, because no package depends on them (network and SATA drivers
   for hardware this SoC does not have). They can be added on request.
-- **581** need a kernel change or a backport, and stay refused: `nftables`/`firewall4`, `ksmbd`, DES-based IPsec,
-  Bluetooth, the Wi-Fi stack (`cfg80211`), namespaces, and similar. 74 user packages depend directly on one of them; the
+- **578** need a kernel change or a backport, and stay refused: `nftables`/`firewall4`, `ksmbd`, DES-based IPsec,
+  Bluetooth, the Wi-Fi stack (`cfg80211`), namespaces, and similar. the gap analysis, made before WireGuard and TPROXY became packages, counted 74 user packages that depend directly on one of them; the
   firewall stays `fw3` with iptables. Getting these means a new kernel, which is [#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)
   and a flash with brick risk.
 
@@ -81,8 +82,8 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
    unchanged Linux 4.19.205 files, 5 (`libchacha`, `libpoly1305`, `chacha_generic`, `poly1305_generic`, `chacha20poly1305`)
    from the SDK's own `crypto/` files, because the vendor kernel has the 5.x crypto library. Only built `.ko` files are
    published, never the SDK sources.
-2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 209-package feed. The result is reproducible: three fresh builds
-   were byte-identical.
+2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 212-package feed. The result is reproducible: fresh builds
+   are byte-identical.
 3. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
    listing in [feed-index.txt](research/feed-index.txt)), signs it with the offline key and verifies the signature.
    Signing on a Mac uses `tools/build/usign/`, a container built from the exact `usign`/`libubox` commits OpenWrt 23.05 uses.
@@ -97,8 +98,8 @@ The details, commands and the trust model are in [research/signed-package-feed.m
 
 Tested ([TESTING 46](TESTING.md#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08), [TESTING 45](TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
 
-- the image's own `opkg` in a container against the published URL with the key the image ships: 118 checks, 0 failures;
-- all 25 built packages install, their module files are byte-identical to the build, 8 real consumers install from the
+- the image's own `opkg` in a container against the published URL with the key the image ships: 132 checks, 0 failures;
+- all 28 built packages install, their module files are byte-identical to the build, 8 real consumers install from the
   official feeds, unsupported things stay refused, and the earlier hand-copied modules upgrade to the signed ones;
 - on the test unit, each module loaded and was exercised (traffic shaping, tc actions and filters, bonding, iptables
   matches, netlink/raw diag, AF_ALG sockets, the ChaCha20-Poly1305 RFC 7539 test vector).
