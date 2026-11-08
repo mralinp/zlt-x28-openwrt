@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs the x28-usign image so feed_release.py can sign on a Mac:
+#   PATH="$PWD/tools/build/usign:$PATH" python3 tools/build/feed_release.py ...
+# Every absolute path argument has its directory mounted at the same path; the container has no network.
+set -eu
+mounts=""
+for a in "$@"; do
+	case "$a" in
+	/*) d=$(dirname "$a")
+		[ -d "$d" ] || continue
+		case " $mounts " in *" -v $d:$d "*) ;; *) mounts="$mounts -v $d:$d" ;; esac ;;
+	esac
+done
+# shellcheck disable=SC2086
+exec docker run --rm --network none $mounts x28-usign:1 "$@"
