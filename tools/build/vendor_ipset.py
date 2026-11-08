@@ -92,12 +92,13 @@ def main():
     parser.add_argument('--stubs', type=Path, default=feed.STUBS, help='kmod stub list to include')
     parser.add_argument('--real', type=Path, default=feed.REAL, help='manifest of packages that carry our built modules')
     parser.add_argument('--x28-packages', action='store_true', help='also build the x28-* packages of package/x28-packages.ini (#417; not for the live feed before #418)')
+    parser.add_argument('--nrband', type=Path, help='the x28-nrband binary (tools/build/x28_nrband.sh): adds the x28-nrband package')
     parser.add_argument('--kmods', type=Path, help='directory with the built .ko files; without it only the stubs and ipset are built')
     args = parser.parse_args()
     modules = {Path(name).stem for name in args.modules.read_text().split()}
     build(args.upstream.read_bytes(), args.library.read_bytes(), modules, args.out, args.stubs.read_text().split(),
           feed.read_real(args.real, args.kmods) if args.kmods else (),
-          feed.read_packages() if args.x28_packages else ())
+          (feed.read_packages() if args.x28_packages else []) + ([feed.nrband_package(args.nrband)] if args.nrband else []))
     print('Local feed built; unsigned and not deployed:', args.out)
 
 

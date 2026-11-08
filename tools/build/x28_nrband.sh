@@ -12,6 +12,6 @@ trap 'rm -rf "$work"' EXIT
 cp "$lib" "$work/libmipc_msg.so"
 cp "$(dirname "$0")/../../package/x28-nrband/src/x28-nrband.c" "$work/"
 docker run --rm --platform linux/arm64 -v "$work:/w" -w /w alpine:3.19 sh -c \
-	'apk add --no-cache gcc musl-dev >/dev/null && gcc -O2 -Wall -o x28-nrband x28-nrband.c -L. -l:libmipc_msg.so -Wl,-rpath,/usr/lib'
+	'apk add --no-cache gcc musl-dev >/dev/null && gcc -O2 -Wall -s -Wl,--build-id=none -o x28-nrband x28-nrband.c -L. -l:libmipc_msg.so -Wl,-rpath,/usr/lib'
 cp "$work/x28-nrband" "$out/x28-nrband"
 echo "built $out/x28-nrband"
