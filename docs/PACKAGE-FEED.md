@@ -10,8 +10,8 @@ The feed is a normal signed `opkg` feed, published as the newest GitHub release 
 src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
 ```
 
-Images from the flasher carry the key; they still carry the older `feed-2` line until the flasher is updated (see
-"Using it" to switch). Signing key fingerprint:
+Images built with the flasher since mralinp/x28-flasher#72 carry this line and the key; older images carry the `feed-2`
+line (see "Using it" to switch). Signing key fingerprint:
 **`7fec994ab0d15b97`** (`package/x28-feed/files/x28-feed.pub`, installed as `/etc/opkg/keys/7fec994ab0d15b97`). `opkg`
 checks the signature; do not turn that off.
 
@@ -57,7 +57,7 @@ refused module.
 
 ## Using it
 
-On an image built from the flasher the key is already there. On a running unit:
+On an image built with the current flasher the line and the key are already there. On a running unit or an older image:
 
 ```sh
 # the key ships with images; check it
@@ -94,7 +94,7 @@ The details, commands and the trust model are in [research/signed-package-feed.m
 
 ## What has been tested, and what has not
 
-Tested ([TESTING 43](TESTING.md#43-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08), [TESTING 42](TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
+Tested ([TESTING 46](TESTING.md#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08), [TESTING 45](TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
 
 - the image's own `opkg` in a container against the published URL with the key the image ships: 118 checks, 0 failures;
 - all 25 built packages install, their module files are byte-identical to the build, 8 real consumers install from the

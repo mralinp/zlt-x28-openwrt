@@ -12,7 +12,7 @@ adapter. Preserve the working modem, board calibration and recoverability.
 
 ## Where it stands
 
-Release `v0.57.2`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+Release `v0.62.1`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
 is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
 **Working on that unit**
@@ -25,7 +25,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 205 of the 976 official `kmod-*`
-  packages install (180 stubs and 25 built for this kernel), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 42](TESTING.md), [TESTING 43](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
+  packages install (180 stubs and 25 built for this kernel), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 45](TESTING.md), [TESTING 46](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
@@ -52,7 +52,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - The vendor 4.19.205 kernel has no `nf_tables` (so fw3), no namespaces (so no `ujail`), and `CONFIG_MODVERSIONS`: the
   official feeds' kernel modules do not load, userspace packages do. `opkg` works through our signed
   [feed](PACKAGE-FEED.md): stubs for what the kernel has, built modules for what it lacks and can take, and a clear refusal for the
-  rest ([TESTING 36](TESTING.md), [TESTING 42](TESTING.md)).
+  rest ([TESTING 36](TESTING.md), [TESTING 45](TESTING.md)).
 
 ## Next
 

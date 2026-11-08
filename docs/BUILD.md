@@ -497,7 +497,7 @@ Userspace packages install from the official feeds, but their kmods need kernel 
 
 The official core feed stays enabled because it also carries packages such as `iptables-mod-*`. The stubs' version has an epoch (`1:4.19.205-x28`), so they outrank the 5.15 packages. A kmod with no stub still depends on the 5.15 `kernel`, so `opkg` refuses it instead of installing a module that can't load.
 
-- **List:** `package/x28-kmod-stubs/stubs.txt`, 178 of the core feed's 976 kmods. A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
+- **List:** `package/x28-kmod-stubs/stubs.txt`, 180 of the core feed's 976 kmods (feed-3 adds 25 packages with modules built for this kernel, see [PACKAGE-FEED](PACKAGE-FEED.md)). A kmod is listed only if all its modules, and those of its kmod dependencies, are on the unit or built in.
 - **Renames:** 4.19's `nf_log_common`, `nf_log_ipv4` and `nf_log_ipv6` count as 5.15's `nf_log_syslog`, and `ipt_MASQUERADE` and `ip6t_MASQUERADE` as `xt_MASQUERADE`.
 - **Incomplete packages are refused:** no stub for `kmod-ipt-ipset` (missing `ip_set_hash_ipmac`), `kmod-ipt-extra` (missing `xt_cgroup`) or `kmod-inet-diag` (missing `raw_diag`). Dependents are also excluded. `ipset` itself installs through the explicit vendor subset below; do not use `--nodeps` to hide a gap.
 - **Check:** `map` takes built-in modules from `modules.builtin` in the SDK tree. `verify` then confirms each one against the unit's own `/proc/config.gz` and `/sys/module`.
@@ -515,7 +515,7 @@ docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v "$P
 
 Tested on a unit: [test 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02).
 
-**Beta feed audit (2026-11-01, #200):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.
+**Beta feed audit (2026-11-01, #200; historical, written before the feed was published and since superseded by `feed-1`, `feed-2` and `feed-3`):** read-only live checks found no installed `kernel` package and the official 5.15 core feed still configured. The clock was correct, signature checking enabled and overlay had about 240 MiB free. No feed/key/package was changed on the device. The proposed feed remains unhosted and uninstalled; built-in coverage derived from the sibling SDK still needs corroboration before deployment.
 
 ### Explicit vendor-ipset subset (#200)
 
@@ -526,9 +526,9 @@ unavailable. This is a locally tested candidate, not a hosted feed or installed 
 
 ### Signed-feed release preparation (#200)
 
-The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed 182-package feed
+The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed feed (209 packages in `feed-3`)
 (stubs and vendor ipset), signs and verifies it locally, and stages an allowlisted release bundle. Its public
-key is checked in; its private key stays outside Git. It is hosted on the pre-releases `feed-1` and `feed-2`, and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
+key is checked in; its private key stays outside Git. It is hosted as release assets (`feed-1`, `feed-2`, and `feed-3` on the stable URL `https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download`, see [PACKAGE-FEED](PACKAGE-FEED.md)), and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
 
 ## VPN set and WireGuard in the image (#230)
 
@@ -539,7 +539,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
 
 - **OpenVPN:** `S90openvpn` is enabled; it starts only the tunnels enabled in `/etc/config/openvpn`. The OpenSSL build was
   chosen over mbed TLS for its download speed ([TESTING 37](TESTING.md)).
-- **L2TP and PPTP:** clients only, configured as LuCI interfaces. PPTP needs the `kmod-mppe` stub in `feed-2`.
+- **L2TP and PPTP:** clients only, configured as LuCI interfaces. PPTP needs the `kmod-mppe` stub in the feed (`feed-2` and later).
 - **WireGuard:** the vendor kernel has no WireGuard. Our module and the TPROXY set are built from the sources in
   [`package/x28-kmods`](../package/x28-kmods/README.md) against the private SDK tree, so the built modules never enter
   this repository, CI or a feed. Build them into `private/kmods` as that README shows; `first_boot.py --kmods
@@ -590,7 +590,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   traffic is not guarded. No restored settings are required; Passwall2 is still off until configured. See
   [behavior and limits](PASSWALL2.md#lan-kill-switch) and [test evidence](TESTING.md#40-passwall2-lan-kill-switch-with-direct-icmp-2026-11-02).
 
-The feed is now [`feed-2`](research/signed-package-feed.md). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
+The feed is now [`feed-3`](PACKAGE-FEED.md) (the CI build still takes the ipset packages from `feed-2`; they are the same files). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
 was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh`.
 
 ## Getting an image from the x28-flasher wizard (#285)

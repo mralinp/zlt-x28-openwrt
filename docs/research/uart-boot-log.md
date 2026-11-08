@@ -31,7 +31,7 @@ lines (numbers are line numbers in the raw capture) and was checked for MAC addr
   (refuse, fall back to the other slot, or only log). This is the question that gates a custom image.
 - Whether `ab_retry` counting makes a failed boot fall back to slot A. The log shows the retry counter at 0 after
   a good boot, nothing more.
-- Which pad of the 3-hole footprint in [RECOVERY.md](../RECOVERY.md#uart-debug-console-2-in-progress) carries
+- Which pad of the 3-hole footprint in [RECOVERY.md](../RECOVERY.md#uart-debug-console-2-read-side-confirmed) carries
   TX and what the logic level is. The capture worked through the owner's adapter and level shifting; those wiring
   details were not recorded in this session and should be added when known.
 

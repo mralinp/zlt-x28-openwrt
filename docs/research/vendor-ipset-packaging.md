@@ -2,6 +2,8 @@
 
 ## Result and scope
 
+**2026-11-08: shipped.** These packages are in `feed-2` and `feed-3` ([PACKAGE-FEED](../PACKAGE-FEED.md)); `ipset` installs with the image's opkg against the published URL ([test 45](../TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). The text below is the original note.
+
 **2026-11-01: local candidate only.** Clean dependency resolution works in the image's real `opkg`
 in a disposable arm64 container. No router packages, keys, feeds, firewall state or firmware were changed.
 This follows #206's removal of incomplete official-aggregate stubs.

@@ -10,6 +10,9 @@ milestones below, written by hand, and the full per-release list at the bottom, 
   instead of loose userspace, manifest and overlay assets; the modules are published as release `kmods-4.19.205`.
   The x28-flasher must switch to the bundle (#352).
 - Docs audited and aligned with v0.57; changelog milestone for v0.39 – v0.57 (#359).
+- The X28 opkg feed is now `feed-3` on a stable URL (`https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download`): 209 signed packages, including 25 that carry kernel modules built for the vendor kernel (traffic shaping and SQM, `veth`, `macvlan`, `bonding`, `nbd`, ChaCha20-Poly1305, and more). `x28-kmods` loads 51 modules at boot. The flasher writes the new URL. See `docs/PACKAGE-FEED.md` (#394 to #398).
+- Firmware releases are created with `--latest=false`, so the feed release stays the repository's "latest" (#406).
+- Docs audited and aligned with the package feed and v0.62: stale feed statements fixed, the TESTING numbering corrected (sections 45 and 46), the research notes listed in `docs/README.md`.
 
 ## Milestones
 

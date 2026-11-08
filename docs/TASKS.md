@@ -1,6 +1,6 @@
 # Tasks — native OpenWrt on the ZLT X28
 
-Status as of 2026-11-07 (release `v0.57.2`; the checklist below was last ticked at v0.22, see STATUS and the changelog for later work). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
+Status as of 2026-11-08 (release `v0.62.1`; the checklist below was last ticked at v0.22, see STATUS and the changelog for later work). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
 stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list is the overview.
 
 ## A. Hardware boundary
@@ -54,7 +54,8 @@ stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list 
 
 - [ ] Fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)).
 - [ ] Local SMS and voice on the native image (worked on the stock overlay; voice blocked by the SIM).
-- [ ] Own 4.19 kernel and kmod feed from a sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)); not tried yet.
+- [x] A signed opkg feed with kernel modules built for the vendor 4.19.205 kernel ([PACKAGE-FEED](PACKAGE-FEED.md)).
+- [ ] Own 4.19 kernel from a sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)); not tried yet.
 - [ ] WireGuard/OpenVPN/proxy dependencies matching the kernel, and selective routing.
 
 ## Known open questions

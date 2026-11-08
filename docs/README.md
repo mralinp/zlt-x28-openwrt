@@ -55,12 +55,49 @@ docs/
 └── (stock-firmware overlay, historical) vendor-command-map.md, luci-on-stock.md, luci-fix-notes.md
 ```
 
+## More research notes and archive
+
+Older analysis and plans, kept for the evidence behind decisions in the documents above. Each is a point-in-time note; the numbered documents are the current state.
+
+### Research
+
+- [`research/changed-data-restore-plan.md`](research/changed-data-restore-plan.md): Changed-data restore: offline proposal (#62)
+- [`research/changed-page-restore-result.md`](research/changed-page-restore-result.md): Changed-page restoration: hardware PASS (#72)
+- [`research/content-enforcement.md`](research/content-enforcement.md): Does anything check rootfs content against the signed digest? (#91)
+- [`research/first-write-plan.md`](research/first-write-plan.md): First inactive-slot write: review plan, not execution approval (#57)
+- [`research/flash-other-units.md`](research/flash-other-units.md): Flashing a unit other than the first one, with no UART and no SSH (#318)
+- [`research/gpl-source-request.md`](research/gpl-source-request.md): GPL source request to ZLT/Tozed (#18)
+- [`research/live-native-boot-prerequisites.md`](research/live-native-boot-prerequisites.md): Live native-boot prerequisites (#84)
+- [`research/lk-authentication-ghidra.md`](research/lk-authentication-ghidra.md): LK authentication paths in Ghidra (#207)
+- [`research/lk-boot-auth-preview.md`](research/lk-boot-auth-preview.md): LK boot/recovery authentication: local Ghidra preview (#211)
+- [`research/misc-probe-plan.md`](research/misc-probe-plan.md): Plan: learn how the preloader reads `misc` without ever selecting A (check 3)
+- [`research/native-image-completeness.md`](research/native-image-completeness.md): Native image completeness (#89)
+- [`research/native-image-readiness.md`](research/native-image-readiness.md): Native-image input and boot audit (#74)
+- [`research/operator-lock.md`](research/operator-lock.md): The stock firmware's operator (SIM) lock
+- [`research/overlay-policy.md`](research/overlay-policy.md): Overlay (`rootfs_data`) policy for the native image (#88)
+- [`research/patched-identical-write-result.md`](research/patched-identical-write-result.md): Patched identical-write result (#70)
+- [`research/recovery-route-proof.md`](research/recovery-route-proof.md): Proving the way back before the first write (gate 6)
+- [`research/rootfs-a-write-plan.md`](research/rootfs-a-write-plan.md): First native image: write, select, recover (plan for #90)
+- [`research/rootfs-signed-content.md`](research/rootfs-signed-content.md): What LK authenticates, and the device-test gate (#40)
+- [`research/slot-selection.md`](research/slot-selection.md): Selecting slot A and getting back to B (#92)
+- [`research/uart-boot-log.md`](research/uart-boot-log.md): UART boot log: slot choice and signature checks
+- [`research/x28-hardware-architecture.md`](research/x28-hardware-architecture.md): X28 hardware architecture
+- [`research/x28-mainline-kernel-feasibility.md`](research/x28-mainline-kernel-feasibility.md): X28 mainline kernel feasibility
+- [`research/x28-mainline-roadmap.md`](research/x28-mainline-roadmap.md): X28 mainline roadmap
+- [`research/x28-modem-driver-analysis.md`](research/x28-modem-driver-analysis.md): X28 modem driver analysis
+
+### Archive (superseded)
+
+- [`archive/2026-10-20-PROJECT-PLAN.md`](archive/2026-10-20-PROJECT-PLAN.md): ZLT X28: custom OpenWrt project plan
+- [`archive/2026-10-20-README.md`](archive/2026-10-20-README.md): ZLT X28 OpenWrt
+- [`archive/2026-10-21-STATUS.md`](archive/2026-10-21-STATUS.md): Project status — 2026-10-21
+
 ## Code map
 
 | Path | What |
 |---|---|
 | `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter) |
-| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
+| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `usign/` (signing image), `opkg_real_test.sh`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
 | (moved) | the backup, USB and guarded flash tools live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/`, `tools/x28-flasher/`) |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |

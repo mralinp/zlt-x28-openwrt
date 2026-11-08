@@ -103,8 +103,8 @@ everyday recovery no longer needs the download agent and a UART. The download-ag
 4. **Publish.** A stable tagged release, build documentation for other owners, and a device page for the OpenWrt
    wiki. The vendor modem blobs cannot be redistributed, so this ships the tooling and packages, not a ready image.
 5. **Later.** Fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), SMS and voice on the
-   native image, and an own 4.19 kernel and kmod feed from a sibling-device SDK
-   ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130); not tried yet).
+   native image, and an own 4.19 kernel from a sibling-device SDK
+   ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130); not tried yet). The kmod feed for the vendor kernel is done: [PACKAGE-FEED](PACKAGE-FEED.md).
 
 ## Risks
 

@@ -1,5 +1,7 @@
 # Signed package feed (#200)
 
+**Current: `feed-3` (2026-11-08), 209 packages on a stable URL: see the last section and [PACKAGE-FEED](../PACKAGE-FEED.md).** The text up to "Hosting of feed-1 and feed-2" describes the first two feeds (182 and 189 packages).
+
 **2026-11-02: published and working on the unit ([test 36](../TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)).** The feed holds 182 packages: the `kernel`
 record, 178 kmod stubs and the vendor-ipset set from PR #217. A feed with only the ipset packages would
 still refuse everything else that needs a kmod, such as the 28 official packages that need `kmod-tun`.
@@ -59,7 +61,7 @@ usign signed and verified the staged feed, and every checksum passed. The image'
 arm64 container passes `opkg_feed_test.sh` (21 checks) and `vendor_ipset_test.sh` (5 groups) against this feed.
 No key bytes were printed. Current staged bundle: `private/research/200-signed-feed/release-3/`.
 
-## Hosting
+## Hosting of feed-1 and feed-2 (earlier feeds)
 
 **`feed-2`** (2026-11-02, 189 assets) adds `kmod-mppe` and `kmod-crypto-arc4` stubs, so PPTP installs (#228). Images
 from #230 use it. `feed-1` stays published for older images.
@@ -85,7 +87,7 @@ limits remain; signing does not add kernel features or make the full official ag
 
 ## feed-3: the stable-URL feed (#396)
 
-**2026-11-08: published and working on the unit** ([test 42](../TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
+**2026-11-08: published and working on the unit** ([test 45](../TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
 The feed holds 209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built modules (`1:4.19.205-x28-r1`)
 and the 3 vendor ipset packages. `feed_release.py` pins its index:
 `INDEX_SHA256 = 1da26cdcc8c1c5fb4a8029767b30895573639d103a0ccb7c95d5c56ccea5a270`. The plain listing to review is
@@ -135,5 +137,5 @@ with its release key `b5043e70f9a75cde`, and `feed-2` verifies with our key `7fe
 assets were compared with the local ones by name, size and SHA-256 (214 of 214), then the published URL was checked from outside
 (`Packages` equals the pin, the signature verifies, a downloaded package matches the index).
 
-Loading all the modules at boot through `x28-kmods` is tested ([test 43](../TESTING.md#43-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08)).
-**Still open:** the flasher (`first_boot.py` in mralinp/x28-flasher) still writes the `feed-2` line into new images.
+Loading all the modules at boot through `x28-kmods` is tested ([test 46](../TESTING.md#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08)).
+The flasher (`first_boot.py` in mralinp/x28-flasher) writes the stable URL into new images since mralinp/x28-flasher#72.

@@ -19,18 +19,12 @@ name a single protocol.
 > **Your device, your risk.** Only do this on a router you own. A wrong file in
 > `/usr/lib/lua` can lock you out of the web UI, and a wrong network change can cut
 > your only connection. Everything here was done on a live router; every script keeps
-> backups. Read the [limitations](#limitations) before pressing *Save & Apply*.
+> backups. Read the limitations before pressing *Save & Apply*.
 
 ## Contents
 
 - [What you get](#what-you-get)
 - [The story, step by step](#the-story-step-by-step)
-- [Install](#install)
-- [What we changed and why](#what-we-changed-and-why)
-- [Limitations](#limitations)
-- [Troubleshooting](#troubleshooting)
-- [Repo layout](#repo-layout)
-- [Credits](#credits)
 
 ## What you get
 
@@ -38,7 +32,7 @@ name a single protocol.
 |---|---|
 | Status → Overview, Firewall, Routes, System Log, Kernel Log, Processes, Realtime (Load, Traffic, Connections) | Working |
 | System → System, Password, SSH-Keys, SSH Access, Startup, Scheduled Tasks, LEDs, Backup/Flash, Reboot | Working |
-| Network → Interfaces | Shows the real protocols (Quectel MIPC Cellular, DHCPv6, Static). **Display only**, see [limitations](#limitations) |
+| Network → Interfaces | Shows the real protocols (Quectel MIPC Cellular, DHCPv6, Static). **Display only**, see limitations |
 | Network → DHCP and DNS, Hostnames, Static Routes, Diagnostics | Render |
 | Network → Firewall (Zones, Port Forwards, Traffic Rules, NAT, Custom Rules) | Render |
 | MTK → WiFi, Multi-AP, Web Console | Working (vendor pages, unchanged) |

@@ -7,7 +7,7 @@
 
 # X28 OpenWrt
 
-**A native OpenWrt 23.05 for the ZLT X28 5G CPE, with WireGuard, OpenVPN, L2TP, PPTP and Passwall2 built in: recovery-first, built in the open, running on a real unit.**
+**A native OpenWrt 23.05 for the ZLT X28 5G CPE, with WireGuard, OpenVPN, L2TP, PPTP and Passwall2 built in and a signed `opkg` package feed built for its kernel: recovery-first, built in the open, running on a real unit.**
 
 [![Release](https://img.shields.io/github/v/release/mralinp/zlt-x28-openwrt?include_prereleases&label=release)](https://github.com/mralinp/zlt-x28-openwrt/releases)
 [![Release workflow](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/release.yml/badge.svg)](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/release.yml)
@@ -17,7 +17,7 @@
 ![Status](https://img.shields.io/badge/status-beta%20%C2%B7%20pre--release-yellow)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-[Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
+[Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Package feed](#package-feed-opkg) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
 
 </div>
 
@@ -39,7 +39,7 @@
 
 The ZLT X28 (MediaTek MT6890/T750, Quectel RG500L modem) ships a locked-down OpenWrt 19.07 with a vendor web
 UI. This project puts a **normal OpenWrt** on it: stock LuCI and UCI, netifd, standard DHCP and firewall,
-**VPN clients and Passwall2 that work on the vendor kernel**, a cooler box, and local SMS/voice for AI projects, **without losing the ability to recover the unit**. So it goes
+**VPN clients and Passwall2 that work on the vendor kernel**, **a package manager that works** (a signed `opkg` feed with kernel modules built for it), a cooler box, and local SMS/voice for AI projects, **without losing the ability to recover the unit**. So it goes
 recovery first: back up everything, prove a way back, then build and flash.
 
 ## Status
@@ -64,7 +64,7 @@ One unit, one SIM, one carrier. Current release: see the badge above; the full s
 | Slot A marked successful | ❌ deliberately not: success stays 0 so the fall-back to stock B remains (see [BOOT-FLOW](docs/BOOT-FLOW.md)) |
 | Temperature | ✅ about 40 °C idle on the SoC (stock 65 °C idle without a fan, 46 °C with the 12 V fan) |
 | SMS and voice | 🗓️ worked on the stock-firmware overlay (voice blocked by the SIM); not yet on the native image |
-| `opkg` with a signed feed for this device line | ✅ 205 of the 976 official kernel packages install (built for this kernel), the rest are refused cleanly: [PACKAGE-FEED](docs/PACKAGE-FEED.md) |
+| `opkg` and LuCI Software with a signed feed for this device line | ✅ 205 of the 976 official kernel packages install (180 stubs and 25 built for this kernel), the rest are refused cleanly; modules load at boot: [Package feed](#package-feed-opkg) |
 | Recovery slot, sysupgrade, fan control, own kernel | 🗓️ planned, see the roadmap |
 
 Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**. The vendor modem
@@ -110,6 +110,23 @@ peer, so the carrier and the far server are out of the picture:
 
 Not yet measured: LAN clients forwarded through each tunnel, L2TP and PPTP against a server, the Passwall2 ceiling
 itself, the tuning ideas, and WireGuard over hours.
+
+## Package feed (opkg)
+
+The vendor kernel is 4.19.205 and the official OpenWrt kernel modules (`kmod-*`) are built for 5.15, so on this device they can never load. This project publishes a **signed `opkg` feed built for this kernel**, so `opkg`, LuCI's *Software* page and the packages that depend on kernel modules behave:
+
+```text
+src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
+```
+
+Images built with the current flasher already have this line and the signing key (`7fec994ab0d15b97`). On a running unit, replace the `x28` line in `/etc/opkg/customfeeds.conf` and run `opkg update`.
+
+- **What installs:** 205 of the 976 official kernel-module packages: 180 stubs for modules the kernel already has, and 25 packages that carry modules we built for it. That covers SQM with `sch_cake`, `tc-full` and traffic-control actions and filters, `veth`, `macvlan`, `bonding`, `nbd`, `ss`, the `iptables` hashlimit and IPsec matches, the IPv6 raw table and ChaCha20-Poly1305 for strongSwan. Built modules are loaded at boot by `x28-kmods` (images built from a current release; on an older image load them with `insmod`).
+- **What is refused:** anything that needs a kernel the vendor image does not have (`nftables`/`firewall4`, `ksmbd`, Bluetooth, the Wi-Fi stack and similar) fails with a clear error instead of installing something that cannot load. LuCI itself is not affected.
+- **Trust:** the index is signed; `opkg` checks it. Tested with the image's own `opkg` against the published URL (118 checks) and on a unit, including a reboot.
+- **Scope:** valid for **the ZLT X28 line only** (MT6890, vendor kernel 4.19.205, OpenWrt 23.05.5 userspace), not for other devices or kernels.
+
+Coverage, limits, how a release is made and what is not tested: **[docs/PACKAGE-FEED.md](docs/PACKAGE-FEED.md)**; the evidence is in [TESTING](docs/TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08).
 
 ## Roadmap to a stable release
 

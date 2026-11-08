@@ -58,6 +58,8 @@ Conventions:
 | 42 | Boot slot switched to B on the X28 PRO unit: the two priority bytes swapped in the four `misc` copies with `dd-nand` | 2026-11-07 | ✅ written and read back, 8 bytes of the 1 MiB differ; the unit then booted slot B (vendor firmware, key-only SSH on 2222 answered). A USB block write to `misc` was refused again (first block not acknowledged, agent silent afterwards) | [slot-selection](research/slot-selection.md) |
 | 43 | DHCP at boot on the X28 PRO unit with `x28-dhcp` (installed by hand on the unit) | 2026-11-07 | ✅ the guard restarted `dnsmasq` 25 s after boot (`x28-dhcp: dnsmasq has no DHCP range for lan; restarting it (1 of 3)`) and the range was served at 34 s, with no manual bridge restart; before it, DHCP stayed dead until the bridge was restarted | [BUILD](BUILD.md) |
 | 44 | 5 GHz on the X28 PRO unit with the two-chip capability keys (applied to the Wi-Fi templates by hand on the unit) | 2026-11-07 | ✅ after a reboot `rai0` is on channel 36, the chip reports 64 °C and there are no `FWCmdTimeout` lines (before: temperature 0, 20 timeouts over 30 s, a coredump); the vendor firmware on slot B uses the same keys | [BUILD](BUILD.md) |
+| 45 | X28 feed-3 with the image's opkg and on the unit | 2026-11-08 | ✅ 118 checks, 0 failures against the published URL; the unit upgraded its 25 hand-copied modules to the signed `-r1` packages: [section 45](#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08) |
+| 46 | `x28-kmods` loads the whole module list at boot | 2026-11-08 | ✅ after a real reboot 51 of 51 modules loaded at 30 s of kernel time, the marker cleared and the boot tries returned to `00`; the retry limit refuses with a forced marker: [section 46](#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -550,7 +552,7 @@ node and the second router's Wi-Fi share what is left.
 
 **Not verified:** a client wired straight to the X28, and a link fast enough to reach the CPU ceiling.
 
-## 42. X28 feed-3 with opkg and on the unit (2026-11-08)
+## 45. X28 feed-3 with opkg and on the unit (2026-11-08)
 
 - **Question**: does the published, signed feed (209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built
   modules, 3 vendor ipset) work with the image's own `opkg`, and does it replace the modules copied to the unit by hand?
@@ -584,11 +586,11 @@ filters, bonding, iptables matches, `ss` through netlink and raw diag, AF_ALG so
 `spidev`, `cdc-acm` and USB/IP against real servers or hardware; a real IPsec tunnel with ChaCha20-Poly1305; `sch_multiq`
 and the `text` ematch (not exercised by the available tools).
 
-## 43. x28-kmods loads the whole module list at boot (2026-11-08)
+## 46. x28-kmods loads the whole module list at boot (2026-11-08)
 
 - **Question**: with the 25 packages from the feed installed, does `x28-kmods` load all 51 modules of its list (the 8 of the image and
   our 43) by itself after a reboot, without harm, and does its safety net hold?
-- **Setup**: the test unit (slot A, kernel 4.19.205, the 25 packages at `1:4.19.205-x28-r1` from [test 42](#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)).
+- **Setup**: the test unit (slot A, kernel 4.19.205, the 25 packages at `1:4.19.205-x28-r1` from [test 45](#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)).
   The unit's image has the older script (8 modules), so the new `package/x28-kmods/files/x28-kmods.init` from `main` was copied
   to `/etc/init.d/x28-kmods` (the old one saved in `/root/`). Slot A boot tries `00 00 00 00` and no marker before each phase.
 
