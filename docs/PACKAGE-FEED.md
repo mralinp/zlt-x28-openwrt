@@ -109,7 +109,7 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
    unchanged Linux 4.19.205 files, 5 (`libchacha`, `libpoly1305`, `chacha_generic`, `poly1305_generic`, `chacha20poly1305`)
    from the SDK's own `crypto/` files, because the vendor kernel has the 5.x crypto library. Only built `.ko` files are
    published, never the SDK sources.
-2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 213-package feed. The result is reproducible: fresh builds
+2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 222-package feed. The result is reproducible: fresh builds
    are byte-identical.
 3. Before signing, `python3 tools/build/release_check.py compare --index FEED_DIR/Packages DIR` proves the feed holds the same bytes as the
    ipks the image assembly uses (the x28-* packages CI builds and the pinned module ipks), and flags a changed file with an unchanged version.

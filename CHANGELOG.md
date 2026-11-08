@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- The next feed revision (222 packages, with the x28-* packages and `x28-base`) is pinned in `feed_release.py` and listed for review; it checks equal to the release ipks. Not yet signed or published (#423).
 - Docs: the package model (required, preinstalled-optional, on demand), the update policy and rollback (#422).
 - One set of ipks per release for the image and the signed feed (#419): CI builds the x28-* packages, the module ipks come from the
   feed release by pinned hash, `tools/build/release_check.py compare` proves a feed revision holds the same bytes, and the

@@ -1,11 +1,11 @@
-# X28 feed index review. Packages sha256 54d545546b82ac1fa1f073336a947a05283df4df6c3e46a49bf19fbff42d51a1
-# 213 packages: kernel, 180 stubs, 29 built packages (-r2), 3 vendor ipset.
+# X28 feed index review. Packages sha256 2935ebb80ad7ed8361587b785459e0dce6e9e167f59b69e44ae9c805cb6948d6
+# 222 packages: kernel, 180 stubs, 38 built packages, 3 vendor ipset.
 # columns: package, version, architecture, size (the ipk), sha256 (first 16 hex), depends
 
 ## kernel record
 kernel                             1:4.19.205-x28       all                 425  336b75fff89439c5  -
 
-## built packages (29): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader
+## built packages (38): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader, the x28-* packages are the userspace
 kmod-bonding                       1:4.19.205-x28-r2    aarch64_generic   81688  114a7f14a98d4892  kernel (= 1:4.19.205-x28)
 kmod-crypto-chacha20poly1305       1:4.19.205-x28-r2    aarch64_generic   11269  1f470d4482fe4376  kernel (= 1:4.19.205-x28), kmod-crypto-aead, kmod-crypto-manager
 kmod-crypto-user                   1:4.19.205-x28-r2    aarch64_generic    6934  93bbb978bf42fccb  kernel (= 1:4.19.205-x28), kmod-crypto-hash, kmod-crypto-manager
@@ -34,7 +34,16 @@ kmod-usb-ledtrig-usbport           1:4.19.205-x28-r2    aarch64_generic    4201 
 kmod-usbip                         1:4.19.205-x28-r2    aarch64_generic   14492  b4c077d88f2883a9  kernel (= 1:4.19.205-x28), kmod-usb-core
 kmod-veth                          1:4.19.205-x28-r2    aarch64_generic    9929  ce922e4a82d9a70c  kernel (= 1:4.19.205-x28)
 kmod-wireguard                     1:4.19.205-x28-r2    aarch64_generic   72724  ee58ec86f0ea632c  kernel (= 1:4.19.205-x28)
+luci-proto-x28-mipc                0.1.0-1              all                5447  b5ac254e4a2be36e  luci-base, x28-mipc
+x28-base                           0.1.0-1              all                 602  fb6c8dcc8fd95ece  kernel, x28-kmods, x28-storage, x28-bootok, x28-dhcp, x28-leds, x28-modem, x28-mipc, luci-proto-x28-mipc, x28-wifi
+x28-bootok                         0.1.0-1              all                2088  cfd2f62a6717a9d8  dropbear
+x28-dhcp                           0.1.0-1              all                1781  32c5adaa1188985a  dnsmasq
 x28-kmods                          1:4.19.205-x28-r2    all                2739  b360a8462652ad66  kernel (= 1:4.19.205-x28)
+x28-leds                           0.1.0-1              all                2598  33c87993bc2bdb42  jsonfilter
+x28-mipc                           0.1.0-1              all               11865  be0c123219492a6b  netifd, jshn
+x28-modem                          0.1.0-1              all                2811  538373b7b1b40cbd  x28-mipc
+x28-storage                        0.1.0-1              all                2186  4dca2f1f45c80f88  -
+x28-wifi                           0.1.0-1              all                7474  377605f5d9fea62c  netifd
 
 ## vendor ipset (3)
 ipset                              1:7.17-1-x28-1       aarch64_generic    2406  7c85703a8d3764f2  libc, x28-ipset-kernel (= 1:4.19.205-x28), libmnl0, libipset13 (= 1:7.17-1-x28-1)

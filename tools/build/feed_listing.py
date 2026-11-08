@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Write the plain listing of a built feed, for review before it is pinned and signed (docs/research/feed-index.txt).
 
-  feed_listing.py --feed DIR --out FILE [--vendor ipset libipset13 x28-ipset-kernel]
+  feed_listing.py --feed DIR --out FILE
 
-Groups: the kernel record, packages we build (modules and the loader, version `-rN`), the vendor ipset packages, and the stubs.
+Groups: the kernel record, packages we build (modules, the loader and the x28-* packages), the vendor ipset packages, and the stubs.
 """
 import argparse
 import hashlib
@@ -12,23 +12,24 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import kmod_stub_feed as ks  # noqa: E402
+import release_check  # noqa: E402
 
 
 def listing(feed):
     raw = (feed / 'Packages').read_bytes()
     idx = ks.parse_index(raw.decode() + '\n')
     vendor = ['ipset', 'libipset13', 'x28-ipset-kernel']
-    built = sorted(n for n, p in idx.items() if '-r' in p['Version'].split(ks.KERNEL)[-1])  # our modules and the loader
+    built = sorted(n for n in idx if n in release_check.ours())  # the module packages, the loader and the x28-* packages
     stubs = sorted(n for n in idx if n not in built and n not in vendor and n != 'kernel')
 
     def row(n):
         p = idx[n]
         return f"{n:34} {p['Version']:20} {p['Architecture']:16} {int(p['Size']):>6}  {p['SHA256sum'][:16]}  {p.get('Depends', '-')}"
     out = [f'# X28 feed index review. Packages sha256 {hashlib.sha256(raw).hexdigest()}',
-           f'# {len(idx)} packages: kernel, {len(stubs)} stubs, {len(built)} built packages (-r{ks.REV}), {len(vendor)} vendor ipset.',
+           f'# {len(idx)} packages: kernel, {len(stubs)} stubs, {len(built)} built packages, {len(vendor)} vendor ipset.',
            '# columns: package, version, architecture, size (the ipk), sha256 (first 16 hex), depends', '',
            '## kernel record', row('kernel'), '',
-           f'## built packages ({len(built)}): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader']
+           f'## built packages ({len(built)}): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader, the x28-* packages are the userspace']
     out += [row(n) for n in built]
     out += ['', f'## vendor ipset ({len(vendor)})'] + [row(n) for n in vendor]
     out += ['', f'## stubs ({len(stubs)}): empty packages for modules the kernel already has'] + [row(n) for n in stubs]

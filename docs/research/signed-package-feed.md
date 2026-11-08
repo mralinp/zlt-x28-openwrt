@@ -90,7 +90,7 @@ limits remain; signing does not add kernel features or make the full official ag
 **2026-11-08: published and working on the unit** ([test 45](../TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
 The published feed holds 213 packages: the `kernel` record, 180 stubs, 29 packages we build (28 that carry modules plus the
 `x28-kmods` loader, `1:4.19.205-x28-r2`) and the 3 vendor ipset packages. `feed_release.py` pins its index (earlier pins are in git
-history): `INDEX_SHA256 = 54d545546b82ac1fa1f073336a947a05283df4df6c3e46a49bf19fbff42d51a1`. The plain listing to review is
+history): `INDEX_SHA256 = 54d545546b82ac1fa1f073336a947a05283df4df6c3e46a49bf19fbff42d51a1`. The next revision (#423, 222 packages: the same plus the nine x28-* packages and `x28-base`) is pinned in the script and listed in [feed-index.txt](feed-index.txt) but not published until it is signed; the published feed is still the 213 packages above. The plain listing to review is
 [feed-index.txt](feed-index.txt). Two fresh builds gave byte-identical output.
 
 **Stable URL.** The feed is a normal release marked *latest*, so images and units configure one line, ever:
