@@ -82,3 +82,32 @@ in their iCloud Drive; a test restore matched. `first_boot.py` puts this URL and
 
 **Still unverified:** ipset set types and the kernel features behind the stubs. The vendor feature
 limits remain; signing does not add kernel features or make the full official aggregate compatible.
+
+## feed-3: the stable-URL feed (#396)
+
+**Pinned and reviewed, not yet signed or published.** `feed_release.py` pins the index of 209 packages:
+`INDEX_SHA256 = 1da26cdcc8c1c5fb4a8029767b30895573639d103a0ccb7c95d5c56ccea5a270`. The plain listing to review is
+[feed-3-index.txt](feed-3-index.txt): the `kernel` record, 180 stubs, 25 packages that carry our built modules
+(`1:4.19.205-x28-r1`) and the 3 vendor ipset packages. Three fresh builds gave byte-identical output.
+
+Rebuild it (needs the built modules in `private/kmods-395/feed`, the inputs of the vendor-ipset doc, and the SDK volume for the modules):
+
+```sh
+python3 tools/build/vendor_ipset.py --upstream private/research/200-ipset/upstream.ipk \
+  --library private/research/200-ipset/upstream-libipset13.ipk \
+  --modules private/research/200-ipset/running-module-files.txt \
+  --out private/feed-396b --kmods private/kmods-395/feed
+shasum -a 256 private/feed-396b/Packages     # must equal INDEX_SHA256
+```
+
+Stable URL: the feed is published as a normal release marked latest, so images and units configure it once:
+
+```text
+src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
+```
+
+Each new feed revision is a new release (`feed-4`, ...) created with `--latest`; the old ones stay as snapshots. Firmware
+releases are created with `--latest=false` (`release.yml`), so they never take that slot.
+
+**Still to do:** signing (needs a Linux `usign`; this Mac has none, and the earlier tests used the image's binary), the container
+test with the image's opkg, the draft release (one asset at a time) and the `first_boot.py` change in the flasher repo.
