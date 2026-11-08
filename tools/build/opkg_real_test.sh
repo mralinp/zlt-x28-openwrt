@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test the whole feed (stubs, vendor ipset and the packages that carry our built modules) with the image's real opkg in a
 # throwaway chroot, official feeds on (#396). Signs with a temporary key. Needs network. Runs on an arm64 host, nothing on
-# the router:
+# the router. With -e FEED_URL=... it tests a published feed with the key the image ships instead (no /feed mount, no
+# temporary key).
 #
 #   docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v KMODS_DIR:/kmods:ro \
 #     -v OLD_DIR:/old:ro -v "$PWD/package/x28-kmod-stubs/real.txt:/real.txt:ro" -v "$PWD/tools/build:/t:ro" \
@@ -31,17 +32,23 @@ check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: got '$2
 inst() { opkg list-installed | grep -c "^$1 "; }
 try() { opkg install "$@" >/tmp/o 2>&1 </dev/null; echo $?; }
 
-usign -G -s /k.sec -p /k.pub && cp /k.pub "/etc/opkg/keys/$(usign -F -p /k.pub)"
-usign -S -m /feed/Packages -s /k.sec -x /feed/Packages.sig
 sed -i '/passwall/d' /etc/opkg/distfeeds.conf /etc/opkg/customfeeds.conf
 # The image already has an x28 line (feed-2); a second one with the same name is skipped, so replace it.
 sed -i '/^src\/gz x28 /d' /etc/opkg/customfeeds.conf
-echo 'src/gz x28 file:///feed' >> /etc/opkg/customfeeds.conf
+if [ -n "${FEED_URL:-}" ]; then
+	# Live feed: the key the image ships must be the one that signed it, so no temporary key.
+	echo "src/gz x28 $FEED_URL" >> /etc/opkg/customfeeds.conf
+	check "the image ships the feed key" "$(ls /etc/opkg/keys | grep -c '^7fec994ab0d15b97$')" 1
+else
+	usign -G -s /k.sec -p /k.pub && cp /k.pub "/etc/opkg/keys/$(usign -F -p /k.pub)"
+	usign -S -m /feed/Packages -s /k.sec -x /feed/Packages.sig
+	echo 'src/gz x28 file:///feed' >> /etc/opkg/customfeeds.conf
+fi
 grep -c '^src/gz x28 ' /etc/opkg/customfeeds.conf /etc/opkg/distfeeds.conf | tr '\n' ' '; echo
 opkg update >/tmp/o 2>&1
 check "feed update succeeds" $? 0
 check "the feed's signature verifies" "$(grep -c 'Signature check failed' /tmp/o)" 0
-check "the index lists 209 packages" "$(grep -c '^Package:' /feed/Packages)" 209
+check "the index lists 209 packages" "$(zcat /var/opkg-lists/x28 | grep -c '^Package:')" 209
 
 echo "--- each package that carries our modules"
 while read -r line; do
