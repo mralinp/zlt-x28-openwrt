@@ -164,7 +164,7 @@ def stub(name, depends, description, files=(), arch='all', scripts=(), version=V
         ('Package', name), ('Version', version), ('Depends', depends), ('Section', 'kernel'), ('Architecture', arch),
         ('Installed-Size', str(sum(len(f[1]) for f in files))), ('Description', description)) if v)
     ipk = tar_gz([('./debian-binary', b'2.0\n'), ('./data.tar.gz', tar_gz(list(files), dirs=True)),
-                  ('./control.tar.gz', tar_gz([('./control', control.encode())] + [('./' + n, d, 0o755) for n, d in scripts]))])
+                  ('./control.tar.gz', tar_gz([('./control', control.encode())] + [('./' + s[0], s[1], s[2] if len(s) > 2 else 0o755) for s in scripts]))])
     return control, ipk
 
 
@@ -177,10 +177,12 @@ def read_packages(spec=PACKAGES, root=None):
     out = []
     for name in cp.sections():
         s = cp[name]
-        files, inits = [], []
-        for line in s['files'].strip().splitlines():
-            mode, dest, src = line.split()
+        files, inits, conf = [], [], []
+        for line in s.get('files', '').strip().splitlines():
+            mode, dest, src, *flag = line.split()
             files.append((f'.{dest}', (root / src).read_bytes(), int(mode, 8)))
+            if flag == ['conf']:  # a config file: an upgrade or removal keeps it if the user changed it
+                conf.append(dest)
             if dest.startswith('/etc/init.d/'):
                 inits.append(dest.rsplit('/', 1)[1])
         scripts = []
@@ -188,6 +190,8 @@ def read_packages(spec=PACKAGES, root=None):
             def script(verb):
                 return ('#!/bin/sh\n' + ''.join(f'[ -n "${{IPKG_INSTROOT}}" ] || /etc/init.d/{i} {verb}\n' for i in inits) + 'exit 0\n').encode()
             scripts = [('postinst', script('enable')), ('prerm', script('disable'))]
+        if conf:
+            scripts.append(('conffiles', ''.join(c + '\n' for c in conf).encode(), 0o644))
         out.append((name, ', '.join(s.get('depends', '').split()), ' '.join(s['description'].split()), files, 'all', scripts,
                     f"{s['version']}-{s['release']}"))
     return out

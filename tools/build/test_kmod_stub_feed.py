@@ -208,8 +208,34 @@ class Build(unittest.TestCase):
                 if dest.startswith('./etc/init.d/'):
                     self.assertRegex(data.decode(), r'(?m)^START=\d+$', dest)  # `enable` needs it
                     self.assertEqual(mode, 0o755, dest)
-            if scripts:
+            if any(s[0] in ('postinst', 'prerm') for s in scripts):  # the enable and disable scripts exist for init scripts only
                 self.assertTrue(any(d.startswith('./etc/init.d/') for d, _, _ in files), name)
+
+    def test_a_config_file_is_listed_in_conffiles_and_a_package_may_have_no_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / 'cfg').write_text('option a 1\n')
+            spec = root / 'spec.ini'
+            spec.write_text('[x28-cfg]\nversion = 0.1.0\nrelease = 1\ndescription = Config\nfiles =\n    0644 /etc/config/x28 cfg conf\n'
+                            '[x28-meta]\nversion = 0.1.0\nrelease = 1\ndepends = x28-cfg\ndescription = Meta\n')
+            pk = {p[0]: p for p in f.read_packages(spec)}
+            self.assertEqual([(s[0], s[1], s[2]) for s in pk['x28-cfg'][5]], [('conffiles', b'/etc/config/x28\n', 0o644)])
+            self.assertEqual((pk['x28-meta'][3], pk['x28-meta'][5], pk['x28-meta'][1]), ([], [], 'x28-cfg'))
+            out = Path(d) / 'out'
+            f.build([], out, [], None, list(pk.values()))
+            outer = tarfile.open(out / 'x28-cfg_0.1.0-1_all.ipk', 'r:gz')
+            ctrl = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./control.tar.gz').read()), mode='r:gz')
+            self.assertEqual({m.name: m.mode for m in ctrl}, {'./control': 0o644, './conffiles': 0o644})
+            self.assertEqual(f.parse_index((out / 'Packages').read_text())['x28-meta']['Depends'], 'x28-cfg')
+
+    def test_x28_base_requires_every_other_package_of_the_spec(self):
+        pk = {p[0]: p for p in f.read_packages()}
+        base = set(pk['x28-base'][1].split(', '))
+        others = set(pk) - {'x28-base'}
+        self.assertEqual(others - base, set(), 'a package of the spec is not protected by x28-base')
+        self.assertEqual(base - others, {'kernel', 'x28-kmods'})  # the kernel record and the loader, which are built elsewhere
+        # nothing depends on x28-base, or removing it would be refused
+        self.assertFalse([n for n, p in pk.items() if 'x28-base' in p[1].split(', ')])
 
     def test_epoch_keeps_the_stub_above_the_feed(self):
         self.assertTrue(f.VERSION.startswith('1:'))

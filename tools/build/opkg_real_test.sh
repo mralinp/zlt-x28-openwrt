@@ -115,6 +115,24 @@ EOT
 else
 	echo "info  /pkg not mounted; skipping"
 fi
+echo "--- x28-base protects the required packages (#418)"
+if [ -f /pkg/x28-packages.ini ]; then
+	MEMBERS="x28-mipc x28-modem x28-wifi x28-leds x28-bootok x28-dhcp x28-kmods x28-storage luci-proto-x28-mipc"
+	check "x28-base installs" "$(try x28-base)" 0
+	check "  is version 0.1.0-1" "$(opkg list-installed x28-base | grep -c ' - 0\.1\.0-1$')" 1
+	for m in $MEMBERS kernel; do
+		check "removing $m is refused" "$(opkg remove $m >/dev/null 2>&1; echo $?)" 255
+		check "  and $m is still installed" "$(opkg list-installed $m | grep -c .)" 1
+	done
+	check "  the files survive the refusals (boot counter, overlay hook, modem script)" "$(ls /etc/init.d/x28-bootok /lib/preinit/79_x28_user_data /etc/init.d/x28-modem /etc/config/fstab 2>/dev/null | wc -l)" 4
+	check "removing only x28-base works" "$(opkg remove x28-base >/dev/null 2>&1; opkg list-installed x28-base | grep -c .)" 0
+	check "  and every member is still installed" "$(opkg list-installed | grep -cE '^(x28-mipc|x28-modem|x28-wifi|x28-leds|x28-bootok|x28-dhcp|x28-kmods|x28-storage|luci-proto-x28-mipc) ')" 9
+	check "  now a member can be removed" "$(opkg remove x28-leds >/dev/null 2>&1; opkg list-installed x28-leds | grep -c .)" 0
+	check "reinstalling x28-base brings back the member and the protection" "$(try x28-base >/dev/null; opkg list-installed x28-leds | grep -c .)" 1
+	check "  and removal is refused again" "$(opkg remove x28-leds >/dev/null 2>&1; echo $?)" 255
+	check "removing x28-storage keeps a changed fstab (conffile)" "$(echo '# user change' >> /etc/config/fstab; opkg remove --force-depends x28-storage >/dev/null 2>&1; grep -c 'user change' /etc/config/fstab)" 1
+	try x28-storage >/dev/null
+fi
 echo "--- real consumers from the official feed"
 for p in tc-full sqm-scripts ss iptables-mod-hashlimit iptables-mod-ipsec nbd usbip proto-bonding; do
 	check "$p installs" "$(try $p)" 0
