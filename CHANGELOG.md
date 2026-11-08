@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Test 51: two units flashed with the v0.68.1 image, checked read-only (#436).
 - Rollback tested on a unit (test 50): this `opkg` cannot install from a URL, so the docs now say to download the older ipk and install it from `/tmp` (#436).
 Nothing yet. Everything that was listed here shipped by v0.68.0 and is under the milestone below.
 

@@ -64,6 +64,7 @@ Conventions:
 | 48 | `x28-kmods` as a package, with the module list in the packages | 2026-11-08 | ✅ 148 container checks, 0 failures against the published URL; on the unit the 28 module packages and the loader were upgraded in one go, the forced marker refused, a live load brought 42 modules back in 3 s, and after a real reboot the loader loaded all 51 by itself: [section 48](#48-x28-kmods-as-a-package-with-the-module-list-in-the-packages-2026-11-08) |
 | 49 | The packaged image from the signed feed with 222 packages, on two reflashed units | 2026-11-08 | ✅ both units flashed and boot fast without errors (owner's report); `opkg update` passes every signature; `x28-base` refuses removal of `x28-modem`; 248 container checks, 0 failures: [section 49](#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) |
 | 50 | Rolling back and forward an x28 package on a unit | 2026-11-08 | ✅ `x28-base` 0.1.0-2 to 0.1.0-1 with `--force-downgrade` and back with `opkg upgrade`; installing from a URL does not work: [section 50](#50-rolling-back-and-forward-an-x28-package-on-a-unit-2026-11-08) |
+| 51 | Two units flashed with the v0.68.1 image | 2026-11-09 | ✅ both units boot, run `x28-base` 0.1.0-2 with the band tool and the switch package, 5G/4G data works on both; carrier aggregation differs by SIM: [section 51](#51-two-units-flashed-with-the-v0681-image-2026-11-09) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -695,3 +696,30 @@ a boot-critical package that is not `x28-kmods`; the full package list on the fl
 | After: no `oops` or `unknown symbol` in `dmesg`; up 1:33, never rebooted | ✅ |
 
 **Not verified:** rolling back a boot-critical package (`x28-bootok`, `x28-modem`) and rebooting; a rollback on the second unit; the band tool itself (not run).
+
+## 51. Two units flashed with the v0.68.1 image (2026-11-09)
+
+- **Question**: does the image built from the `v0.68.1` bundle (224-package feed, `x28-base` 0.1.0-2 requiring `x28-switch` and `x28-nrband`) boot and work on two real units, and do the two behave alike?
+- **Setup**: both units flashed by the owner with the guarded tools from flasher `main` at `4309569` (includes mralinp/x28-flasher#74). Checked over SSH, read-only, one unit at a time (both use 192.168.70.1; each has its own host key, so the key was cleared and accepted by the owner at each swap). Unit 1: 5G home SIM, a fan fitted. Unit 2: a 4G-only SIM (Mobinnet, `roaming`), no fan, probably the two-chip variant (two sets of Wi-Fi kernel threads; its PCI devices were not read).
+
+| Check | Unit 1 | Unit 2 |
+|---|---|---|
+| Packages: `x28-base` 0.1.0-2, `x28-nrband`, `x28-switch` and the other x28-* ones installed; nothing to upgrade | ✅ | ✅ |
+| `x28-switch` init script is owned by the package; its SHA-256 equals the repo file; VLAN enabled; link `S18x28-switch`; no failure marker | ✅ | ✅ |
+| Band tool: `/usr/sbin/x28-nrband` present, no missing library, status reports `nrband_tool present` | ✅ | ✅ |
+| Boot counter: four misc copies with the magic, tries byte `00`, `bootslot=a` | ✅ | ✅ |
+| 154 modules loaded (incl. `wireguard`, `xt_TPROXY`, `xt_socket`, `mt_wifi`); no `oops`/`unknown symbol` | ✅ | ✅ |
+| LuCI serves the login page; `dropbear`, `dnsmasq`, `uhttpd`, `netifd` run | ✅ | ✅ |
+| WAN up, ping 1.1.1.1 | ✅ 5G, home, ~107 ms | ✅ after about 7 min: 4G band 3 (FDD), `roaming`, 107 to 280 ms |
+| Carrier aggregation | 4 carriers, 70 MHz | none: other-band cells (band 1, 7, band 3 ch. 1329) are seen but not aggregated |
+| CPU 97 to 98% idle; no process above 0%; load stuck at 3.0 (unit 1) and 4.1 (unit 2) by 3 and 4 vendor kernel threads sleeping in `msleep` | ✅ | ✅ |
+| Temperatures | 33 to 42 °C (fan) | 43 to 53 °C (no fan, 22 min up) |
+| Syslog rate: about 3,700 and 2,200 lines a minute, from the vendor RIL/ATCI daemons; the log is a 64 KB ring in RAM, `/overlay` at 4% | ⚠ noisy | ⚠ noisy |
+| Software tuning compared (governor, frequency range, thermal trips, sysctl, init scripts, packages, modules) | identical | identical |
+
+**Findings**
+- The 4G-only SIM registered slowly (about 7 minutes from boot); unit 1 was up in about 4. Not investigated further.
+- The vendor daemons log about twice a second even when idle. Harmless to flash, noisy to read; not changed.
+- The load average is cosmetic: it counts the vendor threads that sleep in `msleep`.
+
+**Not verified:** the NR band lock (neither SIM can show it) and the LuCI cell lock page; Wi-Fi clients, speed and LEDs; VPN traffic; a reboot of the fresh images; whether unit 2 is the two-chip variant; why unit 2 gets no aggregation (the SIM profile is the likeliest cause; a 4G-only run of unit 1 would tell).
