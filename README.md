@@ -48,7 +48,7 @@ Current release: **v0.68.0** (a pre-release; the badge above shows the newest).
 | Term | Meaning |
 |---|---|
 | **Native image** | OpenWrt 23.05.5 userspace on the vendor kernel, flashed to slot A. This is the current product. |
-| **Stage 1 overlay** | The old approach: a LuCI fix and scripts added on top of the stock firmware. Historical, see [luci-on-stock](docs/luci-on-stock.md). |
+| **Stage 1 overlay** | The old, deprecated approach: scripts added on top of the stock firmware. Not supported; kept only as history in `docs/`. |
 | **Slot A / slot B** | The two A/B copies of kernel, rootfs and modem firmware in NAND. A runs OpenWrt, B keeps stock. |
 | **Vendor half** | The closed parts (kernel, modem stack, `mt_wifi` driver). They come from your own unit's backup, never from this repo. |
 
@@ -83,9 +83,7 @@ Notes:
 
 ## Quick start
 
-There are two install paths. Use the native image unless you only want LuCI on stock.
-
-### Native image (slot A)
+The install path is the native image on slot A.
 
 1. Read [docs/RECOVERY.md](docs/RECOVERY.md) and [docs/BUILD.md](docs/BUILD.md).
 2. Back up all 51 partitions and verify the hashes. Keep a second copy offline.
@@ -93,18 +91,6 @@ There are two install paths. Use the native image unless you only want LuCI on s
 4. Download `x28-assembly-v0.68.0.tar.gz` from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases). Check it against `SHA256SUMS`.
 5. Use the [x28-flasher](https://github.com/mralinp/x28-flasher) to build the image from the bundle and your backup, then flash slot A. It asks you to type a phrase before each write.
 6. After the first boot, open `https://192.168.70.1/cgi-bin/luci` (self-signed certificate). Root has an empty password: set one. SSH is on port 22, LAN only.
-
-### Stage 1 overlay on stock firmware (historical)
-
-LuCI on the stock system, no flash writes. You need SSH on the stock firmware and `luci_fixed.tgz` from [EngineerMazeed/ZLT-X28](https://github.com/EngineerMazeed/ZLT-X28).
-Try a dry run first:
-
-```bash
-scripts/install.sh -n x28 luci_fixed.tgz
-scripts/install.sh x28 luci_fixed.tgz
-```
-
-LuCI is then on `http://192.168.70.1:4153/cgi-bin/luci` and SSH on port 2222. More: [docs/luci-on-stock.md](docs/luci-on-stock.md).
 
 ## VPN and Passwall2
 
