@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the plain listing of a built feed, for review before it is pinned and signed (docs/research/feed-N-index.txt).
+"""Write the plain listing of a built feed, for review before it is pinned and signed (docs/research/feed-index.txt).
 
   feed_listing.py --feed DIR --out FILE [--vendor ipset libipset13 x28-ipset-kernel]
 

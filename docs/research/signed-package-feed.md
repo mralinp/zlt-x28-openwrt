@@ -85,13 +85,14 @@ in their iCloud Drive; a test restore matched. `first_boot.py` puts this URL and
 **Still unverified:** ipset set types and the kernel features behind the stubs. The vendor feature
 limits remain; signing does not add kernel features or make the full official aggregate compatible.
 
-## feed-3: the stable-URL feed (#396)
+## The feed: one rolling release on a stable URL (#396, #415)
 
 **2026-11-08: published and working on the unit** ([test 45](../TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
-The feed holds 209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built modules (`1:4.19.205-x28-r1`)
-and the 3 vendor ipset packages. `feed_release.py` pins its index:
-`INDEX_SHA256 = 1da26cdcc8c1c5fb4a8029767b30895573639d103a0ccb7c95d5c56ccea5a270`. The plain listing to review is
-[feed-3-index.txt](feed-3-index.txt). Three fresh builds gave byte-identical output.
+The published feed holds 209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built modules
+(`1:4.19.205-x28-r1`) and the 3 vendor ipset packages (pin `1da26cdc…`, in git history). `feed_release.py` now pins the next
+index, 212 packages (adds `kmod-wireguard`, `kmod-ipt-tproxy`, `kmod-ipt-socket`):
+`INDEX_SHA256 = caab74a29426156e1a393e05cacbe36a0886cd2aae7533a0e3ce752289c4e481`. The plain listing to review is
+[feed-index.txt](feed-index.txt). Two fresh builds gave byte-identical output.
 
 **Stable URL.** The feed is a normal release marked *latest*, so images and units configure one line, ever:
 
@@ -99,8 +100,9 @@ and the 3 vendor ipset packages. `feed_release.py` pins its index:
 src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
 ```
 
-Each new feed revision is a new release (`feed-4`, ...) created with `--latest`; the old ones stay as snapshots, and `feed-1`
-and `feed-2` stay for older images. Firmware releases are created with `--latest=false` (`release.yml`), so they never take
+There is **one feed release**, updated in place (before launch nobody depends on older snapshots; the packages are
+versioned, `-rN`, so a changed package is a new file name). It is tagged `feed-3` for historical reasons; the tag is only a
+label. `feed-1` and `feed-2` are old and only used by older images. Firmware releases are created with `--latest=false` (`release.yml`), so they never take
 that slot (a 1.0 release would have). The flasher lists all releases and accepts only `vX.Y.Z` tags with an `x28-assembly-*`
 asset, so a feed release being "latest" does not affect it.
 
@@ -123,10 +125,11 @@ docker build -t x28-usign:1 tools/build/usign
 P=$PWD; PATH="$P/tools/build/usign:$PATH" python3 tools/build/feed_release.py --feed $P/private/feed-N \
   --private-key $P/private/signing/x28-feed-20261101/x28-feed.sec --public-key $P/package/x28-feed/files/x28-feed.pub \
   --out $P/private/research/NNN-signed-feed/release-feed-N
-# 3. upload to a draft one file at a time, compare, then publish as latest
-gh release create feed-N --draft --target "$(git rev-parse HEAD)" --title feed-N --notes-file NOTES.md
-gh release upload feed-N FILE            # one at a time; 214 assets timed out as a single call before
-gh release edit feed-N --draft=false --prerelease=false --latest
+# 3. update the one feed release in place: new packages first, the index last (clients switch at once), then drop what the
+#    new index no longer lists. Upload one file at a time; a single call with all the assets timed out before.
+cd $P/private/research/NNN-signed-feed/release-feed-N
+for f in *.ipk; do gh release view feed-3 --json assets -q '.assets[].name' | grep -qx "$f" || gh release upload feed-3 "$f"; done
+gh release upload feed-3 Packages Packages.gz Packages.sig SHA256SUMS x28-feed.pub --clobber
 # 4. test the published URL
 docker run ... -e FEED_URL=https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download ... bash /t/opkg_real_test.sh
 ```

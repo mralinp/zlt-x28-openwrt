@@ -84,11 +84,12 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
 2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 209-package feed. The result is reproducible: three fresh builds
    were byte-identical.
 3. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
-   listing in [feed-3-index.txt](research/feed-3-index.txt)), signs it with the offline key and verifies the signature.
+   listing in [feed-index.txt](research/feed-index.txt)), signs it with the offline key and verifies the signature.
    Signing on a Mac uses `tools/build/usign/`, a container built from the exact `usign`/`libubox` commits OpenWrt 23.05 uses.
-4. The assets are uploaded to a draft release one file at a time, compared with the local files, and the release is
-   published as **latest**. Firmware releases are created with `--latest=false`, so they never take that slot. Older feed
-   releases (`feed-1`, `feed-2`) stay for older images.
+4. There is **one feed release**, marked **latest**, and it is updated in place: new packages are uploaded first, then the
+   index (`Packages`, `Packages.gz`, `Packages.sig`) is replaced last, so clients switch to the new set at once. Firmware
+   releases are created with `--latest=false`, so they never take that slot. The tag is only a label (it is still
+   `feed-3`); the URL does not contain it. `feed-1` and `feed-2` are old and only used by older images.
 
 The details, commands and the trust model are in [research/signed-package-feed.md](research/signed-package-feed.md).
 
