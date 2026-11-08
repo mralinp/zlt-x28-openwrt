@@ -27,6 +27,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 208 of the 976 official `kmod-*`
   packages install (180 stubs and 28 built for this kernel, WireGuard and TPROXY included), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 45](TESTING.md), [TESTING 46](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
+- The x28-* packages (modem, Wi-Fi, LEDs, boot counter, overlay, loader) are feed packages guarded by `x28-base`, and the flasher installs them from the same ipks ([PACKAGE-FEED](PACKAGE-FEED.md#package-model-and-updates)); not yet proven on a unit.
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
   Every image build ships it.

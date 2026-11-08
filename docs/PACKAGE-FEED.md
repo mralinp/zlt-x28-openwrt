@@ -56,6 +56,29 @@ Of the 976 official 23.05 kmods (see [the gap analysis](research/kmod-gap.md)):
 LuCI itself is not affected: only two `luci-*` packages (`luci-app-siitwizard`, `luci-proto-batman-adv`) depend directly on a
 refused module.
 
+## Package model and updates
+
+Everything we build is a package in this feed, and the image installs the same files (one build, used twice: see "How a release is made").
+Three groups:
+
+| Group | Packages | On the image | If the user removes it |
+|---|---|---|---|
+| **Required** | `x28-base` and what it depends on: `x28-kmods` (module loader), `x28-storage` (overlay), `x28-bootok` (A/B boot counter), `x28-dhcp`, `x28-leds`, `x28-modem`, `x28-mipc` with `luci-proto-x28-mipc` (5G WAN), `x28-wifi` | yes | `opkg` refuses while `x28-base` is installed (`--force-depends` overrides it, on the user); reinstall from the feed |
+| **Preinstalled, optional** | `kmod-wireguard`, `kmod-ipt-tproxy`, `kmod-ipt-socket` (what Passwall2 and WireGuard need), `ipset` with its libraries | yes | `opkg install` brings it back |
+| **On demand** | the other built module packages and the stubs | no | `opkg install` when something needs them |
+
+Not in the feed, and never will be: the vendor parts (the kernel, the modem stack, the `mt_wifi` driver and firmware); they come from the unit's own
+backup. Also image-only for now: `x28-switch`, `x28-nrband`, `iwinfo-mtwifi` and the feed key (the trust anchor must not update itself).
+**Passwall2** (`luci-app-passwall2`, `xray`) stays on its own third-party feed, which the image lists next to ours.
+
+**Updating.** `opkg update && opkg upgrade` updates all of it, ours included; a package only changes when its version number does. The
+boot-critical ones (`x28-bootok`, `x28-kmods`, `x28-modem`) are replaced on disk at once, but the running daemon or the loaded modules change at the **next
+reboot**, so reboot after upgrading them. A module package never replaces a loaded module until then.
+
+**Rolling back.** The feed keeps one current version per package, but the older `.ipk` files stay on the feed release until we clean them up, and every
+firmware release bundle holds the exact set it was made from. To go back, install the older file by its URL with `opkg install --force-downgrade URL`
+(the `-rN` revisions order correctly), then reboot if the package is a boot-critical one. This has not been tested on a unit yet.
+
 ## Using it
 
 On an image built with the current flasher the line and the key are already there. On a running unit or an older image:
