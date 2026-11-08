@@ -10,6 +10,24 @@ INIT = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmods/files/x2
 FUNC = re.search(r'^module_list\(\) \{\n.*?^\}\n', INIT.read_text(), re.M | re.S).group(0)
 
 
+TRIES = re.search(r'^tries_reset\(\) \{\n.*?^\}\n', INIT.read_text(), re.M | re.S).group(0)
+
+
+def tries(slot, a, b):
+    """tries_reset against a fake cmdline, /proc/mtd and a file standing in for misc: A's byte is 2057, B's 2061, in all four copies."""
+    with tempfile.TemporaryDirectory() as d:
+        d = pathlib.Path(d)
+        (d / 'cmdline').write_text(f'console=x bootslot={slot} y\n')
+        (d / 'mtd').write_text('dev: size erasesize name\nmtd3: 00100000 00040000 "misc"\n')
+        misc = bytearray(b'\xff' * 0x100000)
+        for i in range(4):
+            misc[2057 + 262144 * i] = a
+            misc[2061 + 262144 * i] = b
+        (d / 'mtd3').write_bytes(misc)
+        fn = TRIES.replace('/proc/cmdline', str(d / 'cmdline')).replace('/proc/mtd', str(d / 'mtd')).replace('/dev/', str(d) + '/')
+        return subprocess.run(['sh', '-c', fn + '\ntries_reset'], capture_output=True).returncode == 0
+
+
 def run(mods, files):
     with tempfile.TemporaryDirectory() as d:
         listdir = pathlib.Path(d) / 'x28-kmods.d'
@@ -19,6 +37,17 @@ def run(mods, files):
                 (listdir / name).write_text(text)
         script = f"MODS='{mods}'\nLISTDIR='{listdir}'\n{FUNC}\nmodule_list\n"
         return subprocess.run(['sh', '-c', script], capture_output=True, text=True, check=True).stdout.split()
+
+
+class TriesReset(unittest.TestCase):
+    def test_each_slot_checks_its_own_byte(self):
+        self.assertTrue(tries('a', 0, 5))
+        self.assertFalse(tries('a', 1, 0))
+        self.assertTrue(tries('b', 5, 0))
+        self.assertFalse(tries('b', 0, 1))
+
+    def test_no_slot_on_the_command_line_fails(self):
+        self.assertFalse(tries('x', 0, 0))
 
 
 class ModuleList(unittest.TestCase):

@@ -23,13 +23,15 @@ MODS='wireguard x28_udp_lookup nf_socket_ipv4 nf_socket_ipv6 nf_tproxy_ipv4 nf_t
 MARK=/etc/x28-kmods.loading
 MAXTRY=3
 
-# Slot A's tries byte in the four misc copies, as in x28-bootok.
+# The running slot's tries byte (A 2057, B 2061) in the four misc copies, as in x28-bootok.
 tries_reset() {
-	local dev i
-	grep -q 'bootslot=a' /proc/cmdline || return 1
+	local dev i off
+	if grep -q 'bootslot=a' /proc/cmdline; then off=2057
+	elif grep -q 'bootslot=b' /proc/cmdline; then off=2061
+	else return 1; fi
 	dev=/dev/$(sed -n 's/^\(mtd[0-9]*\): [0-9a-f]* [0-9a-f]* "misc"$/\1/p' /proc/mtd)
 	for i in 0 1 2 3; do
-		[ "$(dd if="$dev" bs=1 skip=$((2057 + 262144 * i)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"')" = 00 ] || return 1
+		[ "$(dd if="$dev" bs=1 skip=$((off + 262144 * i)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"')" = 00 ] || return 1
 	done
 }
 
