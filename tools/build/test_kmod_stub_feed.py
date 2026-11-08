@@ -237,6 +237,14 @@ class Build(unittest.TestCase):
         # nothing depends on x28-base, or removing it would be refused
         self.assertFalse([n for n, p in pk.items() if 'x28-base' in p[1].split(', ')])
 
+    def test_nrband_is_an_aarch64_package_with_one_executable(self):
+        with tempfile.TemporaryDirectory() as d:
+            b = Path(d) / 'x28-nrband'
+            b.write_bytes(b'\x7fELF')
+            name, depends, _, files, arch, scripts, version = f.nrband_package(b)
+            self.assertEqual((name, depends, arch, scripts, version), ('x28-nrband', '', 'aarch64_generic', (), '0.1.0-1'))
+            self.assertEqual(files, [('./usr/sbin/x28-nrband', b'\x7fELF', 0o755)])
+
     def test_epoch_keeps_the_stub_above_the_feed(self):
         self.assertTrue(f.VERSION.startswith('1:'))
 

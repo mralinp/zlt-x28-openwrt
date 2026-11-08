@@ -197,6 +197,14 @@ def read_packages(spec=PACKAGES, root=None):
     return out
 
 
+def nrband_package(binary):
+    """x28-nrband: the 5G band tool, built against the unit's own libmipc_msg.so (tools/build/x28_nrband.sh), so it is an SDK-style
+    package: built locally, published on the feed release and pinned by hash, like the module packages."""
+    return ('x28-nrband', '', 'Reads and sets the 5G (NR) band mask of the X28 modem over MIPC, for the band lock of the x28_mipc protocol; '
+            'needs libmipc_msg.so from the image', [('./usr/sbin/x28-nrband', pathlib.Path(binary).read_bytes(), 0o755)],
+            'aarch64_generic', (), '0.1.0-1')
+
+
 def read_real(manifest, kmods):
     """real.txt lines are `package module... [| dependency...]`; the modules are read from the kmods directory."""
     out = []

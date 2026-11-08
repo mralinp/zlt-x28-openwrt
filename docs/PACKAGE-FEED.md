@@ -68,7 +68,7 @@ Three groups:
 | **On demand** | the other built module packages and the stubs | no | `opkg install` when something needs them |
 
 Not in the feed, and never will be: the vendor parts (the kernel, the modem stack, the `mt_wifi` driver and firmware); they come from the unit's own
-backup. Also image-only for now: `x28-switch`, `x28-nrband`, `iwinfo-mtwifi` and the feed key (the trust anchor must not update itself).
+backup. Also image-only for now: `iwinfo-mtwifi` (ImageBuilder builds it) and the feed key (the trust anchor must not update itself). `x28-switch` is a required package, built by CI; `x28-nrband` (the 5G band tool, built against the unit's own library) joins the feed and `x28-base` in the next step ([#436](https://github.com/mralinp/zlt-x28-openwrt/issues/436)).
 **Passwall2** (`luci-app-passwall2`, `xray`) stays on its own third-party feed, which the image lists next to ours.
 
 **Updating.** `opkg update && opkg upgrade` updates all of it, ours included; a package only changes when its version number does. The
