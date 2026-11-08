@@ -60,7 +60,7 @@ Conventions:
 | 44 | 5 GHz on the X28 PRO unit with the two-chip capability keys (applied to the Wi-Fi templates by hand on the unit) | 2026-11-07 | ✅ after a reboot `rai0` is on channel 36, the chip reports 64 °C and there are no `FWCmdTimeout` lines (before: temperature 0, 20 timeouts over 30 s, a coredump); the vendor firmware on slot B uses the same keys | [BUILD](BUILD.md) |
 | 45 | X28 feed-3 with the image's opkg and on the unit | 2026-11-08 | ✅ 118 checks, 0 failures against the published URL; the unit upgraded its 25 hand-copied modules to the signed `-r1` packages: [section 45](#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08) |
 | 46 | `x28-kmods` loads the whole module list at boot | 2026-11-08 | ✅ after a real reboot 51 of 51 modules loaded at 30 s of kernel time, the marker cleared and the boot tries returned to `00`; the retry limit refuses with a forced marker: [section 46](#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08) |
-| 47 | WireGuard and TPROXY as feed packages: the live feed updated in place, the test unit upgraded | 2026-11-08 | ✅ 132 container checks, 0 failures against the published URL; the unit's invented records became the signed `-r1` packages with identical module files; WireGuard and the TPROXY/socket matches work: [section 47](#47-wireguard-and-tproxy-as-feed-packages-on-the-live-feed-and-the-unit-2026-11-08) |
+| 47 | WireGuard and TPROXY as feed packages: the live feed updated in place, the test unit upgraded | 2026-11-08 | ✅ 132 container checks, 0 failures against the published URL; the unit's invented records became the signed `-r1` packages with identical module files; WireGuard and the TPROXY/socket matches work, also after a reboot: [section 47](#47-wireguard-and-tproxy-as-feed-packages-on-the-live-feed-and-the-unit-2026-11-08) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -633,7 +633,8 @@ marker's retry limit was tested only with a forced marker, not with a real crash
 | The image's records for the three packages are `1:4.19.205-x28` before and `1:4.19.205-x28-r1` after | ✅ |
 | On the unit: `opkg list-upgradable` offered exactly the three; `opkg upgrade` made them `-r1`; the 8 module files are byte-identical to before; `opkg files` lists them under the packages; the modules stayed loaded; nothing left to upgrade | ✅ |
 | On the unit: a WireGuard interface can be created, keyed with a listening port and removed; the `socket` match and the `TPROXY` target are accepted in a throwaway chain; internet up, no `oops` in `dmesg` | ✅ |
+| After a real reboot of the unit: back in about 24 s on slot A; `x28-kmods` loaded all 51 modules (first sample at uptime 96 s), marker cleared at about 153 s; boot tries `00 00 00 00`; the three packages still `-r1` and the 8 module files with the same digest as before; all 8 modules loaded; WireGuard and the `socket`/`TPROXY` checks repeated and passed; LAN, Wi-Fi, cellular, `dnsmasq`, `dropbear`, `uhttpd`, `netifd` up; no `oops` | ✅ |
 
-**Not verified:** a reboot after the upgrade (the files are identical, so none is expected to matter); Passwall2 end to end on the
-upgraded packages (it is off on the unit; it was tested on the same module files in [test 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02));
-the image still bakes these modules and invents their records until the flasher installs packages (#420).
+**Not verified:** Passwall2 end to end on the upgraded packages (it is off on the unit, and enabling it routes the unit's traffic
+through a node; it was tested on the same module files in [test 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02)); the image still bakes
+these modules and invents their records until the flasher installs packages (#420).
