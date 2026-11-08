@@ -17,59 +17,94 @@
 ![Status](https://img.shields.io/badge/status-beta%20%C2%B7%20pre--release-yellow)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-[Status](#status) · [VPN and Passwall2](#vpn-and-passwall2) · [Package feed](#package-feed-opkg) · [Roadmap](#roadmap-to-a-stable-release) · [How it works](#how-it-works) · [Build](#build-and-flash) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
+[Status](#status) · [Quick start](#quick-start) · [VPN and Passwall2](#vpn-and-passwall2) · [Package feed](#package-feed-opkg) · [Roadmap](docs/ROADMAP.md) · [How it works](#how-it-works) · [Changelog](CHANGELOG.md) · [Tests](docs/TESTING.md) · [Docs](docs/README.md) · [Contributing](#contributing)
 
 </div>
 
 > [!WARNING]
-> **Your device, your risk.** The X28 is usually someone's only internet connection, and flashing it means
-> writing its NAND over the MediaTek download agent. The native image has been flashed to slot A and boots on
-> **one tested unit**; the procedure is guarded and owner-approved step by step, and needs a verified backup and a
-> UART. It is not a consumer installer. Read [docs/RECOVERY.md](docs/RECOVERY.md) before touching anything.
+> **Your device, your risk.** The X28 is usually someone's only internet connection. Installing the native image
+> writes its NAND over the MediaTek download agent. It has been done on **two tested units** (one X28, one X28 PRO).
+> Every write is guarded and approved step by step.
+> **Before anything else:** make a full backup of all 51 partitions and check its hashes. You also need a 1.8 V UART.
+> This is not a consumer installer. Read [docs/RECOVERY.md](docs/RECOVERY.md) first.
 > Not affiliated with ZLT, Tozed, MediaTek or Quectel.
 
 > [!NOTE]
-> **Tested on stock firmware 1.5 and 8.6.8.** To boot `slot A` you must change the boot order, which needs `SSH` or
-> `telnet` on the stock system. `firmware 1.5` lets you get that, and **SSH access now also works on `firmware 8.6.8`**.
-> It is valid up to `8.6.28`, for both the unlock and OpenWrt, on the **X28, X28 Pro, X28 V-Pro and X28 Pro (Ooredoo)**.
-> The [x28-flasher](https://github.com/mralinp/x28-flasher) repo is **private for now** because it still needs changes
-> for `8.6.x`, so the flashing steps below are reference, not something you can run.
+> **Stock firmware.** To boot slot A you must change the boot order, which needs SSH on the stock system.
+> SSH was gained on stock `1.5` and on `8.6.8`. It is reported valid up to `8.6.28`
+> (X28, X28 Pro, X28 V-Pro, X28 Pro (Ooredoo)); the flasher text says `8.6.26`. `TODO(verify)`: the exact ceiling and the V-Pro and Ooredoo models.
+> The [x28-flasher](https://github.com/mralinp/x28-flasher) repo is **private for now**, so the flashing steps here are reference, not something you can run yet.
 
-## Why
+## Summary
 
-The ZLT X28 (MediaTek MT6890/T750, Quectel RG500L modem) ships a locked-down OpenWrt 19.07 with a vendor web
-UI. This project puts a **normal OpenWrt** on it: stock LuCI and UCI, netifd, standard DHCP and firewall,
-**VPN clients and Passwall2 that work on the vendor kernel**, **a package manager that works** (a signed `opkg` feed with kernel modules built for it), a cooler box, and local SMS/voice for AI projects, **without losing the ability to recover the unit**. So it goes
-recovery first: back up everything, prove a way back, then build and flash.
+This project puts a normal OpenWrt 23.05.5 on the ZLT X28 5G CPE (MediaTek MT6890, Quectel RG500L modem). The
+userspace is standard OpenWrt: LuCI, UCI, netifd, dnsmasq and the fw3 firewall. It runs on the vendor 4.19.205 kernel
+and keeps the vendor modem stack only as a hardware backend. It ships WireGuard, OpenVPN, L2TP, PPTP and Passwall2,
+and a signed `opkg` feed built for this kernel. The OpenWrt image goes on **slot A**; the stock firmware stays on **slot B** as the fallback.
+Current release: **v0.68.0** (a pre-release; the badge above shows the newest).
+
+## Terms used in these docs
+
+| Term | Meaning |
+|---|---|
+| **Native image** | OpenWrt 23.05.5 userspace on the vendor kernel, flashed to slot A. This is the current product. |
+| **Stage 1 overlay** | The old approach: a LuCI fix and scripts added on top of the stock firmware. Historical, see [luci-on-stock](docs/luci-on-stock.md). |
+| **Slot A / slot B** | The two A/B copies of kernel, rootfs and modem firmware in NAND. A runs OpenWrt, B keeps stock. |
+| **Vendor half** | The closed parts (kernel, modem stack, `mt_wifi` driver). They come from your own unit's backup, never from this repo. |
 
 ## Status
 
-One unit, one SIM, one carrier. Current release: see the badge above; the full state is in [docs/STATUS.md](docs/STATUS.md).
+Two units have run the native image: one X28 and one X28 PRO. Detail and evidence: [docs/STATUS.md](docs/STATUS.md) and [docs/TESTING.md](docs/TESTING.md).
 
-| Area | State |
-|---|---|
-| Full NAND backup (51 partitions, hash-verified) | ✅ done |
-| USB recovery: preloader + download agent | ✅ all 51 partitions read over USB; `rootfs_a` and `rootfs_sig_a` written and restored with guarded tools |
-| Native OpenWrt 23.05.5 on slot A (vendor 4.19.205 kernel, fw3 + iptables-legacy) | ✅ boots; stock slot B untouched |
-| 5G data as a normal netifd interface (`x28_mipc`: IPv4, IPv6, IPv4v6, APN from the SIM) | ✅ works, with its own LuCI protocol page and Carrier tab (operator and scan, band and cell lock, roaming, modem status) |
-| LuCI over HTTPS (self-signed, HTTP redirected), LAN bridge (4 sockets), DHCP/DNS, IPv6 on the LAN, firewall and NAT | ✅ works; root has an empty password until you set one |
-| WireGuard (our module for the vendor kernel) | ✅ up to 715 Mbit/s sending, CPU not saturated ([below](#vpn-and-passwall2)) |
-| OpenVPN client | ✅ about 100 Mbit/s, one CPU core is the limit |
-| L2TP and PPTP clients | 🟡 installed, protocols in netifd and LuCI; not yet tested against a server |
-| Passwall2 (xray, TPROXY modules we build) | ✅ whole LAN through the node: TCP, UDP and IPv6, switched from LuCI, survives a reboot |
-| Wi-Fi (MT7915 dual band, vendor `mt_wifi` through a netifd handler) | 🟡 both radios come up with WPA2 and a phone works through them; throughput tests pending |
-| Front panel LEDs (radio, signal, WAN) | ✅ works |
-| Everything at boot, settings surviving reboots, SSH key-only on port 22 | ✅ works |
-| A/B boot counter | ✅ the preloader adds a try per boot; `x28-bootok` resets it after a good boot, like stock |
-| Slot A marked successful | ❌ deliberately not: success stays 0 so the fall-back to stock B remains (see [BOOT-FLOW](docs/BOOT-FLOW.md)) |
-| Temperature | ✅ about 40 °C idle on the SoC (stock 65 °C idle without a fan, 46 °C with the 12 V fan) |
-| SMS and voice | 🗓️ worked on the stock-firmware overlay (voice blocked by the SIM); not yet on the native image |
-| `opkg` and LuCI Software with a signed feed for this device line | ✅ 208 of the 976 official kernel packages install (180 stubs and 28 built for this kernel, WireGuard and TPROXY among them), the rest are refused cleanly; modules load at boot: [Package feed](#package-feed-opkg) |
-| Recovery slot, sysupgrade, fan control, own kernel | 🗓️ planned, see the roadmap |
+| Feature | State | X28 | X28 PRO |
+|---|---|---|---|
+| Full NAND backup (51 partitions, hash-checked) | working | tested | not separately recorded `TODO(verify)` |
+| USB recovery (preloader + download agent), guarded flash of slot A | working | tested | tested ([flash-other-units](docs/research/flash-other-units.md)) |
+| Native image boots from slot A | working | tested | tested |
+| 5G data as a netifd interface (`x28_mipc`), Carrier tab in LuCI | working | tested | untested |
+| HTTPS LuCI (self-signed), LAN bridge, DHCP/DNS, IPv6 on LAN, firewall, NAT | working | tested | DHCP at boot tested, needs `x28-dhcp` ([TESTING 43](docs/TESTING.md)) |
+| Wi-Fi (MT7915 dual band, WPA2) | partial: no throughput tests yet | tested | 5 GHz tested ([TESTING 44](docs/TESTING.md)) |
+| WireGuard, OpenVPN | working | tested | untested |
+| Passwall2 (xray, TPROXY) | working | tested | untested |
+| L2TP, PPTP clients | untested against a server | installed | installed |
+| Front panel LEDs, boot counter, settings kept over reboot | working | tested | untested |
+| `opkg` and LuCI Software with the signed feed | working | tested | packaged image on two units ([TESTING 49](docs/TESTING.md)) |
+| Boot slot switch (A and B) | working | tested | tested ([TESTING 42](docs/TESTING.md)) |
+| SMS and voice | not working on the native image (worked on the stage 1 overlay) | not ported | not ported |
+| `sysupgrade`, OTA | not available | planned | planned |
+| Recovery slot on B, fan control, own kernel | not available | planned | planned |
 
-Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**. The vendor modem
-stack is closed-source and not redistributable, so what this repository publishes is the **build tooling and the
-packages**, not a ready-to-flash image: the image is assembled locally from your own unit's backup.
+Notes:
+
+- Slot A is deliberately **not** marked successful. This keeps the preloader fall-back to stock slot B ([BOOT-FLOW](docs/BOOT-FLOW.md)).
+- Idle SoC temperature is about 40 °C (stock: 65 °C without a fan).
+- The vendor modem stack is closed and not redistributable. This repository publishes the **build tooling and the packages**, not a ready-to-flash image. The image is assembled locally from your own unit's backup.
+- One SIM, one carrier were tested. IPv6 on the 5G WAN: `TODO(verify)` beyond the first unit. The 2.5G WAN port is not covered by a test note: `TODO(verify)`.
+
+## Quick start
+
+There are two install paths. Use the native image unless you only want LuCI on stock.
+
+### Native image (slot A)
+
+1. Read [docs/RECOVERY.md](docs/RECOVERY.md) and [docs/BUILD.md](docs/BUILD.md).
+2. Back up all 51 partitions and verify the hashes. Keep a second copy offline.
+3. Connect a USB-A to USB-C cable (C to C does not work) and a 1.8 V UART.
+4. Download `x28-assembly-v0.68.0.tar.gz` from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases). Check it against `SHA256SUMS`.
+5. Use the [x28-flasher](https://github.com/mralinp/x28-flasher) to build the image from the bundle and your backup, then flash slot A. It asks you to type a phrase before each write.
+6. After the first boot, open `https://192.168.70.1/cgi-bin/luci` (self-signed certificate). Root has an empty password: set one. SSH is on port 22, LAN only.
+
+### Stage 1 overlay on stock firmware (historical)
+
+LuCI on the stock system, no flash writes. You need SSH on the stock firmware and `luci_fixed.tgz` from [EngineerMazeed/ZLT-X28](https://github.com/EngineerMazeed/ZLT-X28).
+Try a dry run first:
+
+```bash
+scripts/install.sh -n x28 luci_fixed.tgz
+scripts/install.sh x28 luci_fixed.tgz
+```
+
+LuCI is then on `http://192.168.70.1:4153/cgi-bin/luci` and SSH on port 2222. More: [docs/luci-on-stock.md](docs/luci-on-stock.md).
 
 ## VPN and Passwall2
 
@@ -119,7 +154,7 @@ The vendor kernel is 4.19.205 and the official OpenWrt kernel modules (`kmod-*`)
 src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
 ```
 
-Images built with the current flasher already have this line and the signing key (`7fec994ab0d15b97`). On a running unit, replace the `x28` line in `/etc/opkg/customfeeds.conf` and run `opkg update`.
+Images built with the current flasher already have this line and the signing key (`7fec994ab0d15b97`). On a running unit, replace the `x28` line in `/etc/opkg/customfeeds.conf` and run `opkg update`. The feed holds 224 packages in total (the kernel packages below plus our own `x28-*` packages).
 
 - **What installs:** 208 of the 976 official kernel-module packages: 180 stubs for modules the kernel already has, and 28 packages that carry modules we built for it. That covers WireGuard and the TPROXY/socket modules (preinstalled in the image, reinstallable and updatable from the feed), SQM with `sch_cake`, `tc-full` and traffic-control actions and filters, `veth`, `macvlan`, `bonding`, `nbd`, `ss`, the `iptables` hashlimit and IPsec matches, the IPv6 raw table and ChaCha20-Poly1305 for strongSwan. Built modules are loaded at boot by `x28-kmods`, which is itself a feed package (`opkg install x28-kmods` once on an older image).
 - **Our own packages:** the 5G WAN, LAN DHCP guard, Wi-Fi, LEDs, boot counter, overlay and module loader are feed packages too, protected by the `x28-base` package, so `opkg upgrade` updates them and a removed one comes back with `opkg install`. Boot-critical ones take effect after a reboot. Passwall2 stays on its own feed. The model, update policy and rollback: [docs/PACKAGE-FEED.md](docs/PACKAGE-FEED.md#package-model-and-updates).
@@ -127,27 +162,7 @@ Images built with the current flasher already have this line and the signing key
 - **Trust:** the index is signed; `opkg` checks it. Tested with the image's own `opkg` against the published URL (148 checks) and on a unit, including a reboot.
 - **Scope:** valid for **the ZLT X28 line only** (MT6890, vendor kernel 4.19.205, OpenWrt 23.05.5 userspace), not for other devices or kernels.
 
-Coverage, limits, how a release is made and what is not tested: **[docs/PACKAGE-FEED.md](docs/PACKAGE-FEED.md)**; the evidence is in [TESTING](docs/TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08).
-
-## Roadmap to a stable release
-
-The target layout is simpler than today's two full firmwares:
-
-- **Slot A: stable OpenWrt**, the thing you run.
-- **Slot B: a recovery slot**, a small kernel and recovery path that can rescue the box and install or reinstall
-  OpenWrt on slot A, and put the stock firmware back if you want it. This frees the flash that now holds a second
-  full firmware and removes the need for the download agent and a UART in everyday recovery.
-
-Roughly in order ([PROJECT-PLAN](docs/PROJECT-PLAN.md) has the detail):
-
-1. Soak and test the slot-A image: 48 h without unexplained reboots, Wi-Fi client and throughput tests, more LED
-   states, the idle CPU and RAM baseline.
-2. Design and build the recovery slot, including the way back to stock.
-3. `sysupgrade` for the new layout.
-4. A tagged stable release, the device page for the OpenWrt wiki, and build documentation for other owners.
-5. Later: fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), local SMS and voice
-   on the native image, and a 4.19 kernel plus kmod feed built from a sibling-device SDK
-   ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).
+Contents, signing, coverage, limits, how a release is made and what is not tested: **[docs/PACKAGE-FEED.md](docs/PACKAGE-FEED.md)**; the evidence is in [TESTING](docs/TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08).
 
 ## How it works
 
