@@ -19,7 +19,7 @@ mkmisc() { # $1 = A entry, $2 = B entry as hex (priority tries success up-type)
 	dd if=/dev/zero bs=262144 count=4 2>/dev/null | tr '\0' '\377' > "$dir/misc"
 	for i in 0 1 2 3; do
 		printf '\000AB0\377\377\377\377' | dd of="$dir/misc" bs=1 seek=$((2048 + 262144 * i)) conv=notrunc 2>/dev/null
-		printf "$(echo "$1$2" | sed 's/../\\x&/g')" | dd of="$dir/misc" bs=1 seek=$((2056 + 262144 * i)) conv=notrunc 2>/dev/null
+		printf "$(h=$1$2; while [ -n "$h" ]; do printf '\\%03o' "0x${h%"${h#??}"}"; h=${h#??}; done)" | dd of="$dir/misc" bs=1 seek=$((2056 + 262144 * i)) conv=notrunc 2>/dev/null
 	done
 }
 entries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2056 + 262144 * i)) count=8 2>/dev/null | hexdump -v -e '1/1 "%02x"'; printf ' '; done; }
