@@ -5,7 +5,8 @@
 # temporary key).
 #
 #   docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v KMODS_DIR:/kmods:ro \
-#     -v OLD_DIR:/old:ro -v "$PWD/package/x28-kmod-stubs/real.txt:/real.txt:ro" -v "$PWD/tools/build:/t:ro" \
+#     -v OLD_DIR:/old:ro -v "$PWD/package/x28-kmod-stubs/real.txt:/real.txt:ro" \
+#     -v "$PWD/package/x28-kmods/files/x28-kmods.init:/loader.init:ro" -v "$PWD/tools/build:/t:ro" \
 #     debian:stable-slim bash /t/opkg_real_test.sh
 #
 # ROOTFS_DIR holds rootfs-management.tar.gz; FEED_DIR is the built feed; KMODS_DIR holds the built .ko files; OLD_DIR holds
@@ -19,6 +20,7 @@ cp /feed/* $R/feed/
 cp /kmods/*.ko $R/kmods/
 cp /old/*.ipk $R/old/
 cp /real.txt $R/real.txt
+[ -f /loader.init ] && cp /loader.init $R/loader.init
 rm -f $R/etc/resolv.conf
 cp /etc/resolv.conf $R/etc/resolv.conf
 mknod -m 666 $R/dev/null c 1 3
@@ -30,7 +32,9 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 fails=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: got '$2', want '$3'"; fails=$((fails+1)); fi; }
 inst() { opkg list-installed | grep -c "^$1 "; }
-try() { opkg install "$@" >/tmp/o 2>&1 </dev/null; echo $?; }
+# opkg exits 0 after printing `wfopen: ... No such file or directory`, so errors in its output count too; the one benign
+# messages (pkg_hash_*: opkg weighing the official 5.15 records it ignores; the install still completes) are filtered.
+try() { opkg install "$@" >/tmp/o 2>&1 </dev/null; rc=$?; [ $rc -eq 0 ] && [ "$(grep '^ \* ' /tmp/o | grep -vc 'pkg_hash_')" -gt 0 ] && rc=254; echo $rc; }
 
 sed -i '/passwall/d' /etc/opkg/distfeeds.conf /etc/opkg/customfeeds.conf
 # The image already has an x28 line (feed-2); a second one with the same name is skipped, so replace it.
@@ -66,6 +70,26 @@ done < /real.txt
 check "no 5.15 kmod is installed" "$(opkg list-installed | grep -E '^kmod-' | grep -c '5\.15')" 0
 check "no 5.15 upgrade is offered" "$(opkg list-upgradable 2>/dev/null | grep -cE '^(kernel|kmod-)')" 0
 
+echo "--- the loader as a package (#416)"
+echo "info  the image's loader before: $(opkg status x28-kmods | grep -c Package) record(s), script $(wc -c < /etc/init.d/x28-kmods) bytes, enabled=$(ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)"
+check "x28-kmods installs over the image's unowned script" "$(try x28-kmods)" 0
+check "  is the -r build" "$(opkg list-installed x28-kmods | grep -c ' - 1:4.19.205-x28-r[0-9]*$')" 1
+check "  owns the init script" "$(opkg files x28-kmods | grep -c '^/etc/init.d/x28-kmods$')" 1
+check "  the script is the one in the repo" "$(cmp -s /etc/init.d/x28-kmods /loader.init && echo same || echo different)" same
+check "  is enabled at boot (S97 link)" "$(ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)" 1
+/etc/init.d/x28-kmods modules > /tmp/mods 2>/tmp/modserr
+check "  'modules' lists every module of the installed packages once" "$(wc -l < /tmp/mods)" "$(cat /etc/x28-kmods.d/* | sort -u | grep -c .)"
+check "  no module is listed twice" "$(sort /tmp/mods | uniq -d | wc -l)" 0
+check "  x28_udp_lookup comes before nf_socket_ipv4" "$(awk '/^x28_udp_lookup$/{a=NR} /^nf_socket_ipv4$/{b=NR} END{print (a>0 && b>a)}' /tmp/mods)" 1
+check "  libchacha comes before chacha20poly1305" "$(awk '/^libchacha$/{a=NR} /^chacha20poly1305$/{b=NR} END{print (a>0 && b>a)}' /tmp/mods)" 1
+check "  kmod-ipt-tproxy's list sorts before kmod-ipt-socket's" "$(ls /etc/x28-kmods.d | awk '/-kmod-ipt-tproxy$/{a=NR} /-kmod-ipt-socket$/{b=NR} END{print (a>0 && b>a)}')" 1
+echo "info  $(wc -l < /tmp/mods) modules in the load order, $(ls /etc/x28-kmods.d | wc -l) list files"
+check "removing a module package removes its list file" "$(opkg remove kmod-nbd >/dev/null 2>&1; ls /etc/x28-kmods.d | grep -c nbd)" 0
+check "  and its module from the load" "$(/etc/init.d/x28-kmods modules | grep -c '^nbd$')" 0
+check "  reinstalling brings it back" "$(try kmod-nbd >/dev/null; /etc/init.d/x28-kmods modules | grep -c '^nbd$')" 1
+check "removing the loader removes the boot link" "$(opkg remove x28-kmods >/dev/null 2>&1; ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)" 0
+check "  and the script" "$([ -e /etc/init.d/x28-kmods ] && echo present || echo gone)" gone
+check "reinstalling the loader enables it again" "$(try x28-kmods >/dev/null; ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)" 1
 echo "--- real consumers from the official feed"
 for p in tc-full sqm-scripts ss iptables-mod-hashlimit iptables-mod-ipsec nbd usbip proto-bonding; do
 	check "$p installs" "$(try $p)" 0

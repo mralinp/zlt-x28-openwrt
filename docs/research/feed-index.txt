@@ -1,39 +1,40 @@
-# X28 feed index review. Packages sha256 caab74a29426156e1a393e05cacbe36a0886cd2aae7533a0e3ce752289c4e481
-# 212 packages: kernel, 180 stubs, 28 built modules (-r1), 3 vendor ipset.
+# X28 feed index review. Packages sha256 54d545546b82ac1fa1f073336a947a05283df4df6c3e46a49bf19fbff42d51a1
+# 213 packages: kernel, 180 stubs, 29 built packages (-r2), 3 vendor ipset.
 # columns: package, version, architecture, size (the ipk), sha256 (first 16 hex), depends
 
 ## kernel record
 kernel                             1:4.19.205-x28       all                 425  336b75fff89439c5  -
 
-## built modules (28): each ipk carries its .ko files in /lib/modules/x28
-kmod-bonding                       1:4.19.205-x28-r1    aarch64_generic   81493  b1e179a0be0c81b6  kernel (= 1:4.19.205-x28)
-kmod-crypto-chacha20poly1305       1:4.19.205-x28-r1    aarch64_generic   11107  8f93a57fe9bddfcf  kernel (= 1:4.19.205-x28), kmod-crypto-aead, kmod-crypto-manager
-kmod-crypto-user                   1:4.19.205-x28-r1    aarch64_generic    6802  56138f8af7d01ad7  kernel (= 1:4.19.205-x28), kmod-crypto-hash, kmod-crypto-manager
-kmod-dummy                         1:4.19.205-x28-r1    aarch64_generic    3825  146081c322dcbcff  kernel (= 1:4.19.205-x28)
-kmod-inet-diag                     1:4.19.205-x28-r1    aarch64_generic    3464  5f4fb385c81872d0  kernel (= 1:4.19.205-x28)
-kmod-ipt-hashlimit                 1:4.19.205-x28-r1    aarch64_generic    9955  2df9f08257a05a89  kernel (= 1:4.19.205-x28), kmod-ipt-core
-kmod-ipt-ipsec                     1:4.19.205-x28-r1    aarch64_generic    5416  4605263b0fffa159  kernel (= 1:4.19.205-x28), kmod-ipt-core
-kmod-ipt-raw6                      1:4.19.205-x28-r1    aarch64_generic    2896  ccbcf97b1f388540  kernel (= 1:4.19.205-x28), kmod-ipt-core, kmod-ip6tables
-kmod-ipt-socket                    1:4.19.205-x28-r1    aarch64_generic    6106  faa901c476c82de7  kernel (= 1:4.19.205-x28), kmod-ipt-tproxy
-kmod-ipt-tproxy                    1:4.19.205-x28-r1    aarch64_generic    9016  a838b547b98a6465  kernel (= 1:4.19.205-x28)
-kmod-leds-uleds                    1:4.19.205-x28-r1    aarch64_generic    3441  a6e2a6cf4f524de0  kernel (= 1:4.19.205-x28)
-kmod-macvlan                       1:4.19.205-x28-r1    aarch64_generic   11813  8507e46029e160f2  kernel (= 1:4.19.205-x28)
-kmod-nbd                           1:4.19.205-x28-r1    aarch64_generic   18964  7e0b95c1ca9ffab8  kernel (= 1:4.19.205-x28)
-kmod-netlink-diag                  1:4.19.205-x28-r1    aarch64_generic    3612  f7ee0507e4b061f4  kernel (= 1:4.19.205-x28)
-kmod-nfnetlink-log                 1:4.19.205-x28-r1    aarch64_generic    8624  6988e20859f59c47  kernel (= 1:4.19.205-x28), kmod-nfnetlink
-kmod-sched                         1:4.19.205-x28-r1    aarch64_generic   50904  ff9851171725feac  kernel (= 1:4.19.205-x28), kmod-sched-core, kmod-lib-crc32c, kmod-lib-textsearch
-kmod-sched-act-vlan                1:4.19.205-x28-r1    aarch64_generic    4848  6948b52896151ff5  kernel (= 1:4.19.205-x28), kmod-sched-core
-kmod-sched-bpf                     1:4.19.205-x28-r1    aarch64_generic    5083  b392f9d8b5613596  kernel (= 1:4.19.205-x28)
-kmod-sched-cake                    1:4.19.205-x28-r1    aarch64_generic   16534  cddde55cc4dbc250  kernel (= 1:4.19.205-x28), kmod-sched-core
-kmod-sched-connmark                1:4.19.205-x28-r1    aarch64_generic     491  7e3dd8425e470659  kernel (= 1:4.19.205-x28), kmod-sched-core, kmod-ipt-core, kmod-ipt-conntrack-extra
-kmod-sched-core                    1:4.19.205-x28-r1    aarch64_generic    4506  e47a02b7befa4ed1  kernel (= 1:4.19.205-x28)
-kmod-sched-flower                  1:4.19.205-x28-r1    aarch64_generic   14698  988c467c887eeb05  kernel (= 1:4.19.205-x28), kmod-sched-core
-kmod-spi-dev                       1:4.19.205-x28-r1    aarch64_generic    9437  ad3ab94150f2908d  kernel (= 1:4.19.205-x28)
-kmod-usb-acm                       1:4.19.205-x28-r1    aarch64_generic   18419  09cc7d681364f4de  kernel (= 1:4.19.205-x28), kmod-usb-core
-kmod-usb-ledtrig-usbport           1:4.19.205-x28-r1    aarch64_generic    4068  8e42a93eaa2a9223  kernel (= 1:4.19.205-x28), kmod-usb-core
-kmod-usbip                         1:4.19.205-x28-r1    aarch64_generic   14346  6376ce5824a5c4b6  kernel (= 1:4.19.205-x28), kmod-usb-core
-kmod-veth                          1:4.19.205-x28-r1    aarch64_generic    9802  6c66fe2efecb2442  kernel (= 1:4.19.205-x28)
-kmod-wireguard                     1:4.19.205-x28-r1    aarch64_generic   72498  2f43b10826123cba  kernel (= 1:4.19.205-x28)
+## built packages (29): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader
+kmod-bonding                       1:4.19.205-x28-r2    aarch64_generic   81688  114a7f14a98d4892  kernel (= 1:4.19.205-x28)
+kmod-crypto-chacha20poly1305       1:4.19.205-x28-r2    aarch64_generic   11269  1f470d4482fe4376  kernel (= 1:4.19.205-x28), kmod-crypto-aead, kmod-crypto-manager
+kmod-crypto-user                   1:4.19.205-x28-r2    aarch64_generic    6934  93bbb978bf42fccb  kernel (= 1:4.19.205-x28), kmod-crypto-hash, kmod-crypto-manager
+kmod-dummy                         1:4.19.205-x28-r2    aarch64_generic    3947  8d1b761dd2e8c5b8  kernel (= 1:4.19.205-x28)
+kmod-inet-diag                     1:4.19.205-x28-r2    aarch64_generic    3588  3bf73c5cfe1d8189  kernel (= 1:4.19.205-x28)
+kmod-ipt-hashlimit                 1:4.19.205-x28-r2    aarch64_generic   10105  5c2447cc472c2dc2  kernel (= 1:4.19.205-x28), kmod-ipt-core
+kmod-ipt-ipsec                     1:4.19.205-x28-r2    aarch64_generic    5555  dbe287d5ea8145d1  kernel (= 1:4.19.205-x28), kmod-ipt-core
+kmod-ipt-raw6                      1:4.19.205-x28-r2    aarch64_generic    3021  887feb15649c131a  kernel (= 1:4.19.205-x28), kmod-ipt-core, kmod-ip6tables
+kmod-ipt-socket                    1:4.19.205-x28-r2    aarch64_generic    6236  a654e277f1a4dcb8  kernel (= 1:4.19.205-x28), kmod-ipt-tproxy
+kmod-ipt-tproxy                    1:4.19.205-x28-r2    aarch64_generic    9142  88c0db0065266440  kernel (= 1:4.19.205-x28)
+kmod-leds-uleds                    1:4.19.205-x28-r2    aarch64_generic    3568  b404243b541a4745  kernel (= 1:4.19.205-x28)
+kmod-macvlan                       1:4.19.205-x28-r2    aarch64_generic   11961  f111fe2badb171be  kernel (= 1:4.19.205-x28)
+kmod-nbd                           1:4.19.205-x28-r2    aarch64_generic   19113  c65b77ed1932400f  kernel (= 1:4.19.205-x28)
+kmod-netlink-diag                  1:4.19.205-x28-r2    aarch64_generic    3736  c594be3d609ea230  kernel (= 1:4.19.205-x28)
+kmod-nfnetlink-log                 1:4.19.205-x28-r2    aarch64_generic    8763  70b90bdaa848f3d6  kernel (= 1:4.19.205-x28), kmod-nfnetlink
+kmod-sched                         1:4.19.205-x28-r2    aarch64_generic   51091  edb8cd24c8a163a7  kernel (= 1:4.19.205-x28), kmod-sched-core, kmod-lib-crc32c, kmod-lib-textsearch
+kmod-sched-act-vlan                1:4.19.205-x28-r2    aarch64_generic    4974  1f64bd284f639701  kernel (= 1:4.19.205-x28), kmod-sched-core
+kmod-sched-bpf                     1:4.19.205-x28-r2    aarch64_generic    5215  cb15bfce21795fab  kernel (= 1:4.19.205-x28)
+kmod-sched-cake                    1:4.19.205-x28-r2    aarch64_generic   16707  14b70f2bd99f92a0  kernel (= 1:4.19.205-x28), kmod-sched-core
+kmod-sched-connmark                1:4.19.205-x28-r2    aarch64_generic     491  05d2d1834ad74606  kernel (= 1:4.19.205-x28), kmod-sched-core, kmod-ipt-core, kmod-ipt-conntrack-extra
+kmod-sched-core                    1:4.19.205-x28-r2    aarch64_generic    4620  0991aa44eaf9c932  kernel (= 1:4.19.205-x28)
+kmod-sched-flower                  1:4.19.205-x28-r2    aarch64_generic   14882  975a5f93bae3d4d1  kernel (= 1:4.19.205-x28), kmod-sched-core
+kmod-spi-dev                       1:4.19.205-x28-r2    aarch64_generic    9587  27b3feaa0b7fdbc1  kernel (= 1:4.19.205-x28)
+kmod-usb-acm                       1:4.19.205-x28-r2    aarch64_generic   18557  81b54a0bb731f3dc  kernel (= 1:4.19.205-x28), kmod-usb-core
+kmod-usb-ledtrig-usbport           1:4.19.205-x28-r2    aarch64_generic    4201  49e2dceb8e981276  kernel (= 1:4.19.205-x28), kmod-usb-core
+kmod-usbip                         1:4.19.205-x28-r2    aarch64_generic   14492  b4c077d88f2883a9  kernel (= 1:4.19.205-x28), kmod-usb-core
+kmod-veth                          1:4.19.205-x28-r2    aarch64_generic    9929  ce922e4a82d9a70c  kernel (= 1:4.19.205-x28)
+kmod-wireguard                     1:4.19.205-x28-r2    aarch64_generic   72724  ee58ec86f0ea632c  kernel (= 1:4.19.205-x28)
+x28-kmods                          1:4.19.205-x28-r2    all                2739  b360a8462652ad66  kernel (= 1:4.19.205-x28)
 
 ## vendor ipset (3)
 ipset                              1:7.17-1-x28-1       aarch64_generic    2406  7c85703a8d3764f2  libc, x28-ipset-kernel (= 1:4.19.205-x28), libmnl0, libipset13 (= 1:7.17-1-x28-1)

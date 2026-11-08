@@ -64,7 +64,7 @@ def build(upstream, library, modules, out, stubs=(), real=()):
     control, package = repackage(upstream, modules)
     library_control, library_package = repackage(library, modules, 'libipset13')
     out.mkdir(parents=True, exist_ok=False)
-    feed.build(list(stubs), out, real)
+    feed.build(list(stubs), out, real, feed.LOADER if real else None)
     marker, marker_ipk = feed.stub('x28-ipset-kernel', 'kernel (= ' + feed.VERSION + ')', DESCRIPTION)
     for filename, metadata, payload in (
             ('x28-ipset-kernel_4.19.205-x28_all.ipk', marker, marker_ipk),

@@ -11,7 +11,7 @@ import tempfile
 from kmod_stub_feed import parse_index
 
 # The index holds every package's SHA-256, so this pin freezes the whole feed. Changing a release means reviewing it again.
-INDEX_SHA256 = 'caab74a29426156e1a393e05cacbe36a0886cd2aae7533a0e3ce752289c4e481'  # the X28 feed, 212 packages: docs/research/feed-index.txt
+INDEX_SHA256 = '54d545546b82ac1fa1f073336a947a05283df4df6c3e46a49bf19fbff42d51a1'  # the X28 feed, 213 packages: docs/research/feed-index.txt
 
 
 def prepare(source, private_key, public_key, output):

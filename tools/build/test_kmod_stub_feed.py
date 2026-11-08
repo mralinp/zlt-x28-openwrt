@@ -105,8 +105,68 @@ class Build(unittest.TestCase):
                 outer = tarfile.open(out / index[name]['Filename'], 'r:gz')
                 data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
                 return {m.name: data.extractfile(m).read() for m in data if m.isfile()}
-            self.assertEqual(files('kmod-r'), {'./lib/modules/x28/a.ko': b'module'})
+            self.assertEqual(files('kmod-r'), {'./lib/modules/x28/a.ko': b'module', './etc/x28-kmods.d/50-kmod-r': b'a\n'})
             self.assertEqual(files('kmod-only'), {})
+
+    def test_a_package_loads_after_the_packages_of_ours_it_depends_on(self):
+        with tempfile.TemporaryDirectory() as d:
+            kmods, out = Path(d) / 'ko', Path(d) / 'out'
+            kmods.mkdir()
+            for m in ('x', 'y', 'z'):
+                (kmods / f'{m}.ko').write_bytes(m.encode())
+            real = [('kmod-q', ['y', 'z'], kmods, ['kmod-p']), ('kmod-p', ['x'], kmods, []), ('kmod-none', [], kmods, ['kmod-q']),
+                    ('kmod-r', ['x'], kmods, ['kmod-q', 'kmod-stub'])]
+            f.build(['kmod-stub'], out, real)
+            index = f.parse_index((out / 'Packages').read_text())
+
+            def listing(name):
+                outer = tarfile.open(out / index[name]['Filename'], 'r:gz')
+                data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+                return {m.name: data.extractfile(m).read() for m in data if m.isfile() and m.name.startswith('./etc/x28-kmods.d/')}
+            self.assertEqual(listing('kmod-p'), {'./etc/x28-kmods.d/50-kmod-p': b'x\n'})
+            self.assertEqual(listing('kmod-q'), {'./etc/x28-kmods.d/51-kmod-q': b'y\nz\n'})  # the module order inside a package is kept
+            self.assertEqual(listing('kmod-r'), {'./etc/x28-kmods.d/52-kmod-r': b'x\n'})
+            self.assertEqual(listing('kmod-none'), {})  # nothing to load, no list
+            self.assertEqual(listing('kmod-stub'), {})
+
+    def test_data_archives_carry_their_parent_directories(self):
+        with tempfile.TemporaryDirectory() as d:
+            kmods, out = Path(d) / 'ko', Path(d) / 'out'
+            kmods.mkdir()
+            (kmods / 'a.ko').write_bytes(b'a')
+            f.build(['kmod-stub'], out, [('kmod-r', ['a'], kmods, [])])
+            index = f.parse_index((out / 'Packages').read_text())
+            outer = tarfile.open(out / index['kmod-r']['Filename'], 'r:gz')
+            data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+            names = [(m.name, m.isdir()) for m in data]
+            dirs = [n for n, is_dir in names if is_dir]
+            self.assertEqual(dirs, ['./etc', './lib', './etc/x28-kmods.d', './lib/modules', './lib/modules/x28'])
+            for n, is_dir in names:  # a directory comes before everything inside it
+                for other, _ in names:
+                    if other.startswith(n.rstrip('/') + '/'):
+                        self.assertLess([x for x, _ in names].index(n), [x for x, _ in names].index(other))
+            stub = tarfile.open(out / index['kmod-stub']['Filename'], 'r:gz')
+            self.assertEqual(tarfile.open(fileobj=io.BytesIO(stub.extractfile('./data.tar.gz').read()), mode='r:gz').getnames(), [])
+
+    def test_the_loader_is_a_package_that_enables_itself(self):
+        with tempfile.TemporaryDirectory() as d:
+            init, out = Path(d) / 'init', Path(d) / 'out'
+            init.write_bytes(b'#!/bin/sh /etc/rc.common\nSTART=97\n')
+            f.build([], out, [], init)
+            index = f.parse_index((out / 'Packages').read_text())
+            p = index['x28-kmods']
+            self.assertEqual((p['Version'], p['Architecture'], p['Depends']), (f'{f.VERSION}-r{f.REV}', 'all', f'kernel (= {f.VERSION})'))
+            outer = tarfile.open(out / p['Filename'], 'r:gz')
+            data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+            member = data.getmember('./etc/init.d/x28-kmods')
+            self.assertEqual(member.mode, 0o755)
+            self.assertEqual(data.extractfile(member).read(), init.read_bytes())
+            ctrl = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./control.tar.gz').read()), mode='r:gz')
+            self.assertEqual({m.name: m.mode for m in ctrl}, {'./control': 0o644, './postinst': 0o755, './prerm': 0o755})
+            self.assertIn(b'x28-kmods enable', ctrl.extractfile('./postinst').read())
+            self.assertIn(b'x28-kmods disable', ctrl.extractfile('./prerm').read())
+            self.assertIn(b'IPKG_INSTROOT', ctrl.extractfile('./postinst').read())  # an image build enables it itself
+            self.assertNotIn('x28-kmods', index.keys() - {'x28-kmods'})
 
     def test_epoch_keeps_the_stub_above_the_feed(self):
         self.assertTrue(f.VERSION.startswith('1:'))
