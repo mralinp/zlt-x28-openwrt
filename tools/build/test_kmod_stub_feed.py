@@ -168,6 +168,49 @@ class Build(unittest.TestCase):
             self.assertIn(b'IPKG_INSTROOT', ctrl.extractfile('./postinst').read())  # an image build enables it itself
             self.assertNotIn('x28-kmods', index.keys() - {'x28-kmods'})
 
+    def test_x28_packages_come_from_the_spec_with_modes_versions_and_enable_scripts(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / 'x').mkdir()
+            (root / 'x/svc.init').write_text('START=50\n')
+            (root / 'x/tool').write_text('#!/bin/sh\n')
+            (root / 'x/data').write_text('d\n')
+            spec = root / 'spec.ini'
+            spec.write_text('[x28-svc]\nversion = 1.2.3\nrelease = 4\ndepends = netifd jshn\ndescription = A service\n  on two lines\n'
+                            'files =\n    0755 /etc/init.d/x28-svc x/svc.init\n    0755 /sbin/x28-tool x/tool\n'
+                            '[x28-plain]\nversion = 0.1.0\nrelease = 1\ndescription = Data\nfiles =\n    0644 /usr/share/x28/data x/data\n')
+            pk = {p[0]: p for p in f.read_packages(spec)}
+            name, depends, description, files, arch, scripts, version = pk['x28-svc']
+            self.assertEqual((depends, description, arch, version), ('netifd, jshn', 'A service on two lines', 'all', '1.2.3-4'))
+            self.assertEqual([(n, m) for n, _, m in files], [('./etc/init.d/x28-svc', 0o755), ('./sbin/x28-tool', 0o755)])
+            self.assertEqual([n for n, _ in scripts], ['postinst', 'prerm'])
+            self.assertIn(b'/etc/init.d/x28-svc enable', scripts[0][1])
+            self.assertIn(b'/etc/init.d/x28-svc disable', scripts[1][1])
+            self.assertIn(b'IPKG_INSTROOT', scripts[0][1])  # an image build enables it itself
+            self.assertNotIn(b'x28-tool', scripts[0][1])
+            self.assertEqual(pk['x28-plain'][5], [])  # no init script, no scripts
+            out = Path(d) / 'out'
+            f.build([], out, [], None, list(pk.values()))
+            index = f.parse_index((out / 'Packages').read_text())
+            self.assertEqual((index['x28-svc']['Version'], index['x28-svc']['Architecture'], index['x28-svc']['Depends']), ('1.2.3-4', 'all', 'netifd, jshn'))
+            self.assertEqual(index['x28-svc']['Filename'], 'x28-svc_1.2.3-4_all.ipk')
+            outer = tarfile.open(out / 'x28-svc_1.2.3-4_all.ipk', 'r:gz')
+            data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
+            self.assertEqual(data.getmember('./etc/init.d/x28-svc').mode, 0o755)
+            self.assertTrue(data.getmember('./sbin').isdir() and data.getmember('./etc/init.d').isdir())  # parent directories
+
+    def test_the_real_spec_builds_and_every_init_script_has_its_start_line(self):
+        for name, depends, description, files, arch, scripts, version in f.read_packages():
+            self.assertRegex(version, r'^\d+\.\d+\.\d+-\d+$', name)
+            self.assertTrue(description and '\n' not in description, name)
+            for dest, data, mode in files:
+                self.assertIn(mode, (0o644, 0o755), dest)
+                if dest.startswith('./etc/init.d/'):
+                    self.assertRegex(data.decode(), r'(?m)^START=\d+$', dest)  # `enable` needs it
+                    self.assertEqual(mode, 0o755, dest)
+            if scripts:
+                self.assertTrue(any(d.startswith('./etc/init.d/') for d, _, _ in files), name)
+
     def test_epoch_keeps_the_stub_above_the_feed(self):
         self.assertTrue(f.VERSION.startswith('1:'))
 

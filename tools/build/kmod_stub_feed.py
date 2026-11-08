@@ -16,6 +16,7 @@ verify proves each stub module that has no .ko on the unit is really built in: -
 Signing is separate: `usign -S -m DIR/Packages -s KEY -x DIR/Packages.sig`.
 """
 import argparse
+import configparser
 import concurrent.futures
 import gzip
 import hashlib
@@ -37,6 +38,7 @@ STUBS = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmod-stubs/st
 REAL = STUBS.with_name('real.txt')
 LOADER = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-kmods/files/x28-kmods.init'
 LIST_DIR = './etc/x28-kmods.d'
+PACKAGES = pathlib.Path(__file__).resolve().parents[2] / 'package/x28-packages.ini'
 # An image build enables the loader itself (IPKG_INSTROOT is set then); on a running system opkg does it.
 LOADER_SCRIPTS = [('postinst', b'#!/bin/sh\n[ -n "${IPKG_INSTROOT}" ] || /etc/init.d/x28-kmods enable\nexit 0\n'),
                   ('prerm', b'#!/bin/sh\n[ -n "${IPKG_INSTROOT}" ] || /etc/init.d/x28-kmods disable\nexit 0\n')]
@@ -166,6 +168,31 @@ def stub(name, depends, description, files=(), arch='all', scripts=(), version=V
     return control, ipk
 
 
+def read_packages(spec=PACKAGES, root=None):
+    """The x28-* packages of package/x28-packages.ini as build() entries: (name, depends, description, files, arch, scripts, version).
+    Every /etc/init.d script is enabled when the package is installed on a running system and disabled when it is removed."""
+    root = pathlib.Path(root) if root else pathlib.Path(spec).parent
+    cp = configparser.ConfigParser(interpolation=None)
+    cp.read(spec)
+    out = []
+    for name in cp.sections():
+        s = cp[name]
+        files, inits = [], []
+        for line in s['files'].strip().splitlines():
+            mode, dest, src = line.split()
+            files.append((f'.{dest}', (root / src).read_bytes(), int(mode, 8)))
+            if dest.startswith('/etc/init.d/'):
+                inits.append(dest.rsplit('/', 1)[1])
+        scripts = []
+        if inits:
+            def script(verb):
+                return ('#!/bin/sh\n' + ''.join(f'[ -n "${{IPKG_INSTROOT}}" ] || /etc/init.d/{i} {verb}\n' for i in inits) + 'exit 0\n').encode()
+            scripts = [('postinst', script('enable')), ('prerm', script('disable'))]
+        out.append((name, ', '.join(s.get('depends', '').split()), ' '.join(s['description'].split()), files, 'all', scripts,
+                    f"{s['version']}-{s['release']}"))
+    return out
+
+
 def read_real(manifest, kmods):
     """real.txt lines are `package module... [| dependency...]`; the modules are read from the kmods directory."""
     out = []
@@ -177,7 +204,7 @@ def read_real(manifest, kmods):
     return out
 
 
-def build(names, out, real=(), loader=None):
+def build(names, out, real=(), loader=None, packages=()):
     out.mkdir(parents=True, exist_ok=True)
     index = []
     pkgs = [('kernel', '', f'Marks the vendor {KERNEL} kernel as installed.')]
@@ -198,10 +225,11 @@ def build(names, out, real=(), loader=None):
     if loader:
         pkgs.append(('x28-kmods', f'kernel (= {VERSION})', 'Loads the modules in /lib/modules/x28 at boot, after the A/B boot counter is reset.',
                      [('./etc/init.d/x28-kmods', pathlib.Path(loader).read_bytes(), 0o755)], 'all', LOADER_SCRIPTS))
+    pkgs += list(packages)
     for name, depends, description, *rest in pkgs:
-        version = VERSION if not rest else f'{VERSION}-r{REV}'
-        control, ipk = stub(name, depends, description, *rest, version=version)
-        filename = f'{name}_{version.split(":")[1]}_{"all" if not rest else rest[1]}.ipk'
+        version = VERSION if not rest else rest[3] if len(rest) > 3 else f'{VERSION}-r{REV}'
+        control, ipk = stub(name, depends, description, *rest[:3], version=version)
+        filename = f'{name}_{version.split(":")[-1]}_{"all" if not rest else rest[1]}.ipk'
         (out / filename).write_bytes(ipk)
         head = control[:control.index('Description: ')]
         index.append(f'{head}Filename: {filename}\nSize: {len(ipk)}\nSHA256sum: {hashlib.sha256(ipk).hexdigest()}\n'

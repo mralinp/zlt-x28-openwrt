@@ -6,7 +6,7 @@
 #
 #   docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v KMODS_DIR:/kmods:ro \
 #     -v OLD_DIR:/old:ro -v "$PWD/package/x28-kmod-stubs/real.txt:/real.txt:ro" \
-#     -v "$PWD/package/x28-kmods/files/x28-kmods.init:/loader.init:ro" -v "$PWD/tools/build:/t:ro" \
+#     -v "$PWD/package/x28-kmods/files/x28-kmods.init:/loader.init:ro" -v "$PWD/package:/pkg:ro" -v "$PWD/tools/build:/t:ro" \
 #     debian:stable-slim bash /t/opkg_real_test.sh
 #
 # ROOTFS_DIR holds rootfs-management.tar.gz; FEED_DIR is the built feed; KMODS_DIR holds the built .ko files; OLD_DIR holds
@@ -21,6 +21,7 @@ cp /kmods/*.ko $R/kmods/
 cp /old/*.ipk $R/old/
 cp /real.txt $R/real.txt
 [ -f /loader.init ] && cp /loader.init $R/loader.init
+[ -d /pkg ] && cp -R /pkg $R/pkg
 rm -f $R/etc/resolv.conf
 cp /etc/resolv.conf $R/etc/resolv.conf
 mknod -m 666 $R/dev/null c 1 3
@@ -91,6 +92,29 @@ check "  reinstalling brings it back" "$(try kmod-nbd >/dev/null; /etc/init.d/x2
 check "removing the loader removes the boot link" "$(opkg remove x28-kmods >/dev/null 2>&1; ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)" 0
 check "  and the script" "$([ -e /etc/init.d/x28-kmods ] && echo present || echo gone)" gone
 check "reinstalling the loader enables it again" "$(try x28-kmods >/dev/null; ls /etc/rc.d/S97x28-kmods 2>/dev/null | wc -l)" 1
+echo "--- the x28-* packages (#417)"
+if [ -f /pkg/x28-packages.ini ]; then
+	awk '/^\[/{gsub(/[][]/,""); pkg=$0} /^[ \t]+[0-7][0-7][0-7][0-7] \//{print pkg, $1, $2, $3}' /pkg/x28-packages.ini > /tmp/x28files
+	for p in $(awk '{print $1}' /tmp/x28files | uniq); do
+		check "$p installs" "$(try $p)" 0
+		check "  is version 0.1.0-1" "$(opkg list-installed $p | grep -c ' - 0\.1\.0-1$')" 1
+		while read -r _ mode dest src; do
+			check "  $dest is the source file" "$(cmp -s /pkg/$src $dest && echo same || echo different)" same
+			case $mode in 0755) want=rwxr-xr-x ;; 0644) want=rw-r--r-- ;; *) want=$mode ;; esac  # busybox has no stat
+			check "  $dest has mode $mode" "$(ls -l $dest | cut -c2-10)" "$want"
+			case $dest in /etc/init.d/*) n=${dest##*/}; check "  $n is enabled at boot" "$(ls /etc/rc.d/S??$n 2>/dev/null | wc -l)" 1 ;; esac
+		done <<EOT
+$(grep "^$p " /tmp/x28files)
+EOT
+	done
+	check "removing x28-leds removes its files and boot link" "$(opkg remove x28-leds >/dev/null 2>&1; ls /sbin/x28-leds /etc/init.d/x28-leds /etc/rc.d/S??x28-leds 2>/dev/null | wc -l)" 0
+	check "  reinstalling brings them and the link back" "$(try x28-leds >/dev/null; ls /sbin/x28-leds /etc/init.d/x28-leds /etc/rc.d/S??x28-leds 2>/dev/null | wc -l)" 3
+	check "removing x28-wifi removes both boot links" "$(opkg remove x28-wifi >/dev/null 2>&1; ls /etc/rc.d/S??x28-wps /etc/rc.d/S??x28-wifi-l1 /etc/init.d/x28-wps 2>/dev/null | wc -l)" 0
+	check "  reinstalling brings them back" "$(try x28-wifi >/dev/null; ls /etc/rc.d/S??x28-wps /etc/rc.d/S??x28-wifi-l1 /etc/init.d/x28-wps 2>/dev/null | wc -l)" 3
+	check "removing x28-mipc is refused while x28-modem needs it" "$(opkg remove x28-mipc >/dev/null 2>&1; echo $?)" 255
+else
+	echo "info  /pkg not mounted; skipping"
+fi
 echo "--- real consumers from the official feed"
 for p in tc-full sqm-scripts ss iptables-mod-hashlimit iptables-mod-ipsec nbd usbip proto-bonding; do
 	check "$p installs" "$(try $p)" 0

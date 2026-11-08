@@ -60,11 +60,11 @@ def repackage(upstream, modules, name='ipset'):
     return text, result
 
 
-def build(upstream, library, modules, out, stubs=(), real=()):
+def build(upstream, library, modules, out, stubs=(), real=(), packages=()):
     control, package = repackage(upstream, modules)
     library_control, library_package = repackage(library, modules, 'libipset13')
     out.mkdir(parents=True, exist_ok=False)
-    feed.build(list(stubs), out, real, feed.LOADER if real else None)
+    feed.build(list(stubs), out, real, feed.LOADER if real else None, packages)
     marker, marker_ipk = feed.stub('x28-ipset-kernel', 'kernel (= ' + feed.VERSION + ')', DESCRIPTION)
     for filename, metadata, payload in (
             ('x28-ipset-kernel_4.19.205-x28_all.ipk', marker, marker_ipk),
@@ -91,11 +91,13 @@ def main():
     parser.add_argument('--out', type=Path, required=True, help='new private output directory')
     parser.add_argument('--stubs', type=Path, default=feed.STUBS, help='kmod stub list to include')
     parser.add_argument('--real', type=Path, default=feed.REAL, help='manifest of packages that carry our built modules')
+    parser.add_argument('--x28-packages', action='store_true', help='also build the x28-* packages of package/x28-packages.ini (#417; not for the live feed before #418)')
     parser.add_argument('--kmods', type=Path, help='directory with the built .ko files; without it only the stubs and ipset are built')
     args = parser.parse_args()
     modules = {Path(name).stem for name in args.modules.read_text().split()}
     build(args.upstream.read_bytes(), args.library.read_bytes(), modules, args.out, args.stubs.read_text().split(),
-          feed.read_real(args.real, args.kmods) if args.kmods else ())
+          feed.read_real(args.real, args.kmods) if args.kmods else (),
+          feed.read_packages() if args.x28_packages else ())
     print('Local feed built; unsigned and not deployed:', args.out)
 
 
