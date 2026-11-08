@@ -95,7 +95,7 @@ system, building the image for your unit, flashing slot A and switching the boot
 4. After the first boot, open `https://192.168.70.1/cgi-bin/luci` (self-signed certificate). Root has an empty password: set one. SSH is on port 22, LAN only.
 
 The flasher downloads the newest `x28-assembly-*` bundle from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases) itself.
-What each step does is in [The flasher app](#the-flasher-app) below. `TODO(verify)`: whether a UART is still needed with the current flasher.
+What each step does is in [The flasher app](#the-flasher-app) below. A UART is not needed to flash. It is only for development and debugging.
 
 ## VPN and Passwall2
 

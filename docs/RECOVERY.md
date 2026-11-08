@@ -47,7 +47,7 @@ are examples, not execution approval; use this unit's own backups only.
 - Backups contain the unit's identity, calibration and credentials. They live in `private/`
   (git-ignored). Never publish them or use them on another unit. Keep a second copy offline.
 - Write or erase work (`risk/brick`) needs a USB read that matches the backup, a tested
-  rollback, UART access (#2) and only the inactive A/B slot.
+  rollback and only the inactive A/B slot. For development work, also UART access (#2). Users flashing with the flasher do not need a UART.
 
 ## Hardware setup
 
