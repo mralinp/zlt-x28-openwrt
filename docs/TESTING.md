@@ -583,3 +583,33 @@ filters, bonding, iptables matches, `ss` through netlink and raw diag, AF_ALG so
 **Not verified:** loading all the modules at boot through `x28-kmods` (needs a reflashed image and a reboot); `nbd`,
 `spidev`, `cdc-acm` and USB/IP against real servers or hardware; a real IPsec tunnel with ChaCha20-Poly1305; `sch_multiq`
 and the `text` ematch (not exercised by the available tools).
+
+## 43. x28-kmods loads the whole module list at boot (2026-11-08)
+
+- **Question**: with the 25 packages from the feed installed, does `x28-kmods` load all 51 modules of its list (the 8 of the image and
+  our 43) by itself after a reboot, without harm, and does its safety net hold?
+- **Setup**: the test unit (slot A, kernel 4.19.205, the 25 packages at `1:4.19.205-x28-r1` from [test 42](#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)).
+  The unit's image has the older script (8 modules), so the new `package/x28-kmods/files/x28-kmods.init` from `main` was copied
+  to `/etc/init.d/x28-kmods` (the old one saved in `/root/`). Slot A boot tries `00 00 00 00` and no marker before each phase.
+
+| Phase | Result |
+|---|---|
+| 1. Marker set to `3`, loader started | ✅ refused, logged "3 loads in a row did not finish; not loading", loaded none of the new modules |
+| 2. Marker removed, `/etc/init.d/x28-kmods start` on the running unit | ✅ 51 of 51 modules loaded within 10 s; marker `1` during the load and cleared after about 115 s; no `oops`, `bug` or `unknown symbol`; LAN, internet and services unaffected |
+| 3. `reboot` | ✅ SSH back within about 70 s on slot A; `x28-kmods` loaded 51 of 51 by itself (kernel time 30.5 s to 31.1 s, right after `x28-bootok`); marker cleared at about 150 s; boot tries `00 00 00 00`; ping 109 ms; `dnsmasq`, `dropbear`, `uhttpd`, `netifd` running, LuCI answers; Wi-Fi (`ra0`, `rai0`) and cellular (`ccmni1`) up |
+
+Side effects, as on stock OpenWrt: loading `bonding` and `dummy` creates idle `bond0` and `dummy0` (DOWN), `nbd` creates 16 `/dev/nbd*`
+nodes, taint becomes 4097. Free memory fell by about 8 MB at most. The only `dmesg` line matching "panic" is
+"Disabling lock debugging due to kernel taint" from the vendor's own modules at 15 s (the log tag contains the word).
+
+Reproduce (on the unit, after copying the script):
+
+```sh
+echo 3 > /etc/x28-kmods.loading; /etc/init.d/x28-kmods start; sleep 10; logread | grep x28-kmods; rm /etc/x28-kmods.loading   # phase 1
+/etc/init.d/x28-kmods start; sleep 10; ls /sys/module | wc -l                                                              # phase 2
+reboot                                                                                                                     # phase 3
+```
+
+**Not verified:** a reflashed image that carries this script (the same file, so no difference is expected); `nbd`, `spidev`, `cdc-acm` and USB/IP
+against real servers or hardware; a real IPsec tunnel with ChaCha20-Poly1305; a module that crashes the kernel at boot (the
+marker's retry limit was tested only with a forced marker, not with a real crash).

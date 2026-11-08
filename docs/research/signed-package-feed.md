@@ -135,5 +135,5 @@ with its release key `b5043e70f9a75cde`, and `feed-2` verifies with our key `7fe
 assets were compared with the local ones by name, size and SHA-256 (214 of 214), then the published URL was checked from outside
 (`Packages` equals the pin, the signature verifies, a downloaded package matches the index).
 
-**Still unverified:** loading all the modules at boot through `x28-kmods`, and the flasher (`first_boot.py` in
-mralinp/x28-flasher) still writes the `feed-2` line into new images.
+Loading all the modules at boot through `x28-kmods` is tested ([test 43](../TESTING.md#43-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08)).
+**Still open:** the flasher (`first_boot.py` in mralinp/x28-flasher) still writes the `feed-2` line into new images.

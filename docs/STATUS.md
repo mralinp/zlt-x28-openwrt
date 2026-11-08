@@ -25,7 +25,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 205 of the 976 official `kmod-*`
-  packages install (180 stubs and 25 built for this kernel), the rest are refused ([TESTING 42](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
+  packages install (180 stubs and 25 built for this kernel), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 42](TESTING.md), [TESTING 43](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).

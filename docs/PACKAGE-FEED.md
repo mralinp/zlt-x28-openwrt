@@ -94,14 +94,16 @@ The details, commands and the trust model are in [research/signed-package-feed.m
 
 ## What has been tested, and what has not
 
-Tested ([TESTING 42](TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
+Tested ([TESTING 43](TESTING.md#43-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08), [TESTING 42](TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
 
 - the image's own `opkg` in a container against the published URL with the key the image ships: 118 checks, 0 failures;
 - all 25 built packages install, their module files are byte-identical to the build, 8 real consumers install from the
   official feeds, unsupported things stay refused, and the earlier hand-copied modules upgrade to the signed ones;
 - on the test unit, each module loaded and was exercised (traffic shaping, tc actions and filters, bonding, iptables
   matches, netlink/raw diag, AF_ALG sockets, the ChaCha20-Poly1305 RFC 7539 test vector).
+- after a reboot, `x28-kmods` loaded all 51 modules of its list by itself (about 30 s into the boot, once `x28-bootok` had reset the
+  boot counter), and its retry limit refuses to load after three unfinished loads in a row (tested with a forced marker).
 
-**Not tested:** loading all the modules at boot through `x28-kmods` (it needs a reflashed image and a reboot); real
+**Not tested:** a reflashed image that carries the longer module list (the test unit got the same script by hand); real
 hardware for `nbd`, `spidev`, `cdc-acm` and USB/IP; a real IPsec tunnel with ChaCha20-Poly1305; `sch_multiq` (a virtual
 device has one transmit queue) and the `text` ematch (the unit's `tc` does not know it).
