@@ -33,4 +33,6 @@ done
 for f in /tmp/src/tproxy/*.ko /tmp/src/wireguard/wireguard.ko; do
 	strip --strip-debug -o "/out/$(basename "$f")" "$f"
 done
+# The same files are the contents of the kmod-wireguard, kmod-ipt-tproxy and kmod-ipt-socket feed packages (#415).
+cp /out/*.ko /out/feed/
 cd /out && sha256sum *.ko | tee SHA256SUMS

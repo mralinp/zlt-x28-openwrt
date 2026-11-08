@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test the whole feed (stubs, vendor ipset and the packages that carry our built modules) with the image's real opkg in a
 # throwaway chroot, official feeds on (#396). Signs with a temporary key. Needs network. Runs on an arm64 host, nothing on
-# the router. With -e FEED_URL=... it tests a published feed with the key the image ships instead (no /feed mount, no
+# the router. With -e EXPECT_PACKAGES=N it also checks the size of the index. With -e FEED_URL=... it tests a published feed with the key the image ships instead (no /feed mount, no
 # temporary key).
 #
 #   docker run --rm --cap-add MKNOD -v ROOTFS_DIR:/in:ro -v FEED_DIR:/feed:ro -v KMODS_DIR:/kmods:ro \
@@ -48,8 +48,10 @@ grep -c '^src/gz x28 ' /etc/opkg/customfeeds.conf /etc/opkg/distfeeds.conf | tr 
 opkg update >/tmp/o 2>&1
 check "feed update succeeds" $? 0
 check "the feed's signature verifies" "$(grep -c 'Signature check failed' /tmp/o)" 0
-check "the index lists 209 packages" "$(zcat /var/opkg-lists/x28 | grep -c '^Package:')" 209
+[ -z "${EXPECT_PACKAGES:-}" ] || check "the index lists $EXPECT_PACKAGES packages" "$(zcat /var/opkg-lists/x28 | grep -c '^Package:')" "$EXPECT_PACKAGES"
 
+echo "--- the records an older image invents for its baked modules (replaced by the feed packages below)"
+for p in kmod-wireguard kmod-ipt-tproxy kmod-ipt-socket; do echo "info  $p before: $(opkg list-installed $p | cut -d' ' -f3)"; done
 echo "--- each package that carries our modules"
 while read -r line; do
 	case "$line" in ''|'#'*) continue ;; esac
