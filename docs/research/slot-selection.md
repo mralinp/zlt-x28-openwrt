@@ -1,5 +1,7 @@
 # Selecting slot A and getting back to B (#92)
 
+> **Correction (2026-11-09, #302):** the preloader's limit is 6 tries, not 3, and it reads the first of the four copies whose magic matches. See [slot-b-reuse](slot-b-reuse.md).
+
 Offline, 2026-10-29: stock upgrade scripts in `rootfs-b-system.tar.gz`, strings of the preloader
 (`mtd00-preloader.bin`) and `lk_b`, the verified `misc` dump, and the [UART log](uart-boot-log.md).
 Nothing was run on the router and no record was written. **This is a plan with an unverified

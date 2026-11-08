@@ -81,6 +81,7 @@ Older analysis and plans, kept for the evidence behind decisions in the document
 - [`research/recovery-route-proof.md`](research/recovery-route-proof.md): Proving the way back before the first write (gate 6)
 - [`research/rootfs-a-write-plan.md`](research/rootfs-a-write-plan.md): First native image: write, select, recover (plan for #90)
 - [`research/rootfs-signed-content.md`](research/rootfs-signed-content.md): What LK authenticates, and the device-test gate (#40)
+- [`research/slot-b-reuse.md`](research/slot-b-reuse.md): What the preloader does without slot B, and what B is worth as storage (#302)
 - [`research/slot-selection.md`](research/slot-selection.md): Selecting slot A and getting back to B (#92)
 - [`research/uart-boot-log.md`](research/uart-boot-log.md): UART boot log: slot choice and signature checks
 - [`research/x28-hardware-architecture.md`](research/x28-hardware-architecture.md): X28 hardware architecture

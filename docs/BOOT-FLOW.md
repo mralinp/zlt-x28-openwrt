@@ -14,6 +14,9 @@ The older slot-B and unresolved-custom-boot statements below describe their orig
 branch changes; the source dump and device remain unchanged. The [check explanation and replacement plan](research/lk-boot-auth-preview.md)
 distinguish binary patching from rebuilding LK and list the unresolved preloader, artifact and recovery stages.
 
+**Preloader slot logic (#302, 2026-11-09):** the preloader's code for the `misc` record, the tries limit (6), the default for a bad record and what it
+means for slot B is in [slot-b-reuse](research/slot-b-reuse.md).
+
 ## Current slot
 
 **Confirmed: slot B is active.** `/proc/cmdline` contains `bootslot=b` and mounts the root filesystem from
