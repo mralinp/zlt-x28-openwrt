@@ -7,12 +7,12 @@ Date: 2026-10-20.
 
 | What | Where |
 |---|---|
-| SSH | `ssh router` (root, port 2222, key `~/.ssh/router`, `ssh-rsa` enabled in `~/.ssh/config`) |
+| SSH | `ssh x28` (root, port 2222, key `~/.ssh/router`, `ssh-rsa` enabled in `~/.ssh/config`) |
 | LuCI | `http://192.168.70.1:4153/cgi-bin/luci` (no trailing slash) |
 | Vendor UI | ports 80 / 443, docroot `/tzwww`, separate from LuCI |
 
 LuCI runs under its own `mini_httpd -p 4153 -d /www`. There is no uhttpd and no `/etc/config/uhttpd`.
-The LuCI login is the Linux `root` password (set with `printf 'root:<pw>\n' | ssh router chpasswd`).
+The LuCI login is the Linux `root` password (set with `printf 'root:<pw>\n' | ssh x28 chpasswd`).
 
 ## Starting point
 
@@ -55,7 +55,7 @@ Do not run vendor binaries such as `sms_mgr` with unknown flags: `sms_mgr -h` is
 ## Rollback
 
 ```sh
-ssh router '
+ssh x28 '
 cp /root/dispatcher.lua.orig /usr/lib/lua/luci/dispatcher.lua
 cp /www/index.html.orig /www/index.html
 rm -f /usr/libexec/rpcd/network /usr/share/rpcd/acl.d/luci-mod-network.json /usr/share/rpcd/acl.d/luci-mod-status.json

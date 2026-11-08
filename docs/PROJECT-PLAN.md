@@ -3,7 +3,7 @@
 Goal: an optimized, modern OpenWrt for the ZLT X28 (MediaTek MT6890 / T750, 4x Cortex-A55), with a fully
 working stock LuCI, cooler operation, and local SMS and voice for an AI project.
 
-> **Current state:** [STATUS.md](STATUS.md). **Evidence:** [TESTING.md](TESTING.md). **History:** [CHANGELOG](../CHANGELOG.md).
+> **Current state:** [STATUS.md](STATUS.md). **Roadmap:** [ROADMAP.md](ROADMAP.md). **Evidence:** [TESTING.md](TESTING.md). **History:** [CHANGELOG](../CHANGELOG.md).
 > This plan was written on 2026-10-20 and brought up to date on 2026-10-29; facts learned since are marked *(updated)*.
 
 ## What we know (measured on the device, 2026-10-20)

@@ -3,7 +3,7 @@
 How to back up the X28's NAND and reach it over USB when Linux no longer boots.
 Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 
-> **Moved, 2026-11-06:** the `tools/recovery/` scripts named below now live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (#343); run them from there. The procedures and evidence here still apply.
+> **Moved, 2026-11-06:** the `tools/recovery/` scripts named below are **not in this repo any more**. They live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (#343), which is private for now; run them from there. `TODO(verify)`: script names and flags against that repo. The procedures and evidence here still apply.
 
 > **Status, 2026-10-29:** USB reads and the bounded changed-page restore test pass. In inactive
 > `rootfs_sig_a`, one 4 KiB pattern page was verified, then the original restored byte-for-byte;
@@ -54,7 +54,7 @@ are examples, not execution approval; use this unit's own backups only.
 | Cable | **USB-A to USB-C**, into a USB-A port (a hub or adapter is fine) |
 | Does not work | USB-C to USB-C: the Mac never sees an attach, so the preloader finds no cable and skips USB |
 | Host | macOS on Apple Silicon. `usb_watch.py` is macOS-only; the other scripts are portable |
-| Router access | `ssh router` (port 22 on the native image, 2222 on older ones; key auth) for step 1 |
+| Router access | `ssh x28` (port 22 on the native image, 2222 on older ones; key auth) for step 1 |
 
 Why C-to-C fails (inferred, not measured): the Mac logged no USB-C attach and no accessory
 event in two power cycles, which fits a modem-side port without CC pull-down resistors.

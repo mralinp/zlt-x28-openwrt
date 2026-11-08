@@ -7,7 +7,7 @@ The X28 image has two halves, built in different places because of licensing:
 | **Open userspace** | OpenWrt 23.05.5 for `armsr/armv8` (aarch64, runs on the Cortex-A55): base system, netifd, **fw3 + iptables-legacy** instead of firewall4, dnsmasq, dropbear, LuCI | GitHub Actions (`.github/workflows/userspace.yml`) or locally, with [`tools/build/userspace.sh`](../tools/build/userspace.sh) |
 | **Vendor half** | stock 4.19 kernel and its 146 modules, the modem/cellular/Wi-Fi binaries, and four 19.07 compatibility libraries | **locally only**, from the unit's own backup (assembly pending; see [#74 input audit](research/native-image-readiness.md)) |
 
-> **Current state, 2026-10-29 (`v0.22.0`):** the assembly is no longer pending. The pipeline is `userspace.sh` (CI) →
+> **Current state, 2026-11-08 (`v0.68.0`):** the assembly is no longer pending. Each release publishes one `x28-assembly-vX.Y.Z.tar.gz`; the image is assembled from it and your backup by the [x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/build/` there; private for now, so the exact flasher commands here are `TODO(verify)`). The text below was written step by step from 2026-10-29 and some commands name the old `tools/` paths. The pipeline is `userspace.sh` (CI) →
 > `stage_native.py` → `first_boot.py` → `package_ubi.py` (offline container) → a guarded `slot_entry.py` flash to slot A
 > ([RECOVERY](RECOVERY.md)). The sections below are in the order the pieces were built and keep their dated notes;
 > older statements such as "no WAN interface, DHCP server or web service" describe that day's profile, not today's. The

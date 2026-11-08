@@ -20,7 +20,7 @@ distinguish binary patching from rebuilding LK and list the unresolved preloader
 `ubi.mtd=42` (`rootfs_b`) as squashfs on `/dev/ubiblock0_0`. `lk_a` and `lk_b` are byte-identical in the backup.
 
 ```bash
-ssh router 'cat /proc/cmdline; cat /proc/mtd'
+ssh x28 'cat /proc/cmdline; cat /proc/mtd'
 ```
 
 ## Partitions per slot

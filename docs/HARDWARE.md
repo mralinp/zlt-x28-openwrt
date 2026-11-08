@@ -18,7 +18,7 @@ The kernel's limits are 500 MHz and 2,000 MHz, in 16 steps, with one frequency s
 1.5 GHz when measured.
 
 ```bash
-ssh router 'cd /sys/devices/system/cpu/cpufreq/policy0; cat cpuinfo_min_freq cpuinfo_max_freq scaling_cur_freq scaling_governor'
+ssh x28 'cd /sys/devices/system/cpu/cpufreq/policy0; cat cpuinfo_min_freq cpuinfo_max_freq scaling_cur_freq scaling_governor'
 ```
 
 ## RAM
@@ -57,8 +57,8 @@ falling `MemAvailable` seen in the soak ([#213](https://github.com/mralinp/zlt-x
 `/tmp` is RAM. Its 313 MiB limit is a ceiling, not a reservation.
 
 ```bash
-ssh router 'grep -E "^(MemTotal|MemFree|MemAvailable|Buffers|Cached|AnonPages|Slab|SReclaimable|KernelStack|PageTables|VmallocUsed|CmaTotal):" /proc/meminfo'
-ssh router 'ls /proc/device-tree/reserved-memory/'
+ssh x28 'grep -E "^(MemTotal|MemFree|MemAvailable|Buffers|Cached|AnonPages|Slab|SReclaimable|KernelStack|PageTables|VmallocUsed|CmaTotal):" /proc/meminfo'
+ssh x28 'ls /proc/device-tree/reserved-memory/'
 ```
 
 ## Flash
@@ -90,7 +90,7 @@ Flash in slot B is reserved for stock today. The planned [recovery slot](https:/
 would keep its size but change what `rootfs_b` holds.
 
 ```bash
-ssh router 'cat /proc/mtd; ubinfo -a; df -h'
+ssh x28 'cat /proc/mtd; ubinfo -a; df -h'
 ```
 
 ## Root filesystem
@@ -129,7 +129,7 @@ Reflashing byte-identical image bytes keeps the overlay, and the usual resets do
 [RECOVERY](RECOVERY.md#clearing-settings-when-the-overlay-is-on-user_data-183).
 
 ```bash
-ssh router 'ls -la /; cat /proc/mounts; du -sk /rom/*'
+ssh x28 'ls -la /; cat /proc/mounts; du -sk /rom/*'
 ```
 
 ## Device tree
@@ -161,5 +161,5 @@ other MAC addresses. **Do not paste your own unfiltered tree into a public issue
 names and the board identity.
 
 ```bash
-ssh router 'cd /proc/device-tree; ls; tr "\0" " " < compatible'
+ssh x28 'cd /proc/device-tree; ls; tr "\0" " " < compatible'
 ```

@@ -1,4 +1,4 @@
-# Project status — 2026-11-07
+# Project status — 2026-11-08
 
 The older status snapshot (stock-firmware overlay era, 2026-10-21) is kept in
 [archive/2026-10-21-STATUS.md](archive/2026-10-21-STATUS.md). Evidence for everything below is in
@@ -12,8 +12,8 @@ adapter. Preserve the working modem, board calibration and recoverability.
 
 ## Where it stands
 
-Release `v0.62.1`. The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
-is flashed to slot A of one test unit and boots; stock slot B is untouched.
+Release `v0.68.0` (a pre-release). The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock slot B is untouched. Most feature tests were done on the first unit; the PRO tests are in [TESTING](TESTING.md) 42 to 44 and 49.
 
 **Working on that unit**
 - 5G data through the `x28_mipc` netifd protocol (IPv4, IPv6, IPv4v6, APN from the SIM) and its LuCI page.
@@ -27,7 +27,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 208 of the 976 official `kmod-*`
   packages install (180 stubs and 28 built for this kernel, WireGuard and TPROXY included), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 45](TESTING.md), [TESTING 46](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
-- The x28-* packages (modem, Wi-Fi, LEDs, boot counter, overlay, loader) are feed packages guarded by `x28-base`, and the flasher installs them from the same ipks ([PACKAGE-FEED](PACKAGE-FEED.md#package-model-and-updates)); not yet proven on a unit.
+- The x28-* packages (modem, Wi-Fi, LEDs, boot counter, overlay, loader) are feed packages guarded by `x28-base`, and the flasher installs them from the same ipks ([PACKAGE-FEED](PACKAGE-FEED.md#package-model-and-updates)); proven on two units with the packaged image ([TESTING 49](TESTING.md)). The feed holds 224 packages.
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
   Every image build ships it.
@@ -44,7 +44,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)). The load average of about 3 is
   vendor threads in uninterruptible sleep, harmless ([TESTING 33](TESTING.md)).
 - SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
-- One unit, one SIM, one carrier. Hardware revision differences are unknown.
+- One SIM, one carrier. Differences between X28 and X28 PRO hardware are only known where [TESTING](TESTING.md) 42 to 44 record them.
+- `sysupgrade` and OTA are not available. L2TP and PPTP are not tested against a server.
 
 ## Known limits of the base
 
@@ -57,7 +58,7 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 
 ## Next
 
-See the roadmap in [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, then a recovery slot on B (a small kernel
+See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, then a recovery slot on B (a small kernel
 and rescue path that installs OpenWrt on A and can restore stock), `sysupgrade` for that layout, a stable release and
 the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
 sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

@@ -36,7 +36,7 @@ vendor kernel threads in uninterruptible sleep ([TESTING 33](TESTING.md)). It do
   passing traffic, and no fan: `for z in /sys/class/thermal/thermal_zone*; do echo "$(cat $z/type) $(cat $z/temp)"; done`
   (values are in thousandths of a degree).
 - **With the fan** the numbers come from the reboot-surviving logger from #6 (`/usr/bin/templog`, one line per
-  minute in `/root/templog`, last ~200 lines kept): `ssh router 'tail -n 20 /root/templog'`.
+  minute in `/root/templog`, last ~200 lines kept): `ssh x28 'tail -n 20 /root/templog'`.
 - The modem was confirmed up when the fan result was taken: `ping 8.8.8.8` from the router answered in about 95 ms
   through the SIM.
 

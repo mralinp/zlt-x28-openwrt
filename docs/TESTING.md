@@ -81,7 +81,7 @@ Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and 
 
 ## 1. Full NAND backup over SSH
 
-- **Setup**: root SSH to the running X28 (`ssh router`).
+- **Setup**: root SSH to the running X28 (`ssh x28`).
 - **Run**: `python3 tools/recovery/dump_partitions.py` (streams `nanddump --bb=padbad -q /dev/mtdN` per
   partition into gzip files with SHA-256 and ECC notices), then
   `python3 tools/recovery/verify_backup.py private/backups/<date>`.
@@ -269,8 +269,8 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
   for procd's `system board`, which LuCI's header needs. Reviewed by `router-safety-auditor` before the run.
 - **Run** (everything under `/tmp`; the script deletes its tree and the tarball on exit):
   ```bash
-  ssh router 'cat > /tmp/x28-rootfs.tar.gz' < private/build/out/openwrt-23.05.5-armsr-armv8-generic-rootfs.tar.gz
-  ssh router 'sh -s' < tools/build/device_ram_test.sh
+  ssh x28 'cat > /tmp/x28-rootfs.tar.gz' < private/build/out/openwrt-23.05.5-armsr-armv8-generic-rootfs.tar.gz
+  ssh x28 'sh -s' < tools/build/device_ram_test.sh
   ```
 - **Result** (2026-10-23, OEM 1.5.13, kernel 4.19.205, 268 MB available, SoC 50 °C before and after):
   **10/10 checks passed**, twice:
@@ -301,7 +301,7 @@ transmitting UART bytes or entering a password. **Do not wire a 3.3 V adapter's 
   the read-back hash of `rootfs_a` equals the candidate, every neighbour partition (boot, lk, tee, signature, `misc`,
   the whole B side and the modem-side partitions) is unchanged before and after, one write, no retry, no reboot.
   Dry runs: `python3 tools/recovery/slot_entry.py rootfs_a identical --candidate-dir <ubi dir> [--base-dir <ubi dir>]`.
-- **Boot and router checks** (24–26, 30), read over `ssh router` and from the Mac:
+- **Boot and router checks** (24–26, 30), read over `ssh x28` and from the Mac:
   `grep bootslot /proc/cmdline`, `ifstatus wan`, `ping 1.1.1.1`, `iptables -t nat -S POSTROUTING`, `wifi status`,
   `curl -d luci_username=root -d luci_password= http://192.168.70.1/cgi-bin/luci` (302 = logged in),
   `/sys/class/thermal/thermal_zone*/temp`, `top`. The reboot test: record the SSH host key and Wi-Fi key hash, `reboot`,

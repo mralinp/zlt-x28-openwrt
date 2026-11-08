@@ -19,4 +19,3 @@ Roughly in order ([PROJECT-PLAN](PROJECT-PLAN.md) has the detail):
 5. Later: fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), local SMS and voice
    on the native image, and a 4.19 kernel plus kmod feed built from a sibling-device SDK
    ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).
-

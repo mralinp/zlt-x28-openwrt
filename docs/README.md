@@ -4,14 +4,15 @@ Read in this order if you are new (or returning after a long break):
 
 1. [**STATUS.md**](STATUS.md): where the project stands today, what works and what is unproven.
 2. [**TESTING.md**](TESTING.md): what has actually been proven, with commands to reproduce it. Start here for evidence.
-3. [**PROJECT-PLAN.md**](PROJECT-PLAN.md): goal, strategy, phases, the roadmap to a stable release and the risks.
-4. [**BUILD.md**](BUILD.md): how the native image is built (open half in CI, vendor half locally).
-5. [**RECOVERY.md**](RECOVERY.md): backup, USB recovery path, UART, flash sessions, safety rules. Read before touching flash.
-6. [**BOOT-FLOW.md**](BOOT-FLOW.md): A/B slots, the preloader boot counter, the rootfs signature check.
-7. [**NATIVE-CELLULAR.md**](NATIVE-CELLULAR.md): the `x28_mipc` cellular protocol.
-8. [**THERMAL.md**](THERMAL.md): heat baseline, the 12 V fan and current readings.
-9. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
-10. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
+3. [**ROADMAP.md**](ROADMAP.md): what comes next (recovery slot, `sysupgrade`, stable release).
+4. [**PROJECT-PLAN.md**](PROJECT-PLAN.md): goal, strategy, phases, the roadmap to a stable release and the risks.
+5. [**BUILD.md**](BUILD.md): how the native image is built (open half in CI, vendor half locally).
+6. [**RECOVERY.md**](RECOVERY.md): backup, USB recovery path, UART, flash sessions, safety rules. Read before touching flash.
+7. [**BOOT-FLOW.md**](BOOT-FLOW.md): A/B slots, the preloader boot counter, the rootfs signature check.
+8. [**NATIVE-CELLULAR.md**](NATIVE-CELLULAR.md): the `x28_mipc` cellular protocol.
+9. [**THERMAL.md**](THERMAL.md): heat baseline, the 12 V fan and current readings.
+10. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
+11. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
 
 What changed and when: [../CHANGELOG.md](../CHANGELOG.md).
 
@@ -21,6 +22,7 @@ What changed and when: [../CHANGELOG.md](../CHANGELOG.md).
 docs/
 ├── README.md                 this index
 ├── STATUS.md                 current state (older snapshots live in archive/)
+├── ROADMAP.md                what comes next, moved out of the README
 ├── TASKS.md                  task overview by area, with the roadmap items
 ├── TESTING.md                test log: every test, result, reproduce command, what is not proven
 ├── PROJECT-PLAN.md           goal, strategy, phase status, roadmap to a stable release, risks, operating rules
