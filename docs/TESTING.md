@@ -62,6 +62,7 @@ Conventions:
 | 46 | `x28-kmods` loads the whole module list at boot | 2026-11-08 | ✅ after a real reboot 51 of 51 modules loaded at 30 s of kernel time, the marker cleared and the boot tries returned to `00`; the retry limit refuses with a forced marker: [section 46](#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08) |
 | 47 | WireGuard and TPROXY as feed packages: the live feed updated in place, the test unit upgraded | 2026-11-08 | ✅ 132 container checks, 0 failures against the published URL; the unit's invented records became the signed `-r1` packages with identical module files; WireGuard and the TPROXY/socket matches work, also after a reboot: [section 47](#47-wireguard-and-tproxy-as-feed-packages-on-the-live-feed-and-the-unit-2026-11-08) |
 | 48 | `x28-kmods` as a package, with the module list in the packages | 2026-11-08 | ✅ 148 container checks, 0 failures against the published URL; on the unit the 28 module packages and the loader were upgraded in one go, the forced marker refused, a live load brought 42 modules back in 3 s, and after a real reboot the loader loaded all 51 by itself: [section 48](#48-x28-kmods-as-a-package-with-the-module-list-in-the-packages-2026-11-08) |
+| 49 | The packaged image from the signed feed with 222 packages, on two reflashed units | 2026-11-08 | ✅ both units flashed and boot fast without errors (owner's report); `opkg update` passes every signature; `x28-base` refuses removal of `x28-modem`; 248 container checks, 0 failures: [section 49](#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -662,3 +663,19 @@ install into a directory the image lacks. Every data archive now carries its par
 **Not verified:** a freshly flashed image built from packages (the flasher still bakes the modules and the old script until #420); a
 unit with the new loader but only some module packages upgraded (the migration upgrades everything in one command before the reboot);
 the `-r1` files still on the release (kept until this passed; they are not in the index).
+
+## 49. The packaged image and the feed with the x28-* packages (2026-11-08)
+
+- **Question**: does the signed feed with the x28-* packages and `x28-base` (222 packages, [#423](https://github.com/mralinp/zlt-x28-openwrt/issues/423)) work with the image's own `opkg`, and does an image built from those packages run on real units?
+- **Setup**: the feed was built with `vendor_ipset.py --x28-packages`, checked against the release ipks with `release_check.py compare` (`ok`), signed offline and published in place (Packages `2935ebb8…48d6`). The image was built by the flasher at `87dbdf0` (packaged mode, mralinp/x28-flasher#73) from the release bundle. Both units were flashed by the owner with the guarded tools.
+
+| Check | Result |
+|---|---|
+| The published `Packages` has the pinned SHA-256; the signature verifies with the repo's public key; `compare` against the live URL is `ok` | ✅ |
+| The image's real `opkg` in a container against the live URL: signature, 222 packages, each x28-* package installs with files equal to the repo sources, modes and boot links right, module packages and refusals as before, the hand-copied `kmod-sched-core` upgrades: **248 checks, 0 failures** | ✅ |
+| Both units flashed with the packaged image: fully functional, fast boots, no errors (owner's report; the details were not collected here) | ✅ |
+| On a flashed unit, `opkg update` passes the signature check on our feed and every other feed | ✅ |
+| On a flashed unit, `opkg remove x28-modem --noaction` is refused: `x28-base` depends on it; `--force-depends` is the named override | ✅ |
+
+**Not verified:** `opkg upgrade` of an x28-* package from the feed on a unit; rolling back with `--force-downgrade`; a reboot after upgrading
+a boot-critical package; the full package list on the flashed units (not collected); the flasher's CI release (its runs were cancelled).

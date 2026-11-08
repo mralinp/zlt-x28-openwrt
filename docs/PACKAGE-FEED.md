@@ -77,7 +77,7 @@ reboot**, so reboot after upgrading them. A module package never replaces a load
 
 **Rolling back.** The feed keeps one current version per package, but the older `.ipk` files stay on the feed release until we clean them up, and every
 firmware release bundle holds the exact set it was made from. To go back, install the older file by its URL with `opkg install --force-downgrade URL`
-(the `-rN` revisions order correctly), then reboot if the package is a boot-critical one. This has not been tested on a unit yet.
+(the `-rN` revisions order correctly), then reboot if the package is a boot-critical one. This has not been tested on a unit yet. What is tested: [TESTING 49](TESTING.md#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) (the packaged image on two units, the `x28-base` protection).
 
 ## Using it
 
