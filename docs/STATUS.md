@@ -24,7 +24,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
 - SSH takes the owner's key or the root password on port 22 (LAN only). Root has an empty password until the owner sets one (LuCI or `passwd`), like stock OpenWrt; dropbear never accepts an empty password, so password login starts then.
 - The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
-- `opkg` works through our signed feed. OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
+- `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 205 of the 976 official `kmod-*`
+  packages install (180 stubs and 25 built for this kernel), the rest are refused ([TESTING 42](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
   built for this kernel with no symbol version check, loaded late at boot ([BUILD](BUILD.md), [TESTING 37](TESTING.md)).
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
@@ -50,7 +51,8 @@ is flashed to slot A of one test unit and boots; stock slot B is untouched.
   copies it from the owner's own backup.
 - The vendor 4.19.205 kernel has no `nf_tables` (so fw3), no namespaces (so no `ujail`), and `CONFIG_MODVERSIONS`: the
   official feeds' kernel modules do not load, userspace packages do. `opkg` works through our signed
-  [feed](research/signed-package-feed.md): stubs for what the kernel has, and a clear refusal for what it lacks ([TESTING 36](TESTING.md)).
+  [feed](PACKAGE-FEED.md): stubs for what the kernel has, built modules for what it lacks and can take, and a clear refusal for the
+  rest ([TESTING 36](TESTING.md), [TESTING 42](TESTING.md)).
 
 ## Next
 

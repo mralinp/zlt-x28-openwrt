@@ -1,0 +1,107 @@
+# The X28 package feed
+
+**Supported for one device line only: the ZLT X28 and its rebrands (MediaTek MT6890, vendor kernel 4.19.205, aarch64,
+OpenWrt 23.05.5 userspace).** The feed carries kernel packages built for that exact kernel and its config. It is not valid for
+other devices or kernels, and nothing here makes the official 23.05 kernel packages (5.15) work.
+
+The feed is a normal signed `opkg` feed, published as the newest GitHub release of this repository:
+
+```text
+src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
+```
+
+Images from the flasher carry the key; they still carry the older `feed-2` line until the flasher is updated (see
+"Using it" to switch). Signing key fingerprint:
+**`7fec994ab0d15b97`** (`package/x28-feed/files/x28-feed.pub`, installed as `/etc/opkg/keys/7fec994ab0d15b97`). `opkg`
+checks the signature; do not turn that off.
+
+## What it does
+
+The official feeds carry about 10 000 userspace packages that run on this device as they are, and 976 kernel-module packages
+(`kmod-*`) built for kernel 5.15. The X28 runs a vendor 4.19.205 kernel, so the official `kmod-*` packages can never load.
+This feed makes `opkg` tell the truth about that kernel:
+
+| What | Count | Meaning |
+|---|---|---|
+| `kernel` record | 1 | marks the running kernel as installed, so packages that need `kernel (= …)` resolve |
+| Stubs | 180 | empty `kmod-*` packages for modules the kernel already has (built in or shipped by the vendor), so userspace that depends on them installs |
+| Built modules | 25 | `kmod-*` packages that carry modules the vendor kernel lacks, built for it (version `1:4.19.205-x28-r1`) |
+| Vendor ipset | 3 | `ipset`, `libipset13` and a marker, for the vendor kernel's ipset set types |
+
+A package that needs a kernel module the feed has neither stubbed nor built **fails to install with a clear error** instead
+of installing something that cannot load. That is by design: `opkg install kmod-nft-core` is refused, not broken.
+
+All versions carry the epoch `1:`, so they outrank the official 5.15 packages. `opkg` may print
+`cannot find dependency kernel (= 5.15…)` while installing; it refers to the official record it is ignoring, and the install
+continues.
+
+## What is covered
+
+Of the 976 official 23.05 kmods (see [the gap analysis](research/kmod-gap.md)):
+
+- **205** install: 180 stubs and 25 built modules. This includes SQM (`sqm-scripts`, `sch_cake`), `tc-full`, `veth`, `macvlan`,
+  `bonding`, `nbd`, `usbip`, `ss` (netlink/raw diag), `iptables-mod-hashlimit`, `iptables-mod-ipsec`,
+  the IPv6 raw table (`kmod-ipt-raw6`), ChaCha20-Poly1305 for strongSwan, flower/vlan/bpf traffic control, `dummy`, `uleds`, and the USB serial driver `cdc-acm`.
+  **24 of the 27** kmods that some user package depends on are covered. The other three: `kmod-ipt-ipset` (covered by the vendor
+  ipset packages instead), `kmod-ipt-quota2` (its source exists only in the vendor SDK) and `kmod-iscsi-initiator`
+  (skipped; needs a SCSI transport module for one niche package).
+- **About 190** more are buildable out of tree but not built, because no package depends on them (network and SATA drivers
+  for hardware this SoC does not have). They can be added on request.
+- **581** need a kernel change or a backport, and stay refused: `nftables`/`firewall4`, `ksmbd`, DES-based IPsec,
+  Bluetooth, the Wi-Fi stack (`cfg80211`), namespaces, and similar. 74 user packages depend directly on one of them; the
+  firewall stays `fw3` with iptables. Getting these means a new kernel, which is [#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)
+  and a flash with brick risk.
+
+LuCI itself is not affected: only two `luci-*` packages (`luci-app-siitwizard`, `luci-proto-batman-adv`) depend directly on a
+refused module.
+
+## Using it
+
+On an image built from the flasher the key is already there. On a running unit:
+
+```sh
+# the key ships with images; check it
+ls /etc/opkg/keys/7fec994ab0d15b97
+# replace an older x28 line (feed-1, feed-2) with the stable URL
+sed -i 's|^src/gz x28 .*|src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download|' /etc/opkg/customfeeds.conf
+opkg update
+opkg upgrade kmod-sched-core   # or any built module; see `opkg list-upgradable`
+```
+
+Built modules are installed in `/lib/modules/x28/`, out of reach of the kernel's on-demand `modprobe`. The `x28-kmods` init
+script loads them about 30 seconds after boot, once `x28-bootok` has reset the A/B boot counter, and stops after three loads
+in a row that did not finish, so a bad module cannot cause a boot loop. **Images built before the module list was extended
+do not know the newer modules:** load them by hand with `insmod /lib/modules/x28/<name>.ko` until the image is rebuilt.
+
+A newly built version of a module has a higher revision (`-r2`, …), so `opkg upgrade` picks it up.
+
+## How a release is made
+
+1. The modules are built locally against the private vendor SDK tree (`package/x28-kmods/build.sh`); 38 of them come from
+   unchanged Linux 4.19.205 files, 5 (`libchacha`, `libpoly1305`, `chacha_generic`, `poly1305_generic`, `chacha20poly1305`)
+   from the SDK's own `crypto/` files, because the vendor kernel has the 5.x crypto library. Only built `.ko` files are
+   published, never the SDK sources.
+2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 209-package feed. The result is reproducible: three fresh builds
+   were byte-identical.
+3. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
+   listing in [feed-3-index.txt](research/feed-3-index.txt)), signs it with the offline key and verifies the signature.
+   Signing on a Mac uses `tools/build/usign/`, a container built from the exact `usign`/`libubox` commits OpenWrt 23.05 uses.
+4. The assets are uploaded to a draft release one file at a time, compared with the local files, and the release is
+   published as **latest**. Firmware releases are created with `--latest=false`, so they never take that slot. Older feed
+   releases (`feed-1`, `feed-2`) stay for older images.
+
+The details, commands and the trust model are in [research/signed-package-feed.md](research/signed-package-feed.md).
+
+## What has been tested, and what has not
+
+Tested ([TESTING 42](TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
+
+- the image's own `opkg` in a container against the published URL with the key the image ships: 118 checks, 0 failures;
+- all 25 built packages install, their module files are byte-identical to the build, 8 real consumers install from the
+  official feeds, unsupported things stay refused, and the earlier hand-copied modules upgrade to the signed ones;
+- on the test unit, each module loaded and was exercised (traffic shaping, tc actions and filters, bonding, iptables
+  matches, netlink/raw diag, AF_ALG sockets, the ChaCha20-Poly1305 RFC 7539 test vector).
+
+**Not tested:** loading all the modules at boot through `x28-kmods` (it needs a reflashed image and a reboot); real
+hardware for `nbd`, `spidev`, `cdc-acm` and USB/IP; a real IPsec tunnel with ChaCha20-Poly1305; `sch_multiq` (a virtual
+device has one transmit queue) and the `text` ematch (the unit's `tc` does not know it).

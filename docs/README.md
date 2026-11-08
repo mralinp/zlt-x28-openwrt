@@ -11,6 +11,7 @@ Read in this order if you are new (or returning after a long break):
 7. [**NATIVE-CELLULAR.md**](NATIVE-CELLULAR.md): the `x28_mipc` cellular protocol.
 8. [**THERMAL.md**](THERMAL.md): heat baseline, the 12 V fan and current readings.
 9. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
+10. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
 
 What changed and when: [../CHANGELOG.md](../CHANGELOG.md).
 
@@ -29,6 +30,7 @@ docs/
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
 ├── THERMAL.md                baseline, fan result and the native image reading, how it was measured
+├── PACKAGE-FEED.md           the supported X28 opkg feed: URL, key, coverage, limits, how a release is made
 ├── research/kernel-module-crc.md  TPROXY module CRCs vs the stock kernel, and how they load anyway
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting

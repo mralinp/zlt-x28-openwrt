@@ -85,29 +85,55 @@ limits remain; signing does not add kernel features or make the full official ag
 
 ## feed-3: the stable-URL feed (#396)
 
-**Pinned and reviewed, not yet signed or published.** `feed_release.py` pins the index of 209 packages:
+**2026-11-08: published and working on the unit** ([test 42](../TESTING.md#42-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08)). User view: [PACKAGE-FEED](../PACKAGE-FEED.md).
+The feed holds 209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built modules (`1:4.19.205-x28-r1`)
+and the 3 vendor ipset packages. `feed_release.py` pins its index:
 `INDEX_SHA256 = 1da26cdcc8c1c5fb4a8029767b30895573639d103a0ccb7c95d5c56ccea5a270`. The plain listing to review is
-[feed-3-index.txt](feed-3-index.txt): the `kernel` record, 180 stubs, 25 packages that carry our built modules
-(`1:4.19.205-x28-r1`) and the 3 vendor ipset packages. Three fresh builds gave byte-identical output.
+[feed-3-index.txt](feed-3-index.txt). Three fresh builds gave byte-identical output.
 
-Rebuild it (needs the built modules in `private/kmods-395/feed`, the inputs of the vendor-ipset doc, and the SDK volume for the modules):
-
-```sh
-python3 tools/build/vendor_ipset.py --upstream private/research/200-ipset/upstream.ipk \
-  --library private/research/200-ipset/upstream-libipset13.ipk \
-  --modules private/research/200-ipset/running-module-files.txt \
-  --out private/feed-396b --kmods private/kmods-395/feed
-shasum -a 256 private/feed-396b/Packages     # must equal INDEX_SHA256
-```
-
-Stable URL: the feed is published as a normal release marked latest, so images and units configure it once:
+**Stable URL.** The feed is a normal release marked *latest*, so images and units configure one line, ever:
 
 ```text
 src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
 ```
 
-Each new feed revision is a new release (`feed-4`, ...) created with `--latest`; the old ones stay as snapshots. Firmware
-releases are created with `--latest=false` (`release.yml`), so they never take that slot.
+Each new feed revision is a new release (`feed-4`, ...) created with `--latest`; the old ones stay as snapshots, and `feed-1`
+and `feed-2` stay for older images. Firmware releases are created with `--latest=false` (`release.yml`), so they never take
+that slot (a 1.0 release would have). The flasher lists all releases and accepts only `vX.Y.Z` tags with an `x28-assembly-*`
+asset, so a feed release being "latest" does not affect it.
 
-**Still to do:** signing (needs a Linux `usign`; this Mac has none, and the earlier tests used the image's binary), the container
-test with the image's opkg, the draft release (one asset at a time) and the `first_boot.py` change in the flasher repo.
+**Revisions.** Packages built from `real.txt` carry `1:4.19.205-x28-rN` (`REV` in `kmod_stub_feed.py`), so `opkg` upgrades them
+when a module is rebuilt. Stubs keep `1:4.19.205-x28`, which the `kernel (= …)` dependency pins. Bump `REV` whenever the content
+of any of those packages changes.
+
+### Making a release
+
+```sh
+# 1. build the modules (needs the private SDK volume), then the feed
+docker run --rm -v x28-kbuild:/k -v "$PWD/package/x28-kmods:/src:ro" -v "$PWD/private/kmods:/out" debian:bookworm bash /src/build.sh
+python3 tools/build/vendor_ipset.py --upstream private/research/200-ipset/upstream.ipk \
+  --library private/research/200-ipset/upstream-libipset13.ipk \
+  --modules private/research/200-ipset/running-module-files.txt --out private/feed-N --kmods private/kmods/feed
+shasum -a 256 private/feed-N/Packages     # review the listing, then update INDEX_SHA256 in a PR
+# 2. sign with the offline key; usign runs in a container built from the exact OpenWrt 23.05 sources.
+#    Use absolute paths: the wrapper mounts only the directories it sees as absolute path arguments.
+docker build -t x28-usign:1 tools/build/usign
+P=$PWD; PATH="$P/tools/build/usign:$PATH" python3 tools/build/feed_release.py --feed $P/private/feed-N \
+  --private-key $P/private/signing/x28-feed-20261101/x28-feed.sec --public-key $P/package/x28-feed/files/x28-feed.pub \
+  --out $P/private/research/NNN-signed-feed/release-feed-N
+# 3. upload to a draft one file at a time, compare, then publish as latest
+gh release create feed-N --draft --target "$(git rev-parse HEAD)" --title feed-N --notes-file NOTES.md
+gh release upload feed-N FILE            # one at a time; 214 assets timed out as a single call before
+gh release edit feed-N --draft=false --prerelease=false --latest
+# 4. test the published URL
+docker run ... -e FEED_URL=https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download ... bash /t/opkg_real_test.sh
+```
+
+`tools/build/usign/` checks `git rev-parse HEAD` after fetching `usign` `f1f65026…` and `libubox` `75a3b870…` (the commits
+OpenWrt 23.05 builds). It was tested with a throwaway key, a tampered file is rejected, OpenWrt's own 23.05 `base` feed verifies
+with its release key `b5043e70f9a75cde`, and `feed-2` verifies with our key `7fec994ab0d15b97`. For `feed-3` the uploaded
+assets were compared with the local ones by name, size and SHA-256 (214 of 214), then the published URL was checked from outside
+(`Packages` equals the pin, the signature verifies, a downloaded package matches the index).
+
+**Still unverified:** loading all the modules at boot through `x28-kmods`, and the flasher (`first_boot.py` in
+mralinp/x28-flasher) still writes the `feed-2` line into new images.

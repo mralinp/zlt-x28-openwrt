@@ -549,3 +549,37 @@ this agrees with the 0.45 cores per 100 Mbit/s of section 31, so the router was 
 node and the second router's Wi-Fi share what is left.
 
 **Not verified:** a client wired straight to the X28, and a link fast enough to reach the CPU ceiling.
+
+## 42. X28 feed-3 with opkg and on the unit (2026-11-08)
+
+- **Question**: does the published, signed feed (209 packages: the `kernel` record, 180 stubs, 25 packages that carry our built
+  modules, 3 vendor ipset) work with the image's own `opkg`, and does it replace the modules copied to the unit by hand?
+- **Setup**: `tools/build/opkg_real_test.sh` runs the image's `opkg` (rootfs of build 264) in a throwaway chroot on an arm64
+  Docker host, official feeds on, against `https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download` with the key
+  the image ships (no temporary key). Then the same URL on the test unit (slot A, kernel 4.19.205).
+
+| Check | Result |
+|---|---|
+| The image ships key `7fec994ab0d15b97`; `opkg update` passes the signature check; the index lists 209 packages | ✅ |
+| Each of the 25 built packages installs as `1:4.19.205-x28-r1`; every module file equals the build output (44 file checks); the dependency-only `kmod-sched-connmark` carries no files | ✅ |
+| `tc-full`, `sqm-scripts`, `ss`, `iptables-mod-hashlimit`, `iptables-mod-ipsec`, `nbd`, `usbip`, `proto-bonding` install from the official feed | ✅ |
+| `kmod-nft-core`, `iptables-mod-quota2`, `open-iscsi` and the incomplete `kmod-ipt-ipset` are refused; `ipset` installs through the vendor subset | ✅ |
+| No 5.15 `kmod-*` installed or offered as an upgrade | ✅ |
+| The hand-copied `1:4.19.205-x28` kmod-sched-core is offered as an upgrade and becomes `-r1` | ✅ |
+| **On the unit**: the feed line moved to the stable URL, `opkg update` passes the signature, exactly the 25 hand-copied packages are offered, `opkg upgrade` makes all 25 `-r1`, nothing is left to upgrade, and all 43 module files equal the signed build | ✅ |
+| After the upgrade, `sch_cake` shaped traffic on a throwaway veth pair and an `act_gact` drop action dropped its packets; no reboot (up 5:17), no oops in `dmesg` | ✅ |
+
+Result: 118 checks, 0 failures in the container. Reproduce:
+
+```sh
+docker run --rm --cap-add MKNOD -e FEED_URL=https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download \
+  -v ROOTFS_DIR:/in:ro -v KMODS_DIR:/kmods:ro -v OLD_DIR:/old:ro \
+  -v "$PWD/package/x28-kmod-stubs/real.txt:/real.txt:ro" -v "$PWD/tools/build:/t:ro" debian:stable-slim bash /t/opkg_real_test.sh
+```
+
+The modules themselves were tested one by one on the unit while they were built (loading, traffic shaping, tc actions and
+filters, bonding, iptables matches, `ss` through netlink and raw diag, AF_ALG sockets, and the RFC 7539 ChaCha20-Poly1305 vector).
+
+**Not verified:** loading all the modules at boot through `x28-kmods` (needs a reflashed image and a reboot); `nbd`,
+`spidev`, `cdc-acm` and USB/IP against real servers or hardware; a real IPsec tunnel with ChaCha20-Poly1305; `sch_multiq`
+and the `text` ematch (not exercised by the available tools).

@@ -64,6 +64,7 @@ One unit, one SIM, one carrier. Current release: see the badge above; the full s
 | Slot A marked successful | ❌ deliberately not: success stays 0 so the fall-back to stock B remains (see [BOOT-FLOW](docs/BOOT-FLOW.md)) |
 | Temperature | ✅ about 40 °C idle on the SoC (stock 65 °C idle without a fan, 46 °C with the 12 V fan) |
 | SMS and voice | 🗓️ worked on the stock-firmware overlay (voice blocked by the SIM); not yet on the native image |
+| `opkg` with a signed feed for this device line | ✅ 205 of the 976 official kernel packages install (built for this kernel), the rest are refused cleanly: [PACKAGE-FEED](docs/PACKAGE-FEED.md) |
 | Recovery slot, sysupgrade, fan control, own kernel | 🗓️ planned, see the roadmap |
 
 Every ✅ links to evidence and a reproduce command in **[docs/TESTING.md](docs/TESTING.md)**. The vendor modem
@@ -196,7 +197,7 @@ path ([RECOVERY](docs/RECOVERY.md#uart-debug-console-2-read-side-confirmed)). Th
 Start with [docs/TESTING.md](docs/TESTING.md) for evidence and [docs/STATUS.md](docs/STATUS.md) for the current state.
 [docs/README.md](docs/README.md) is the full index and code map; the main ones:
 [PROJECT-PLAN](docs/PROJECT-PLAN.md), [BUILD](docs/BUILD.md), [RECOVERY](docs/RECOVERY.md), [BOOT-FLOW](docs/BOOT-FLOW.md),
-[NATIVE-CELLULAR](docs/NATIVE-CELLULAR.md), [PASSWALL2](docs/PASSWALL2.md), [THERMAL](docs/THERMAL.md),
+[NATIVE-CELLULAR](docs/NATIVE-CELLULAR.md), [PACKAGE-FEED](docs/PACKAGE-FEED.md), [PASSWALL2](docs/PASSWALL2.md), [THERMAL](docs/THERMAL.md),
 [WORKFLOW](docs/WORKFLOW.md), the [kmod gap analysis](docs/research/kmod-gap.md) (what it takes to carry every official package) and the [CHANGELOG](CHANGELOG.md).
 
 ## Releases
