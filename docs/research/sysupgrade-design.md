@@ -1,0 +1,75 @@
+# Sysupgrade for the A/B layout: design (#154)
+
+Research and design only; nothing here was run on a device. Inputs: [slot-b-reuse](slot-b-reuse.md) (preloader behaviour, decoded not run),
+the build guard in [BUILD](../BUILD.md), and the flasher's boot-order step. Open points are marked.
+
+## Constraints that shape it
+
+- `misc` is written only from the running system (`dd-nand`, four copies, last first, read back). DL cannot write it, so the priority flip
+  and the tries reset are sysupgrade's job, as in the flasher's *Boot order* step.
+- The preloader picks A unless B's priority is higher, counts a try per boot, and at 6 tries gives the other slot priority 15 and resets.
+  `x28-bootok` puts the running slot's tries back to 0 after a good boot.
+- The image build **refuses** `sysupgrade`, `ubiformat`, `ubiupdatevol`, `mtd ... write`, `lib/upgrade/*` and writes to `/dev/mtd*`
+  ([BUILD](../BUILD.md), `ab_guard` in x28-flasher). Sysupgrade needs a reviewed, narrow exception, not a general one.
+- The slot image is a full UBI image (`rootfs` squashfs + `rootfs_data`, 126 erase blocks) for `rootfs_a`/`rootfs_b`. LK checks
+  `rootfs_sig`, not the rootfs content, and no content check was found, so a new rootfs needs no new signature.
+- The overlay lives on `user_data` and is reset when the image UUID changes ([overlay-policy](overlay-policy.md)). A kept config is a
+  separate decision.
+
+## Two modes
+
+| | **Native B** (#450) | **In place on A** (no native B) |
+|---|---|---|
+| Target | The inactive slot's `rootfs_x` (and `boot_x` if the kernel changes) | `rootfs_a`, the running root |
+| Runs from | RAM (the usual `nand_do_upgrade` stage 2) | RAM, same |
+| Backstop if the new image does not boot | Preloader flips back to the old slot at 6 tries; the old slot is untouched | Stock B repairs A (erases it), then the flasher over DL; or DL directly |
+| Power loss mid-write | Old slot untouched; new slot half-written but not selected yet | A half-written and selected: it boots, fails, and falls to B at 6 tries |
+
+Native B is the safe design; the in-place mode is what exists today. Both share the steps below.
+
+## Steps (OpenWrt `platform_check_image` / `platform_do_upgrade` shape)
+
+1. **Check** (running system, no writes): the file is a UBI image for this board, its size fits the mtd, the manifest hash matches, and
+   `x28-bootok` is installed. Refuse if the running slot's tries are not 0, since a counting slot is not a good base.
+2. **Pick the target** from `bootslot` on the command line (native B: the other slot; in place: A). Read `misc`, check the magic in all four
+   copies, and refuse otherwise.
+3. **Write from RAM**: stop services, `ubiformat` the target mtd with the image, then read the whole mtd back and compare its hash.
+   Touch nothing else and **do not touch `misc` yet**.
+4. **Only then change `misc`** (native B): target priority above the other (15 and 14), target tries 0, success untouched; four copies, last
+   first, each read back. In place there is no flip: A stays selected, A's tries are reset to 0 after the verify.
+5. **Reboot.** The new image's `x28-bootok` resets its slot's tries after a healthy boot. A boot that never gets there counts to 6 and the
+   preloader falls back.
+
+Never reset tries or flip priorities before step 3 verifies: a half-written slot with a fresh budget is the worst case.
+
+## Failure behaviour
+
+| Failure | Result |
+|---|---|
+| Image check fails (1, 2) | Nothing written. |
+| Write or read-back mismatch (3) | Target left unselected (native B) and the old slot boots as before. In place: A is damaged; the next boot counts tries toward the fall-back. |
+| Power loss in 3 | As above. |
+| Power loss in 4 | At most one `misc` copy is mid-write. The preloader takes the first copy with a valid magic, so copy 1 (written last) still says the old state until the end. |
+| New image boots but is bad | Tries count to 6, preloader flips back (native B), old slot boots. |
+| Both slots bad | Loop or hang; only DL with the flasher. |
+
+## Image format and config
+
+- One file: a tarball in the OpenWrt sysupgrade shape (`sysupgrade-x28/CONTROL`, `root` = the UBI image, a hash file), built by the same
+  tooling as the slot image, in x28-flasher's `tools/build`. No new signing: the feed key is for packages.
+- Config: `sysupgrade -k` keeps `/etc/config` through a `sysupgrade.tgz` restored on first boot into the new overlay. The boot-path guard
+  must run over those files before they are applied ([overlay-policy](overlay-policy.md)).
+
+## Open and untested
+
+- Whether a half-written A panics and resets, or hangs until the watchdog; the command line has no `panic=`.
+- The preloader's tries-6 branch (never seen; the logged maximum is 5).
+- Whether the preloader recovers a `misc` whose copy 1 is blank (decoded as yes, not run).
+- The narrow exception to the build guard, and the bumped `ab_guard`/submodule pin in x28-flasher.
+
+## Implementation issues to open after review
+
+1. Sysupgrade image tarball and its host checks (x28-flasher `tools/build`), no device.
+2. `platform_*` hooks and the `misc` writer as a package, host-tested with a fake `misc` and writer (`risk/brick`).
+3. Build-guard exception limited to that package (x28-flasher), auditor review.
+4. Hardware pass on the sacrificial unit with UART: step 3 interrupted, step 4 interrupted, a bad image, the tries-6 fall-back.

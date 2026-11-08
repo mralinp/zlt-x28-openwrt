@@ -83,6 +83,7 @@ Older analysis and plans, kept for the evidence behind decisions in the document
 - [`research/rootfs-signed-content.md`](research/rootfs-signed-content.md): What LK authenticates, and the device-test gate (#40)
 - [`research/slot-b-reuse.md`](research/slot-b-reuse.md): What the preloader does without slot B, and what B is worth as storage (#302)
 - [`research/slot-selection.md`](research/slot-selection.md): Selecting slot A and getting back to B (#92)
+- [`research/sysupgrade-design.md`](research/sysupgrade-design.md): Sysupgrade for the A/B layout: design (#154)
 - [`research/uart-boot-log.md`](research/uart-boot-log.md): UART boot log: slot choice and signature checks
 - [`research/x28-hardware-architecture.md`](research/x28-hardware-architecture.md): X28 hardware architecture
 - [`research/x28-mainline-kernel-feasibility.md`](research/x28-mainline-kernel-feasibility.md): X28 mainline kernel feasibility
