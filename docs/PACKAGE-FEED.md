@@ -84,10 +84,12 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
    published, never the SDK sources.
 2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 212-package feed. The result is reproducible: fresh builds
    are byte-identical.
-3. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
+3. Before signing, `python3 tools/build/release_check.py compare --index FEED_DIR/Packages DIR` proves the feed holds the same bytes as the
+   ipks the image assembly uses (the x28-* packages CI builds and the pinned module ipks), and flags a changed file with an unchanged version.
+4. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
    listing in [feed-index.txt](research/feed-index.txt)), signs it with the offline key and verifies the signature.
    Signing on a Mac uses `tools/build/usign/`, a container built from the exact `usign`/`libubox` commits OpenWrt 23.05 uses.
-4. There is **one feed release**, marked **latest**, and it is updated in place: new packages are uploaded first, then the
+5. There is **one feed release**, marked **latest**, and it is updated in place: new packages are uploaded first, then the
    index (`Packages`, `Packages.gz`, `Packages.sig`) is replaced last, so clients switch to the new set at once. Firmware
    releases are created with `--latest=false`, so they never take that slot. The tag is only a label (it is still
    `feed-3`); the URL does not contain it. `feed-1` and `feed-2` are old and only used by older images.

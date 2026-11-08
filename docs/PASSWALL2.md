@@ -23,7 +23,7 @@ came back on their own after a reboot.
 | `opkg` dependencies | `kmod-ipt-tproxy` and `kmod-ipt-socket` records at the kernel's version, so `iptables-mod-tproxy` and `-socket` resolve. `iptables-mod-extra` still wants `kmod-ipt-extra`, which has no stub yet |
 
 The sources are in [`package/x28-kmods`](../package/x28-kmods/README.md); the modules are built against the private SDK
-tree, so the built files never enter Git or a feed; they are published as release `kmods-4.19.205` and bundled into every release's
+tree, so the built files never enter Git or a feed; they are published as packages on the feed release and bundled into every release's
 `x28-assembly-*` asset ([BUILD](BUILD.md#vpn-set-and-wireguard-in-the-image-230)). Build them with `package/x28-kmods/build.sh` and pass the directory
 to `first_boot.py --tproxy-modules` ([BUILD](BUILD.md#vpn-set-and-wireguard-in-the-image-230)).
 

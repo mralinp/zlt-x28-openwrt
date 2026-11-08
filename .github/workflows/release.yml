@@ -81,9 +81,16 @@ jobs:
           cp userspace/*.manifest "$B/userspace.manifest"
           # The package files first_boot.py reads (X28_OVERLAY).
           tar -cf - package/luci-proto-x28-mipc package/x28-bootok/files package/x28-dhcp/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-wifi/files | tar -xf - -C "$B/overlay"
-          # Built against the private SDK tree, so not built here: taken from the kmods release (#352).
-          gh release download kmods-4.19.205 -D "$B/kmods"
-          (cd "$B/kmods" && sha256sum -c SHA256SUMS)
+          # One set of ipks for the image and the signed feed (#419). The x28-* packages need no SDK: built here, byte for byte
+          # what the feed is cut from. The module packages are built locally against the private SDK tree and sit on the
+          # newest feed release, which is updated in place; they are taken from there by the hashes in package/x28-kmods/ipk.sha256,
+          # so this job never waits for signing, and a changed file fails here instead of shipping.
+          python3 tools/build/release_check.py x28 --out "$B/ipk"
+          gh release download --dir "$B/ipk" $(awk '{print "-p " $2}' package/x28-kmods/ipk.sha256)
+          python3 tools/build/release_check.py fetch "$B/ipk" || { echo "package/x28-kmods/ipk.sha256 is out of date: run release_check.py pin"; exit 1; }
+          # first_boot.py reads the eight image modules as .ko files until it reads ipks (#420).
+          python3 tools/build/release_check.py kmods "$B/ipk" --out "$B/kmods"
+          (cd "$B/kmods" && sha256sum -- *.ko > SHA256SUMS)
           # ipset from the feed-2 release; alsa-lib and libstdcpp6 from OpenWrt 23.05.5, pinned by hash.
           gh release download feed-2 -D "$B/ipk" -p 'ipset_*' -p 'libipset13_*' -p 'x28-ipset-kernel_*'
           R=https://downloads.openwrt.org/releases/23.05.5

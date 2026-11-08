@@ -6,6 +6,9 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- One set of ipks per release for the image and the signed feed (#419): CI builds the x28-* packages, the module ipks come from the
+  feed release by pinned hash, `tools/build/release_check.py compare` proves a feed revision holds the same bytes, and the
+  `kmods-4.19.205` release is retired.
 - Releases publish one `x28-assembly-vX.Y.Z.tar.gz` (userspace, package files, the eight kernel modules, extra packages)
   instead of loose userspace, manifest and overlay assets; the modules are published as release `kmods-4.19.205`.
   The x28-flasher must switch to the bundle (#352).
