@@ -117,9 +117,10 @@ else
 fi
 echo "--- x28-base protects the required packages (#418)"
 if [ -f /pkg/x28-packages.ini ]; then
-	MEMBERS="x28-mipc x28-modem x28-wifi x28-leds x28-bootok x28-dhcp x28-kmods x28-storage luci-proto-x28-mipc"
+	MEMBERS="x28-mipc x28-modem x28-wifi x28-leds x28-bootok x28-dhcp x28-kmods x28-storage luci-proto-x28-mipc x28-switch x28-nrband"
 	check "x28-base installs" "$(try x28-base)" 0
-	check "  is version 0.1.0-1" "$(opkg list-installed x28-base | grep -c ' - 0\.1\.0-1$')" 1
+	check "  is version 0.1.0-2" "$(opkg list-installed x28-base | grep -c ' - 0\.1\.0-2$')" 1
+	check "  x28-nrband brought /usr/sbin/x28-nrband (executable, an ELF file)" "$([ -x /usr/sbin/x28-nrband ] && head -c 4 /usr/sbin/x28-nrband | tr -d '\177')" ELF
 	for m in $MEMBERS kernel; do
 		check "removing $m is refused" "$(opkg remove $m >/dev/null 2>&1; echo $?)" 255
 		check "  and $m is still installed" "$(opkg list-installed $m | grep -c .)" 1
