@@ -69,10 +69,14 @@ opkg update
 opkg upgrade kmod-sched-core   # or any built module; see `opkg list-upgradable`
 ```
 
-Built modules are installed in `/lib/modules/x28/`, out of reach of the kernel's on-demand `modprobe`. The `x28-kmods` init
-script loads them about 30 seconds after boot, once `x28-bootok` has reset the A/B boot counter, and stops after three loads
-in a row that did not finish, so a bad module cannot cause a boot loop. **Images built before the module list was extended
-do not know the newer modules:** load them by hand with `insmod /lib/modules/x28/<name>.ko` until the image is rebuilt.
+Built modules are installed in `/lib/modules/x28/`, out of reach of the kernel's on-demand `modprobe`. Each module package also
+ships a list, `/etc/x28-kmods.d/NN-<package>` (`NN` is 50 plus its depth among our packages, so a package loads after the ones it
+needs). The loader, the `x28-kmods` package, reads its short built-in list and then those files and loads the modules about 30
+seconds after boot, once `x28-bootok` has reset the A/B boot counter; it stops after three loads in a row that did not finish, so
+a bad module cannot cause a boot loop. `/etc/init.d/x28-kmods modules` prints what it would load, in order. Installing or removing
+a module package adds or removes its modules from the load; nothing else is edited. **A unit or image that still has the old loader
+(a fixed list baked into the image) needs `opkg install x28-kmods` once**; it replaces the old script and from then on every
+module package loads itself. Until then, load newer modules by hand with `insmod /lib/modules/x28/<name>.ko`.
 
 A newly built version of a module has a higher revision (`-r2`, …), so `opkg upgrade` picks it up.
 
@@ -82,7 +86,7 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
    unchanged Linux 4.19.205 files, 5 (`libchacha`, `libpoly1305`, `chacha_generic`, `poly1305_generic`, `chacha20poly1305`)
    from the SDK's own `crypto/` files, because the vendor kernel has the 5.x crypto library. Only built `.ko` files are
    published, never the SDK sources.
-2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 212-package feed. The result is reproducible: fresh builds
+2. `tools/build/vendor_ipset.py … --kmods DIR` assembles the 213-package feed. The result is reproducible: fresh builds
    are byte-identical.
 3. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
    listing in [feed-index.txt](research/feed-index.txt)), signs it with the offline key and verifies the signature.
@@ -98,8 +102,8 @@ The details, commands and the trust model are in [research/signed-package-feed.m
 
 Tested ([TESTING 46](TESTING.md#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08), [TESTING 45](TESTING.md#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08), [TESTING 36](TESTING.md#36-x28-opkg-feed-on-the-unit-2026-11-02)):
 
-- the image's own `opkg` in a container against the published URL with the key the image ships: 132 checks, 0 failures;
-- all 28 built packages install, their module files are byte-identical to the build, 8 real consumers install from the
+- the image's own `opkg` in a container against the published URL with the key the image ships: 148 checks, 0 failures;
+- all 28 module packages and the loader install (opkg needs parent directories in the package, which they now have), their module files are byte-identical to the build, 8 real consumers install from the
   official feeds, unsupported things stay refused, and the earlier hand-copied modules upgrade to the signed ones;
 - on the test unit, each module loaded and was exercised (traffic shaping, tc actions and filters, bonding, iptables
   matches, netlink/raw diag, AF_ALG sockets, the ChaCha20-Poly1305 RFC 7539 test vector).
