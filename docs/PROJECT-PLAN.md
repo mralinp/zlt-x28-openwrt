@@ -28,7 +28,7 @@ Migrate in stages so the box stays usable after every stage.
 - **Stage 1: adapter layer (superseded).** Vendor daemons stay, UCI is synced to the vendor backend via `vendorbridge`/`vendorsync` on the stock firmware (`router/`). It worked, but it is not the goal; the native image does not use it.
 - **Stage 2: take over networking (done on slot A).** Real `netifd`, the firewall and `dnsmasq`, with the modem WAN through our own `x28_mipc` protocol; the vendor network managers are gone. *(updated)* The stock kernel has no `nf_tables`, so the firewall is **fw3 + iptables-legacy**, not fw4.
 - **Stage 3: rebuilt rootfs (done on slot A).** OpenWrt 23.05.5 userland (musl, aarch64) on the vendor kernel and its modules, flashed to the inactive A/B slot with guarded tools. *(updated)* It boots on one unit with 5G, LuCI, LAN, Wi-Fi and LEDs ([STATUS](STATUS.md)).
-- **Stage 4: stable release with a recovery slot (next).** See the roadmap below.
+- **Stage 4: stable release (next).** Recovery is the flasher over DL mode, not a recovery slot. See the roadmap below.
 
 ## Phase status (2026-10-29)
 
@@ -40,7 +40,7 @@ Migrate in stages so the box stays usable after every stage.
 | 3 SMS and voice | 🗓️ worked on the stock overlay; to be ported to the native image |
 | 4 Source and toolchain | 🟡 stock blobs extracted and used; GPL source not obtained; own kernel parked ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)) |
 | 5 Modern OpenWrt image | ✅ boots on slot A with LAN, Wi-Fi and cellular data; stock slot B untouched |
-| 6 Release | 🟡 pre-releases on every merge; stable release, recovery slot and `sysupgrade` still ahead |
+| 6 Release | 🟡 pre-releases on every merge; stable release and `sysupgrade` still ahead |
 
 ## Phases
 
@@ -87,18 +87,17 @@ Reproducible build (CI), versioned images, upgrade path (slot switch), docs, a r
 
 ## Roadmap to a stable release (2026-10-29)
 
-Target layout: **slot A holds a stable OpenWrt, slot B becomes a recovery slot**. The recovery slot is a small kernel
-and rescue path that can install or reinstall OpenWrt on slot A and can put the stock firmware back. Today both slots
-hold a full firmware; with a recovery slot the second full firmware is no longer kept, which frees storage, and
-everyday recovery no longer needs the download agent and a UART. The download-agent route stays as the last resort.
+Target layout: **slot A holds a stable OpenWrt; slot B keeps the stock firmware** as the automatic fall-back (the preloader
+switches to B when A's tries reach 6 and stock repairs A). *(updated 2026-11-09)* The recovery slot (#152, #153) was dropped:
+**recovery is the [x28-flasher](https://github.com/mralinp/x28-flasher) over the download-agent (DL) mode**, which needs a
+computer, a USB-A to USB-C cable and the user's own download agent. DL cannot write `misc`, so it cannot reset the A/B
+state. What to do with B's storage is answered in [slot-b-reuse](research/slot-b-reuse.md): only `rootfs_b` (64 MiB) is plain data, not worth the fall-back.
 
 1. **Stabilise slot A.** 48 h soak with no unexplained reboots, Wi-Fi client and throughput tests, more LED states,
    idle CPU and RAM baseline, find out why the load average is ~3 on an idle CPU. Compare temperatures with the
    baseline in [THERMAL](THERMAL.md).
-2. **Recovery slot.** Design the small kernel and rescue environment, how it is entered (boot record, button or
-   failed boots), how it installs A, and the way back to stock. Prove it on the test unit with the download agent as
-   the safety net, then retire the stock copy in B. Risk: today the fall-back to stock B is the safety net, so the
-   recovery slot has to be as good before the stock copy goes.
+2. **Recovery (done differently).** No recovery slot: the way back is the flasher over DL mode, and the fall-back to stock B stays
+   as it is (see above). Remaining work is the flasher's, in its own repository.
 3. **`sysupgrade`** for the new layout (A/B NAND with UBI and a preloader that picks the slot).
 4. **Publish.** A stable tagged release, build documentation for other owners, and a device page for the OpenWrt
    wiki. The vendor modem blobs cannot be redistributed, so this ships the tooling and packages, not a ready image.

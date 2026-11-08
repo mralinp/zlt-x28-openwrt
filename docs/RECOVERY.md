@@ -16,9 +16,8 @@ Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 > (identical rewrite first, then write, each verified by read-back and neighbour guards) and the unit boots them. The
 > download-agent route is the proven way to replace slot A. It is **not** proven for `misc`: block writes there were
 > never acknowledged (twice), so `misc` is only changed live with the stock `dd-nand` method, byte by byte, with the
-> full partition compared after each write ([TESTING](TESTING.md) 28 and 29). The planned recovery slot
-> ([PROJECT-PLAN](PROJECT-PLAN.md)) is meant to make this everyday path independent of the download agent; the
-> agent stays the last resort.
+> full partition compared after each write ([TESTING](TESTING.md) 28 and 29). There is no recovery slot
+> ([PROJECT-PLAN](PROJECT-PLAN.md)): the download agent with the flasher is the way back, and needs a computer, USB and your own agent.
 
 See the [#72 changed-page result](research/changed-page-restore-result.md),
 [#70 identical-write result](research/patched-identical-write-result.md),

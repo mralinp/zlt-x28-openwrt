@@ -45,6 +45,7 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
   vendor threads in uninterruptible sleep, harmless ([TESTING 33](TESTING.md)).
 - SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
 - One SIM, one carrier. Differences between X28 and X28 PRO hardware are only known where [TESTING](TESTING.md) 42 to 44 record them.
+- Recovery is the flasher over DL mode, not a recovery slot: it needs a computer, USB and your own download agent. DL cannot write `misc`, so it cannot reset the A/B state ([slot-b-reuse](research/slot-b-reuse.md)).
 - `sysupgrade` and OTA are not available. L2TP and PPTP are not tested against a server.
 
 ## Known limits of the base
@@ -58,7 +59,6 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
 
 ## Next
 
-See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, then a recovery slot on B (a small kernel
-and rescue path that installs OpenWrt on A and can restore stock), `sysupgrade` for that layout, a stable release and
-the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
+See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, `sysupgrade` for the A/B layout
+([#154](https://github.com/mralinp/zlt-x28-openwrt/issues/154)), a stable release and the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
 sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

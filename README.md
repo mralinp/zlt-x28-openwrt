@@ -75,7 +75,7 @@ Two units have run the native image: one X28 and one X28 PRO. Detail and evidenc
 | Boot slot switch (A and B) | working | tested | tested ([TESTING 42](docs/TESTING.md)) |
 | SMS and voice | not working on the native image (worked on the stage 1 overlay) | not ported | not ported |
 | `sysupgrade`, OTA | not available | planned | planned |
-| Recovery slot on B, fan control, own kernel | not available | planned | planned |
+| Fan control, own kernel | not available | planned | planned |
 
 Notes:
 

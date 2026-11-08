@@ -44,8 +44,7 @@ stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list 
 ## F. Stable release (roadmap)
 
 - [ ] 48 h soak with no unexplained reboots; idle CPU and RAM baseline; explain the load average of ~3 on an idle CPU.
-- [ ] **Recovery slot** on B: small kernel and rescue path that installs OpenWrt on A and can restore stock; frees the
-      flash that holds a second full firmware. Prove it, then retire the stock copy.
+- [x] ~~Recovery slot on B~~ dropped (#152, #153): recovery is the flasher over DL mode ([slot-b-reuse](research/slot-b-reuse.md)).
 - [ ] `sysupgrade` for the new layout.
 - [ ] Stable tagged release; OpenWrt wiki device page; build documentation.
 - [ ] Prove restore and independent installation on another unit.
