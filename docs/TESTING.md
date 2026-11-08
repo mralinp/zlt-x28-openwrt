@@ -61,6 +61,7 @@ Conventions:
 | 45 | X28 feed-3 with the image's opkg and on the unit | 2026-11-08 | ✅ 118 checks, 0 failures against the published URL; the unit upgraded its 25 hand-copied modules to the signed `-r1` packages: [section 45](#45-x28-feed-3-with-opkg-and-on-the-unit-2026-11-08) |
 | 46 | `x28-kmods` loads the whole module list at boot | 2026-11-08 | ✅ after a real reboot 51 of 51 modules loaded at 30 s of kernel time, the marker cleared and the boot tries returned to `00`; the retry limit refuses with a forced marker: [section 46](#46-x28-kmods-loads-the-whole-module-list-at-boot-2026-11-08) |
 | 47 | WireGuard and TPROXY as feed packages: the live feed updated in place, the test unit upgraded | 2026-11-08 | ✅ 132 container checks, 0 failures against the published URL; the unit's invented records became the signed `-r1` packages with identical module files; WireGuard and the TPROXY/socket matches work, also after a reboot: [section 47](#47-wireguard-and-tproxy-as-feed-packages-on-the-live-feed-and-the-unit-2026-11-08) |
+| 48 | `x28-kmods` as a package, with the module list in the packages | 2026-11-08 | ✅ 148 container checks, 0 failures against the published URL; on the unit the 28 module packages and the loader were upgraded in one go, the forced marker refused, a live load brought 42 modules back in 3 s, and after a real reboot the loader loaded all 51 by itself: [section 48](#48-x28-kmods-as-a-package-with-the-module-list-in-the-packages-2026-11-08) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -638,3 +639,26 @@ marker's retry limit was tested only with a forced marker, not with a real crash
 **Not verified:** Passwall2 end to end on the upgraded packages (it is off on the unit, and enabling it routes the unit's traffic
 through a node; it was tested on the same module files in [test 39](#39-tproxy-and-passwall2-on-the-unit-2026-11-02)); the image still bakes
 these modules and invents their records until the flasher installs packages (#420).
+
+## 48. x28-kmods as a package, with the module list in the packages (2026-11-08)
+
+- **Question** (#416): does the loader work as a feed package that reads each module package's list, installing over the image's old
+  script, and does it still load everything safely at boot?
+- **Setup**: the feed (213 packages) updated in place; the image's `opkg` in a container against the published URL; then the test
+  unit (slot A, tries `00 00 00 00`), after an opkg status backup and a copy of the loader it ran (`/root/x28-kmods.init.prev`).
+
+| Check | Result |
+|---|---|
+| Container, live URL, key the image ships: the loader installs over the image's unowned script (no forced overwrite), is owned and enabled (S97 link), `modules` lists 51 modules once each in dependency order; removing `kmod-nbd` removes its list and its module from the load, reinstalling brings it back; removing the loader removes the boot link and script, reinstalling enables it | ✅ 148 checks, 0 failures (twice in a row; two earlier runs hit intermittent downloads) |
+| Unit: `opkg upgrade` of the 28 module packages to `-r2` and `opkg install x28-kmods`; 27 list files; the script equals the repo's; nothing left to upgrade | ✅ |
+| Unit, forced marker `3` with 42 modules unloaded: the loader refuses, logs "3 loads in a row did not finish; not loading", loads nothing | ✅ |
+| Unit, live load: all 51 loaded within 3 s; marker `1` during the load, cleared after its window; boot tries `00 00 00 00`; no `oops`, `bug` or `unknown symbol`; internet up | ✅ |
+| Unit, real reboot: back in about 24 s on slot A; the loader loaded all 51 by itself (kernel time 30.6 s to 31.2 s, first sample at 90 s already 51); marker cleared at about 155 s; tries `00 00 00 00`; 29 packages at `-r2`, nothing to upgrade; WireGuard and the `socket`/`TPROXY` checks pass; LAN, Wi-Fi, cellular, `dnsmasq`, `dropbear`, `uhttpd`, `netifd` up; no `oops` | ✅ |
+
+The container test found a builder bug before any of this: the `.ipk` data archives had no directory entries, and opkg does not create
+missing parent directories (it prints `wfopen: ... No such file or directory`, exits 0 and records the file), so a package could not
+install into a directory the image lacks. Every data archive now carries its parent directories, and the test fails on opkg's error lines.
+
+**Not verified:** a freshly flashed image built from packages (the flasher still bakes the modules and the old script until #420); a
+unit with the new loader but only some module packages upgraded (the migration upgrades everything in one command before the reboot);
+the `-r1` files still on the release (kept until this passed; they are not in the index).
