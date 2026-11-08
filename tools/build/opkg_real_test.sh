@@ -34,7 +34,8 @@ check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: got '$2
 inst() { opkg list-installed | grep -c "^$1 "; }
 # opkg exits 0 after printing `wfopen: ... No such file or directory`, so errors in its output count too; the one benign
 # messages (pkg_hash_*: opkg weighing the official 5.15 records it ignores; the install still completes) are filtered.
-try() { opkg install "$@" >/tmp/o 2>&1 </dev/null; rc=$?; [ $rc -eq 0 ] && [ "$(grep '^ \* ' /tmp/o | grep -vc 'pkg_hash_')" -gt 0 ] && rc=254; echo $rc; }
+# A download that fails ("Check your network settings") is retried up to 5 times: the live URL is a CDN reached through the image's own fetcher.
+try() { for attempt in 1 2 3 4 5; do opkg install "$@" >/tmp/o 2>&1 </dev/null; rc=$?; grep -q 'opkg_download\|Failed to download' /tmp/o || break; sleep 4; done; [ $rc -eq 0 ] && [ "$(grep '^ \* ' /tmp/o | grep -vc 'pkg_hash_')" -gt 0 ] && rc=254; echo $rc; }
 
 sed -i '/passwall/d' /etc/opkg/distfeeds.conf /etc/opkg/customfeeds.conf
 # The image already has an x28 line (feed-2); a second one with the same name is skipped, so replace it.
@@ -49,8 +50,8 @@ else
 	echo 'src/gz x28 file:///feed' >> /etc/opkg/customfeeds.conf
 fi
 grep -c '^src/gz x28 ' /etc/opkg/customfeeds.conf /etc/opkg/distfeeds.conf | tr '\n' ' '; echo
-opkg update >/tmp/o 2>&1
-check "feed update succeeds" $? 0
+for attempt in 1 2 3 4 5; do opkg update >/tmp/o 2>&1; rc=$?; [ $rc -eq 0 ] && break; sleep 4; done
+check "feed update succeeds" $rc 0
 check "the feed's signature verifies" "$(grep -c 'Signature check failed' /tmp/o)" 0
 [ -z "${EXPECT_PACKAGES:-}" ] || check "the index lists $EXPECT_PACKAGES packages" "$(zcat /var/opkg-lists/x28 | grep -c '^Package:')" "$EXPECT_PACKAGES"
 
