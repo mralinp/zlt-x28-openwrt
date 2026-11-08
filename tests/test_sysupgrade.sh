@@ -24,7 +24,9 @@ mkmisc() { # $1 = A entry, $2 = B entry as hex (priority tries success up-type)
 }
 entries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2056 + 262144 * i)) count=8 2>/dev/null | hexdump -v -e '1/1 "%02x"'; printf ' '; done; }
 ALL() { printf '%s %s %s %s ' "$1" "$1" "$1" "$1"; }
-export X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_MARK=$dir/native-b X28_UP_TMP=$dir
+mkdir -p "$dir/root/etc/init.d" "$dir/root/tmp" "$dir/dump"; : > "$dir/root/etc/init.d/x28-bootok"; chmod +x "$dir/root/etc/init.d/x28-bootok"
+echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"
+export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump
 . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh"
 
 # flip to B: B 15 tries 0, A 14, success and up-type bytes kept, in all four copies
@@ -35,7 +37,24 @@ mkmisc 0f050000 0e000101; x28_misc_select a 0 2>/dev/null; [ "$(entries)" = "$(A
 # copies are written last to first: a failure at the third call leaves copy 1 (the one read first) and copy 2 old, copies 4 and 3 new
 mkmisc 0f000000 0e000101; : > "$CALLS"; ! (FAILAT=3; export FAILAT; x28_misc_select b 1) 2>/dev/null
 [ "$(entries)" = "0f0000000e000101 0f0000000e000101 0e0000000f000101 0e0000000f000101 " ]
+rc=0; mkmisc 0f000000 0e000101; (FAILAT=2; export FAILAT; x28_misc_select b 1) 2>/dev/null || rc=$?; [ "$rc" -eq 2 ]    # partial change is code 2
+[ "$(ls "$dir/dump" | wc -l)" -ge 1 ] && [ "$(wc -c < "$dir/dump/$(ls "$dir/dump" | head -1)")" -eq 1048576 ]       # the dump is the whole partition
+# a writer that damages a neighbouring byte is caught by the whole-partition compare, which the 8-byte read-back alone would miss
+cat > "$dir/dd-nand4" <<'STUB'
+#!/bin/sh
+for a in "$@"; do case "$a" in of=*) f=${a#of=};; seek=*) s=${a#seek=};; count=*) c=${a#count=};; esac; done
+dd of="$f" bs=1 seek="$s" count="$c" conv=notrunc 2>/dev/null
+printf 'Z' | dd of="$f" bs=1 seek=$((s + 100)) count=1 conv=notrunc 2>/dev/null
+STUB
+chmod +x "$dir/dd-nand4"; mkmisc 0f000000 0e000101
+rc=0; (X28_UP_DDNAND=$dir/dd-nand4; x28_misc_select b 1) 2>/dev/null || rc=$?; [ "$rc" -eq 2 ]
+# a short write (fewer bytes than asked) is caught too
+printf '#!/bin/sh\ntrue\n' > "$dir/dd-nand5"; chmod +x "$dir/dd-nand5"; mkmisc 0f000000 0e000101
+rc=0; (X28_UP_DDNAND=$dir/dd-nand5; x28_misc_select b 1) 2>/dev/null || rc=$?; [ "$rc" -eq 2 ]
+# bootslot=b flips to A the same way
+echo 'bootslot=b' > "$dir/proc/cmdline"; mkmisc 0e000000 0f000101; x28_misc_select a 1 2>/dev/null; [ "$(entries)" = "$(ALL 0f0000000e000101)" ]; echo 'bootslot=a' > "$dir/proc/cmdline"
 # mixed copies, a missing magic, no record: refused, nothing written
+mkmisc 0f000000 0e000101; : > "$CALLS"; ! (FAILAT=3; export FAILAT; x28_misc_select b 1) 2>/dev/null   # mixed copies again
 : > "$CALLS"; ! x28_misc_select b 1 2>/dev/null; [ ! -s "$CALLS" ]
 mkmisc 0f000000 0e000101; printf 'X' | dd of="$dir/misc" bs=1 seek=$((2048 + 262144 * 2)) conv=notrunc 2>/dev/null
 ! x28_misc_select b 1 2>/dev/null; [ ! -s "$CALLS" ]
@@ -45,8 +64,10 @@ mkmisc 0f000000 0e000101; x28_tries_zero "$dir/misc" 2>/dev/null
 echo 'bootslot=b' > "$dir/proc/cmdline"; mkmisc 0e000101 0f030000; ! x28_tries_zero "$dir/misc" 2>/dev/null
 echo 'bootslot=a' > "$dir/proc/cmdline"
 # target: in place without the marker, the other slot with it
-[ "$(x28_target)" = "a 0" ]; : > "$dir/native-b"; [ "$(x28_target)" = "b 1" ]
-echo 'bootslot=b' > "$dir/proc/cmdline"; [ "$(x28_target)" = "a 1" ]; echo 'bootslot=a' > "$dir/proc/cmdline"; rm "$dir/native-b"
+[ "$(x28_target)" = "a 0" ]; : > "$dir/root/etc/x28-native-b"
+! x28_target 2>/dev/null                                                              # marker alone is not enough
+: > "$dir/root/tmp/x28-write-b-ok"; [ "$(x28_target)" = "b 1" ]
+echo 'bootslot=b' > "$dir/proc/cmdline"; [ "$(x28_target)" = "a 1" ]; echo 'bootslot=a' > "$dir/proc/cmdline"; rm "$dir/root/etc/x28-native-b" "$dir/root/tmp/x28-write-b-ok"
 
 # the tarball
 mkdir -p "$dir/t/sysupgrade-x28"; head -c 4096 /dev/urandom > "$dir/t/sysupgrade-x28/root"
@@ -59,7 +80,7 @@ echo hello > "$dir/junk"; (cd "$dir" && tar -cf junk.tar junk); ! platform_check
 mkmisc 0f050000 0e000101; ! platform_check_image "$dir/good.tar" 2>/dev/null        # tries still counting
 
 # the order: a failed write or verify leaves misc alone; success changes it only afterwards
-: > "$dir/native-b"
+: > "$dir/root/etc/x28-native-b"; : > "$dir/root/tmp/x28-write-b-ok"
 X28_UP_WRITE=false X28_UP_VERIFY=true; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ] && [ "$(entries)" = "$(ALL 0f0000000e000101)" ] && [ ! -e "$dir/x28-root.ubi" ]
 X28_UP_WRITE=true X28_UP_VERIFY=false
@@ -69,4 +90,15 @@ platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e00000
 # the image is written to the right partition
 X28_UP_WRITE='echo' ; mkmisc 0f000000 0e000101
 [ "$(platform_do_upgrade "$dir/good.tar" 2>/dev/null)" = "$dir/x28-root.ubi /dev/mtd42" ]
+# the check step: bootok missing, not enough RAM, image larger than the partition
+mkmisc 0f000000 0e000101
+chmod -x "$dir/root/etc/init.d/x28-bootok"; ! platform_check_image "$dir/good.tar" 2>/dev/null; chmod +x "$dir/root/etc/init.d/x28-bootok"
+echo 'MemAvailable:      20000 kB' > "$dir/proc/meminfo"; ! platform_check_image "$dir/good.tar" 2>/dev/null
+echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"; platform_check_image "$dir/good.tar" 2>/dev/null
+sed -i.bak 's/"rootfs_a"/"rootfs_a"/; s/^mtd28: 04000000/mtd28: 00000800/' "$dir/proc/mtd"; ! platform_check_image "$dir/good.tar" 2>/dev/null
+sed -i.bak 's/^mtd28: 00000800/mtd28: 04000000/' "$dir/proc/mtd"
+# the upgrade itself re-checks the running slot's tries
+mkmisc 0f050000 0e000101; : > "$CALLS"; X28_UP_WRITE=true X28_UP_VERIFY=true; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]
+# without X28_UP_TEST the environment redirects nothing
+[ "$(env -u X28_UP_TEST X28_UP_MISC=/tmp/evil X28_UP_PROC="$dir/proc" sh -c '. "$1"; echo "$X28_UP_MISC|$X28_UP_DDNAND"' x "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh")" = "|dd-nand" ]
 echo "PASS: x28-sysupgrade checks first, writes and verifies the target, and changes misc only afterwards, copy 1 last"
