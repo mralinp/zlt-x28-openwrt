@@ -478,8 +478,8 @@ boots with its clock at 2010-01-01, and HTTPS (`opkg`, LuCI Software) fails unti
 
 The preloader adds one "tries" to the A record in all four `misc` copies on every boot (observed 0 -> 1 after a reboot). Stock
 resets it to 0 after each good boot; the native image did not, so a healthy slot A would run out of its inferred 7 tries and
-stock B would repair (erase) it. `x28-bootok` (START=96) does what stock does: once Dropbear and the LAN are up, on slot A only,
-it writes 0 to the A tries byte of each copy that is not 0 (copy at 0x800 last, after checking all four are boot-control
+stock B would repair (erase) it. `x28-bootok` (START=96) does what stock does: once Dropbear and the LAN are up, on the running slot (A or B),
+it writes 0 to that slot's tries byte (A 2057, B 2061) of each copy that is not 0 (copy at 0x800 last, after checking all four are boot-control
 records and reading each byte back), with the stock `dd-nand` + `libnandapi.so` copied into the image. It never writes the
 success byte, priorities or any other partition; a boot that never reaches it keeps counting, so the fall-back to B stays.
 `ab_guard` allows the `dd-nand` token in that one script only while it keeps the reviewed shape. Dropbear now listens on

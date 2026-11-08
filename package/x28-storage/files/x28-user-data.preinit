@@ -31,13 +31,14 @@ x28_ud_new_image() {
 	umount "$X28_UD_MNT"
 }
 
-# Slot A's tries in misc, this boot's included (record at 2048, tries at byte 9, as in x28-bootok). Read only; empty if unreadable.
+# The running slot's tries in misc, this boot's included (record at 2048, tries at byte 9 for A, 13 for B, as in x28-bootok). Read only; empty if unreadable.
 x28_ud_tries() {
-	local misc
+	local misc off
+	case "$(cat "$X28_UD_PROC/cmdline" 2>/dev/null)" in *bootslot=a*) off=2057 ;; *bootslot=b*) off=2061 ;; *) return 0 ;; esac
 	misc="$(sed -n 's/^\(mtd[0-9]*\): .* "misc"$/\1/p' "$X28_UD_PROC/mtd")"
 	[ -n "$misc" ] || return 0
 	x28_ud_node "$misc" "$X28_UD_SYS/class/mtd/$misc"
-	dd if="$X28_UD_DEV/$misc" bs=1 skip=2057 count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
+	dd if="$X28_UD_DEV/$misc" bs=1 skip=$off count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
 }
 
 do_x28_user_data() {

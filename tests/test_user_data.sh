@@ -15,6 +15,7 @@ umount() { echo umount >> "$dir/calls"; }
 reset() { : > "$dir/calls"; mkdir -p "$dir/mnt/upper" "$dir/mnt/work"; }
 tries() { head -c 2057 /dev/zero > "$dir/dev/mtd3"; printf "\\00$1" >> "$dir/dev/mtd3"; }
 printf 'mtd3: 00100000 00040000 "misc"\nmtd49: 00400000 00040000 "productinfo"\nmtd50: 1ab80000 00040000 "user_data"\n' > "$dir/proc/mtd"
+echo 'console=x bootslot=a y' > "$dir/proc/cmdline"
 tries 1
 
 # Same image: the overlay stays.
@@ -42,6 +43,11 @@ reset; echo OLD > "$dir/mnt/etc/.extroot-uuid"; rm() { return 1; }; do_x28_user_
 reset; tries 2; do_x28_user_data; grep -q attach "$dir/calls" || exit 1
 reset; tries 3; do_x28_user_data; [ ! -s "$dir/calls" ] && [ -d "$dir/mnt/upper" ] || exit 1
 reset; tries 7; do_x28_user_data; [ ! -s "$dir/calls" ] || exit 1
+# Slot B reads its own byte (2061), not A's: A at 7 does not stop B, B at 7 does.
+echo 'bootslot=b' > "$dir/proc/cmdline"
+reset; tries 7; do_x28_user_data; grep -q attach "$dir/calls" && echo "B: A's byte ignored" >/dev/null || exit 1
+reset; { head -c 2061 /dev/zero; printf '\007'; } > "$dir/dev/mtd3"; do_x28_user_data; [ ! -s "$dir/calls" ] || exit 1
+echo 'bootslot=a' > "$dir/proc/cmdline"
 # misc unreadable: go on.
 reset; /bin/rm -f "$dir/dev/mtd3"; do_x28_user_data; grep -q attach "$dir/calls" || exit 1
 # No user_data partition: no attach.
