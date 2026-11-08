@@ -233,7 +233,7 @@ class Build(unittest.TestCase):
         base = set(pk['x28-base'][1].split(', '))
         others = set(pk) - {'x28-base'}
         self.assertEqual(others - base, set(), 'a package of the spec is not protected by x28-base')
-        self.assertEqual(base - others, {'kernel', 'x28-kmods'})  # the kernel record and the loader, which are built elsewhere
+        self.assertEqual(base - others, {'kernel', 'x28-kmods', 'x28-nrband'})  # the kernel record, the loader and the band tool, which are built elsewhere
         # nothing depends on x28-base, or removing it would be refused
         self.assertFalse([n for n, p in pk.items() if 'x28-base' in p[1].split(', ')])
 

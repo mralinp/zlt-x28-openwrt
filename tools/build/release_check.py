@@ -24,9 +24,9 @@ PINS = ROOT / 'package/x28-kmods/ipk.sha256'
 
 
 def sdk_built():
-    """Names of the packages built against the private SDK tree: the module packages and the loader."""
+    """Names of the packages built against private vendor files: the module packages, the loader and the band tool."""
     names = [l.split('|')[0].split()[0] for l in feed.REAL.read_text().splitlines() if l.strip() and not l.startswith('#')]
-    return names + ['x28-kmods']
+    return names + ['x28-kmods', 'x28-nrband']
 
 
 def ours():

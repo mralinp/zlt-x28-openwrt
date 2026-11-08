@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- `x28-base` requires `x28-switch` and `x28-nrband` (release 2); the next feed revision (224 packages) is pinned, and the band tool ipk is pinned like the module ipks (#436).
 - `x28-switch` is a package and a member of `x28-base`; `vendor_ipset.py --nrband` adds `x28-nrband` to a feed; the band tool is built reproducibly and stripped. The feed revision and `x28-base` dependency on `x28-nrband` follow (#436).
 - The next feed revision (222 packages, with the x28-* packages and `x28-base`) is pinned in `feed_release.py` and listed for review; it checks equal to the release ipks. Not yet signed or published (#423).
 - Docs: the package model (required, preinstalled-optional, on demand), the update policy and rollback (#422).
