@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- `x28-bootok` resets slot B's tries byte when a native B boots, as it does A's (#451).
 - `x28-kmods` waits for the running slot's tries byte (A or B), not only A's (#452).
 - Test 51: two units flashed with the v0.68.1 image, checked read-only (#436).
 - Rollback tested on a unit (test 50): this `opkg` cannot install from a URL, so the docs now say to download the older ipk and install it from `/tmp` (#436).

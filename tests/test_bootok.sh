@@ -22,7 +22,7 @@ mkmisc() { # four copies of an A record with the given tries byte (octal, e.g. 0
 		printf "\\000AB0\\377\\377\\377\\377\\017\\$1\\000\\000\\016\\000\\001\\000" | dd of="$dir/misc" bs=1 seek=$((2048 + 262144 * i)) conv=notrunc 2>/dev/null
 	done
 }
-tries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2057 + 262144 * i)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"'; printf ' '; done; }
+tries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((${1:-2057} + 262144 * i)) count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"'; printf ' '; done; }
 logger() { :; }
 X28_BOOTOK_PROC=$dir/proc X28_BOOTOK_DEV=$dir/misc X28_BOOTOK_DDNAND=$dir/dd-nand . "$(dirname "$0")/../package/x28-bootok/files/x28-bootok.init"
 
@@ -31,8 +31,11 @@ mkmisc 005; : > "$CALLS"; reset_tries 2>/dev/null
 : > "$CALLS"; reset_tries 2>/dev/null; [ ! -s "$CALLS" ]                         # already 0: nothing written
 mkmisc 005; dd if=/dev/zero of="$dir/misc" bs=1 seek=$((2048 + 262144 * 2 + 1)) count=1 conv=notrunc 2>/dev/null
 : > "$CALLS"; ! reset_tries 2>/dev/null; [ ! -s "$CALLS" ]                       # not a boot-control record: nothing written
+# slot B: only B's byte (2061) is reset, A's stays; the other slot's byte is never written
 mkmisc 005; echo 'console=ttyS0 bootslot=b' > "$dir/proc/cmdline"
-: > "$CALLS"; reset_tries 2>/dev/null; [ ! -s "$CALLS" ] && [ "$(tries)" = "05 05 05 05 " ]   # slot B: never written
+for i in 0 1 2 3; do printf '\\004' | dd of="$dir/misc" bs=1 seek=$((2061 + 262144 * i)) conv=notrunc 2>/dev/null; done
+: > "$CALLS"; reset_tries 2>/dev/null; [ "$(wc -l < "$CALLS")" -eq 4 ] && [ "$(tries 2061)" = "00 00 00 00 " ] && [ "$(tries)" = "05 05 05 05 " ]
+: > "$CALLS"; reset_tries 2>/dev/null; [ ! -s "$CALLS" ]                         # B already 0: nothing written
 echo 'console=ttyS0 bootslot=a' > "$dir/proc/cmdline"; mkmisc 005; : > "$CALLS"
 ! FAIL=1 reset_tries 2>/dev/null; [ "$(wc -l < "$CALLS")" -eq 1 ]               # a failed write stops after the first copy
 [ "$(tries)" = "05 05 05 05 " ]
@@ -61,4 +64,4 @@ echo 'console=ttyS0' > "$dir/proc/cmdline"; mkmisc 005; : > "$CALLS"; ! reset_tr
 pidof() { return 1; }; ! healthy
 pidof() { return 0; }; ifstatus() { echo '{ "up": true }'; }; healthy
 ifstatus() { echo '{ "up": false }'; }; ! healthy
-echo "PASS: x28-bootok resets the A tries byte in all four copies, only on slot A, only on a boot-control record, and stops on failure"
+echo "PASS: x28-bootok resets the running slot's tries byte in all four copies, for the running slot only, only on a boot-control record, and stops on failure"
