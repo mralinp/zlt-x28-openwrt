@@ -24,16 +24,19 @@
 > [!WARNING]
 > **Your device, your risk.** The X28 is usually someone's only internet connection. Installing the native image
 > writes its NAND over the MediaTek download agent. It has been done on **two tested units** (one X28, one X28 PRO).
-> Every write is guarded and approved step by step.
-> **Before anything else:** make a full backup of all 51 partitions and check its hashes. You also need a 1.8 V UART.
-> This is not a consumer installer. Read [docs/RECOVERY.md](docs/RECOVERY.md) first.
+> **Use the [x28-flasher](https://github.com/mralinp/x28-flasher) application for everything:** backup, root access,
+> flashing and the change of boot order to slot A. Do not flash, edit `misc` or change the boot order by hand.
+> The flasher has the guards that stop a wrong write from breaking the device. The manual steps in these docs are
+> reference for how it works, not instructions to follow.
+> The flasher takes a full backup of all 51 partitions and checks its hashes before it flashes anything.
+> Read [docs/RECOVERY.md](docs/RECOVERY.md) to understand the risks.
 > Not affiliated with ZLT, Tozed, MediaTek or Quectel.
 
 > [!NOTE]
 > **Stock firmware.** To boot slot A you must change the boot order, which needs SSH on the stock system.
 > SSH was gained on stock `1.5` and on `8.6.8`. It is reported valid up to `8.6.28`
 > (X28, X28 Pro, X28 V-Pro, X28 Pro (Ooredoo)); the flasher text says `8.6.26`. `TODO(verify)`: the exact ceiling and the V-Pro and Ooredoo models.
-> The [x28-flasher](https://github.com/mralinp/x28-flasher) repo is **private for now**, so the flashing steps here are reference, not something you can run yet.
+> The flasher is **not public yet** (the repo is private while it is finished). Until it is released, do not flash by hand: wait for the flasher.
 
 ## Summary
 
@@ -83,14 +86,16 @@ Notes:
 
 ## Quick start
 
-The install path is the native image on slot A.
+You need the **x28-flasher** application. It does the whole install in one place: backup, root access on the stock
+system, building the image for your unit, flashing slot A and switching the boot order to slot A. There is no other supported way.
 
-1. Read [docs/RECOVERY.md](docs/RECOVERY.md) and [docs/BUILD.md](docs/BUILD.md).
-2. Back up all 51 partitions and verify the hashes. Keep a second copy offline.
-3. Connect a USB-A to USB-C cable (C to C does not work) and a 1.8 V UART.
-4. Download `x28-assembly-v0.68.0.tar.gz` from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases). Check it against `SHA256SUMS`.
-5. Use the [x28-flasher](https://github.com/mralinp/x28-flasher) to build the image from the bundle and your backup, then flash slot A. It asks you to type a phrase before each write.
-6. After the first boot, open `https://192.168.70.1/cgi-bin/luci` (self-signed certificate). Root has an empty password: set one. SSH is on port 22, LAN only.
+1. Get the [x28-flasher](https://github.com/mralinp/x28-flasher) when it is released.
+2. Connect the unit with a **USB-A to USB-C** cable (C to C does not work).
+3. In the flasher, run the steps in order: Connect, Backup, Root access, Build image, Flash OpenWrt, Boot order. Keep the backup safe, with a second copy offline.
+4. After the first boot, open `https://192.168.70.1/cgi-bin/luci` (self-signed certificate). Root has an empty password: set one. SSH is on port 22, LAN only.
+
+The flasher downloads the newest `x28-assembly-*` bundle from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases) itself.
+What each step does is in [The flasher app](#the-flasher-app) below. `TODO(verify)`: whether a UART is still needed with the current flasher.
 
 ## VPN and Passwall2
 
@@ -204,12 +209,11 @@ Note: This flasher enables SSH with root access on firmware versions up to 8.6.2
 
 ## Build and flash
 
-Backup, USB access, image assembly and flashing belong to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher)
-(private for now). It downloads the latest release's `x28-assembly-*` bundle from here and assembles the image locally
-from your own unit's backup. You need a ZLT X28, a **USB-A-to-USB-C** cable (C-to-C does not work) and a **1.8 V** UART
-path ([RECOVERY](docs/RECOVERY.md#uart-debug-console-2-read-side-confirmed)). The steps, gates and typed approvals are in
-[docs/BUILD.md](docs/BUILD.md), [docs/RECOVERY.md](docs/RECOVERY.md) and
-[docs/research/rootfs-a-write-plan.md](docs/research/rootfs-a-write-plan.md). Read them first.
+Backup, root access, image assembly, flashing and the boot order all belong to the
+[x28-flasher](https://github.com/mralinp/x28-flasher) (private for now). Use it; do not run the steps by hand.
+It builds the image locally from a release's `x28-assembly-*` bundle and **your own unit's backup**, because the vendor half
+cannot be published. How the pieces work, for readers and reviewers: [docs/BUILD.md](docs/BUILD.md),
+[docs/RECOVERY.md](docs/RECOVERY.md) and [docs/research/rootfs-a-write-plan.md](docs/research/rootfs-a-write-plan.md).
 
 ## Documentation
 

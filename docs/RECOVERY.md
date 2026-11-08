@@ -3,6 +3,8 @@
 How to back up the X28's NAND and reach it over USB when Linux no longer boots.
 Tracks issue #4 (way back to stock); builds on #1 (partition dump).
 
+> **Use the flasher.** Do not run the commands below by hand. The [x28-flasher](https://github.com/mralinp/x28-flasher) application does backup, root access, flashing and the boot-order change with the guards built in. This page explains how recovery works.
+>
 > **Moved, 2026-11-06:** the `tools/recovery/` scripts named below are **not in this repo any more**. They live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (#343), which is private for now; run them from there. `TODO(verify)`: script names and flags against that repo. The procedures and evidence here still apply.
 
 > **Status, 2026-10-29:** USB reads and the bounded changed-page restore test pass. In inactive
