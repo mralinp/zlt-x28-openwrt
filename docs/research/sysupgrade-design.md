@@ -55,7 +55,7 @@ Never reset tries or flip priorities before step 3 verifies: a half-written slot
 
 ## Image format and config
 
-- One file: a tarball in the OpenWrt sysupgrade shape (`sysupgrade-x28/CONTROL`, `root` = the UBI image, a hash file), built by the same
+- One file: a tarball in the OpenWrt sysupgrade shape (`sysupgrade-x28/root` = the UBI image, `root.sha256` its hash, `root.rootfs` = `sha256 bytes` of the squashfs in volume 0, which the verify reads back), built by the same
   tooling as the slot image, in x28-flasher's `tools/build`. No new signing: the feed key is for packages.
 - Config: `sysupgrade -k` keeps `/etc/config` through a `sysupgrade.tgz` restored on first boot into the new overlay. The boot-path guard
   must run over those files before they are applied ([overlay-policy](overlay-policy.md)).

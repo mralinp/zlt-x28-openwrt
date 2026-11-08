@@ -11,6 +11,7 @@ define Package/x28-sysupgrade
   SECTION:=base
   CATEGORY:=Base system
   TITLE:=Sysupgrade hooks for the X28 A/B layout (not shipped yet)
+  DEPENDS:=+ubi-utils
   PKGARCH:=all
 endef
 

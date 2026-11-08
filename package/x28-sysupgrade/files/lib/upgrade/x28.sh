@@ -10,8 +10,10 @@
 # The environment can redirect nothing in production: these are fixed unless X28_UP_TEST is set (tests/test_sysupgrade.sh).
 if [ -z "$X28_UP_TEST" ]; then
 	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/root
-	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify
+	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev
 fi
+X28_UP_SYS=${X28_UP_SYS:-/sys}
+X28_UP_DEVDIR=${X28_UP_DEVDIR:-/dev}
 X28_UP_PROC=${X28_UP_PROC:-/proc}
 X28_UP_DDNAND=${X28_UP_DDNAND:-dd-nand}
 X28_UP_MISC=${X28_UP_MISC:-}		# misc device; found in /proc/mtd when empty
@@ -22,9 +24,33 @@ X28_COPY=262144
 X28_DIR=sysupgrade-x28
 X28_MIN_FREE_KB=32768
 
-# The device steps are not written yet (design: the verify attaches the result and compares the volumes). Until then: fail closed.
-x28_ubi_write() { x28_log "ubiformat step not implemented"; return 1; }
-x28_ubi_verify() { x28_log "volume verify not implemented"; return 1; }
+# The device steps. Write: detach the target if it is attached (the caller, sysupgrade stage 2, has already left the root on it:
+# unmounted, running from RAM), then ubiformat the image onto it. ubiformat rewrites erase counters, so a byte compare of the whole mtd
+# cannot be the check. Verify: attach the result as a scratch UBI device (9) and hash the rootfs volume's squashfs bytes against the
+# tarball's root.rootfs ("sha256 bytes"). Both need ubi-utils (ubiformat, ubidetach, ubiattach, ubiblock).
+X28_SCRATCH=9
+
+x28_ubi_write() {
+	local img=$1 dev=$2 n u
+	n=${dev#/dev/mtd}
+	for u in "$X28_UP_SYS"/class/ubi/ubi[0-9]*; do
+		[ -r "$u/mtd_num" ] && [ "$(cat "$u/mtd_num")" = "$n" ] || continue
+		ubiblock --remove "$X28_UP_DEVDIR/${u##*/}_0" 2>/dev/null
+		ubidetach -m "$n" || { x28_log "cannot detach mtd$n"; return 1; }
+	done
+	ubiformat "$dev" -y -f "$img" >/dev/null 2>&1 || { x28_log "ubiformat failed"; return 1; }
+}
+
+x28_ubi_verify() {
+	local dev=$2 n got i
+	n=${dev#/dev/mtd}
+	[ -n "$X28_EXP_SHA" ] && [ "${X28_EXP_BYTES:-0}" -gt 0 ] || { x28_log "no expected rootfs hash"; return 1; }
+	ubiattach /dev/ubi_ctrl -m "$n" -d "$X28_SCRATCH" >/dev/null 2>&1 || { x28_log "cannot attach the written mtd$n"; return 1; }
+	i=0; while [ ! -e "$X28_UP_DEVDIR/ubi${X28_SCRATCH}_0" ] && [ "$i" -lt 20 ]; do sleep 1; i=$((i + 1)); done
+	got=$(head -c "$X28_EXP_BYTES" "$X28_UP_DEVDIR/ubi${X28_SCRATCH}_0" 2>/dev/null | sha256sum | cut -d' ' -f1)
+	ubidetach -d "$X28_SCRATCH" >/dev/null 2>&1
+	[ "$got" = "$X28_EXP_SHA" ] || { x28_log "the written rootfs volume does not match the image"; return 1; }
+}
 
 x28_log() { echo "x28-sysupgrade: $*" >&2; }
 
@@ -108,7 +134,7 @@ x28_free_kb() { sed -n 's/^MemAvailable: *\([0-9]*\) kB.*/\1/p' "$X28_UP_PROC/me
 # $1 = sysupgrade tarball: sysupgrade-x28/root (the UBI image) and sysupgrade-x28/root.sha256 (its hash).
 platform_check_image() {
 	local f=$1 want got dev size t flip free
-	tar -tf "$f" 2>/dev/null | grep -qx "$X28_DIR/root" && tar -tf "$f" | grep -qx "$X28_DIR/root.sha256" || { x28_log "not an X28 sysupgrade file"; return 1; }
+	tar -tf "$f" 2>/dev/null | grep -qx "$X28_DIR/root" && tar -tf "$f" | grep -qx "$X28_DIR/root.sha256" && tar -tf "$f" | grep -qx "$X28_DIR/root.rootfs" || { x28_log "not an X28 sysupgrade file"; return 1; }
 	want=$(tar -xOf "$f" "$X28_DIR/root.sha256") && got=$(tar -xOf "$f" "$X28_DIR/root" | sha256sum | cut -d' ' -f1)
 	[ -n "$want" ] && [ "${want%% *}" = "$got" ] || { x28_log "image hash does not match"; return 1; }
 	[ -x "$X28_UP_ROOT/etc/init.d/x28-bootok" ] || { x28_log "x28-bootok is not installed"; return 1; }
@@ -121,8 +147,7 @@ platform_check_image() {
 	[ -n "$free" ] && [ "$free" -gt $((size / 1024 + X28_MIN_FREE_KB)) ] || { x28_log "not enough free RAM to hold the image"; return 1; }
 }
 
-# X28_UP_WRITE IMAGE MTD and X28_UP_VERIFY IMAGE MTD are the device steps (ubiformat from RAM; attach and compare the volumes).
-# ponytail: ubiformat rewrites erase counters, so a byte compare of the whole mtd cannot be the check; the verify must read the volumes.
+# X28_UP_WRITE IMAGE MTD and X28_UP_VERIFY IMAGE MTD are the device steps above (the tests replace them).
 # Returns 2 when misc was partly changed: the caller must NOT reboot into the target then (the old slot still boots; see the dump).
 platform_do_upgrade() {
 	local f=$1 t flip mtd want img=$X28_UP_TMP/x28-root.ubi
@@ -131,6 +156,7 @@ platform_do_upgrade() {
 	mtd=$(x28_mtd_of "rootfs_$t"); [ -n "$mtd" ] || { x28_log "no rootfs_$t"; return 1; }
 	x28_misc_entries "$(x28_misc_dev)" >/dev/null || return 1
 	want=$(tar -xOf "$f" "$X28_DIR/root.sha256") && want=${want%% *}
+	set -- $(tar -xOf "$f" "$X28_DIR/root.rootfs"); X28_EXP_SHA=$1 X28_EXP_BYTES=$2
 	if ! tar -xOf "$f" "$X28_DIR/root" > "$img" || [ "$(sha256sum < "$img" | cut -d' ' -f1)" != "$want" ]; then rm -f "$img"; x28_log "cannot unpack the image to RAM; nothing written"; return 1; fi
 	$X28_UP_WRITE "$img" "/dev/$mtd" && $X28_UP_VERIFY "$img" "/dev/$mtd" || { rm -f "$img"; x28_log "write or verify failed; misc untouched"; return 1; }
 	rm -f "$img"

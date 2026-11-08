@@ -26,7 +26,7 @@ entries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2056 + 262144 * 
 ALL() { printf '%s %s %s %s ' "$1" "$1" "$1" "$1"; }
 mkdir -p "$dir/root/etc/init.d" "$dir/root/tmp" "$dir/dump"; : > "$dir/root/etc/init.d/x28-bootok"; chmod +x "$dir/root/etc/init.d/x28-bootok"
 echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"
-export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump
+export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
 . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh"
 
 # flip to B: B 15 tries 0, A 14, success and up-type bytes kept, in all four copies
@@ -71,7 +71,7 @@ echo 'bootslot=b' > "$dir/proc/cmdline"; [ "$(x28_target)" = "a 1" ]; echo 'boot
 
 # the tarball
 mkdir -p "$dir/t/sysupgrade-x28"; head -c 4096 /dev/urandom > "$dir/t/sysupgrade-x28/root"
-(cd "$dir/t/sysupgrade-x28" && sha256sum root | cut -d' ' -f1 > root.sha256)
+(cd "$dir/t/sysupgrade-x28" && sha256sum root | cut -d' ' -f1 > root.sha256 && head -c 1000 root | sha256sum | cut -d' ' -f1 | tr '\n' ' ' > root.rootfs && echo 1000 >> root.rootfs)
 (cd "$dir/t" && tar -cf "$dir/good.tar" sysupgrade-x28)
 mkmisc 0f000000 0e000101; platform_check_image "$dir/good.tar" 2>/dev/null
 echo 0000 > "$dir/t/sysupgrade-x28/root.sha256"; (cd "$dir/t" && tar -cf "$dir/badhash.tar" sysupgrade-x28)
@@ -99,6 +99,20 @@ sed -i.bak 's/"rootfs_a"/"rootfs_a"/; s/^mtd28: 04000000/mtd28: 00000800/' "$dir
 sed -i.bak 's/^mtd28: 00000800/mtd28: 04000000/' "$dir/proc/mtd"
 # the upgrade itself re-checks the running slot's tries
 mkmisc 0f050000 0e000101; : > "$CALLS"; X28_UP_WRITE=true X28_UP_VERIFY=true; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]
+# the device steps with fake ubi-utils: detach only when attached, then ubiformat; the verify hashes the scratch volume
+mkdir -p "$dir/sys/class/ubi/ubi0" "$dir/devx"; echo 28 > "$dir/sys/class/ubi/ubi0/mtd_num"; ULOG=$dir/ulog; : > "$ULOG"
+ubiformat() { echo "ubiformat $*" >> "$ULOG"; }
+ubidetach() { echo "ubidetach $*" >> "$ULOG"; }
+ubiblock() { echo "ubiblock $*" >> "$ULOG"; }
+ubiattach() { echo "ubiattach $*" >> "$ULOG"; head -c 1000 "$dir/t/sysupgrade-x28/root" > "$dir/devx/ubi9_0"; head -c 24 /dev/zero >> "$dir/devx/ubi9_0"; }
+x28_ubi_write img /dev/mtd28 2>/dev/null
+[ "$(cat "$ULOG")" = "$(printf 'ubiblock --remove %s/devx/ubi0_0\nubidetach -m 28\nubiformat /dev/mtd28 -y -f img' "$dir")" ]
+: > "$ULOG"; x28_ubi_write img /dev/mtd42 2>/dev/null; [ "$(cat "$ULOG")" = "ubiformat /dev/mtd42 -y -f img" ]      # not attached: no detach
+ubiformat() { return 1; }; ! x28_ubi_write img /dev/mtd42 2>/dev/null
+X28_EXP_SHA=$(head -c 1000 "$dir/t/sysupgrade-x28/root" | sha256sum | cut -d' ' -f1) X28_EXP_BYTES=1000
+: > "$ULOG"; x28_ubi_verify img /dev/mtd42 2>/dev/null; grep -q '^ubiattach /dev/ubi_ctrl -m 42 -d 9$' "$ULOG" && grep -q '^ubidetach -d 9$' "$ULOG"
+X28_EXP_SHA=0000; ! x28_ubi_verify img /dev/mtd42 2>/dev/null; X28_EXP_SHA=; ! x28_ubi_verify img /dev/mtd42 2>/dev/null
+unset -f ubiformat ubidetach ubiblock ubiattach
 # without X28_UP_TEST the environment redirects nothing
 [ "$(env -u X28_UP_TEST X28_UP_MISC=/tmp/evil X28_UP_PROC="$dir/proc" sh -c '. "$1"; echo "$X28_UP_MISC|$X28_UP_DDNAND"' x "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh")" = "|dd-nand" ]
 echo "PASS: x28-sysupgrade checks first, writes and verifies the target, and changes misc only afterwards, copy 1 last"
