@@ -36,6 +36,7 @@ jobs:
       - run: python3 tools/firmware/inventory.py selftest
       - run: python3 tools/build/test_kmod_stub_feed.py
       - run: python3 tools/build/test_vendor_ipset.py
+      - run: python3 tools/build/test_x28_kmods.py
       - run: sh package/x28-leds/files/x28-leds selftest
       - run: sh package/x28-dhcp/files/x28-dhcp-guard selftest
       - run: sh package/x28-mipc/files/x28-apn selftest
