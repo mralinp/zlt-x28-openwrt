@@ -122,4 +122,4 @@ jobs:
           separate mralinp/x28-flasher repo. See docs/BUILD.md,
           docs/RECOVERY.md and CHANGELOG.md.
           EOF
-          gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag $PRE
+          gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag --latest=false $PRE
