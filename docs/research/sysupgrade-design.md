@@ -33,7 +33,7 @@ Native B is the safe design; the in-place mode is what exists today. Both share 
    `x28-bootok` is installed. Refuse if the running slot's tries are not 0, since a counting slot is not a good base.
 2. **Pick the target** from `bootslot` on the command line (native B: the other slot; in place: A). Read `misc`, check the magic in all four
    copies, and refuse otherwise.
-3. **Write from RAM**: stop services, `ubiformat` the target mtd with the image, then read the whole mtd back and compare its hash.
+3. **Write from RAM**: stop services, `ubiformat` the target mtd with the image, then verify it. *(Corrected in #457: `ubiformat` rewrites erase counters, so a whole-mtd hash cannot match; the verify attaches the result and compares the volumes. Untested.)*
    Touch nothing else and **do not touch `misc` yet**.
 4. **Only then change `misc`** (native B): target priority above the other (15 and 14), target tries 0, success untouched; four copies, last
    first, each read back. In place there is no flip: A stays selected, A's tries are reset to 0 after the verify.
