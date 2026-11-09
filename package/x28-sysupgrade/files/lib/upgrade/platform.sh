@@ -10,7 +10,7 @@
 
 # The environment can redirect nothing in production: these are fixed unless X28_UP_TEST is set (tests/test_sysupgrade.sh).
 if [ -z "$X28_UP_TEST" ]; then
-	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/overlay/x28-dumps
+	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/tmp X28_UP_KEEP=/overlay/x28-dumps X28_UP_KMSG=/dev/kmsg
 	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log
 fi
 X28_UP_SYS=${X28_UP_SYS:-/sys}
@@ -20,8 +20,10 @@ X28_UP_DDNAND=${X28_UP_DDNAND:-dd-nand}
 X28_UP_MISC=${X28_UP_MISC:-}		# misc device; found in /proc/mtd when empty
 X28_UP_ROOT=${X28_UP_ROOT:-}		# prefix of /etc for the marker, the confirmation file and the bootok check
 X28_UP_TMP=${X28_UP_TMP:-/tmp}
-X28_UP_DUMP=${X28_UP_DUMP:-/overlay/x28-dumps}	# persistent: /overlay is the one old mount stage 2 keeps (/root is RAM by then)
-X28_UP_LOG=${X28_UP_LOG:-}		# appended to as well as stderr, so stage 2 leaves a trace across the reboot
+X28_UP_DUMP=${X28_UP_DUMP:-/tmp}	# the dump the misc compare uses: RAM, because stage 2 unmounts /overlay (stage2: remount,ro and umount -l) before platform_do_upgrade
+X28_UP_KEEP=${X28_UP_KEEP:-}		# persistent copy, made by platform_pre_upgrade while /overlay is still writable
+X28_UP_LOG=${X28_UP_LOG:-}		# appended to when writable (before the pivot); in the RAM root only the kernel log (UART, pstore) survives
+X28_UP_KMSG=${X28_UP_KMSG:-}
 # What the standard sysupgrade (common.sh run_ramfs) copies into the RAM root before stage 2 runs: everything below is used after the
 # root is gone. Busybox applets are listed by path; install_bin follows them. Unproven on the unit until the first identical-image run.
 RAMFS_COPY_BIN="/usr/sbin/ubiformat /usr/sbin/ubidetach /usr/sbin/ubiattach /usr/sbin/ubiblock /sbin/dd-nand /usr/bin/hexdump /usr/bin/cmp /bin/tar /usr/bin/sha256sum /usr/bin/cut /usr/bin/head /usr/bin/wc /bin/cp /bin/rm /bin/date /bin/sleep"
@@ -60,6 +62,7 @@ x28_ubi_verify() {
 
 x28_log() {
 	echo "x28-sysupgrade: $*" >&2
+	[ -n "$X28_UP_KMSG" ] && echo "<5>x28-sysupgrade: $*" > "$X28_UP_KMSG" 2>/dev/null
 	[ -n "$X28_UP_LOG" ] && echo "$(date +%H:%M:%S) $*" >> "$X28_UP_LOG" 2>/dev/null
 	return 0
 }
@@ -143,6 +146,17 @@ x28_mtd_of() { sed -n "s/^\\(mtd[0-9]*\\): [0-9a-f]* [0-9a-f]* \"$1\"\$/\\1/p" "
 x28_mtd_of_size() { printf '%d' "0x$(sed -n "s/^mtd[0-9]*: \\([0-9a-f]*\\) [0-9a-f]* \"$1\"\$/\\1/p" "$X28_UP_PROC/mtd")"; }
 
 x28_free_kb() { sed -n 's/^MemAvailable: *\([0-9]*\) kB.*/\1/p' "$X28_UP_PROC/meminfo"; }
+
+# Called by stage2 with the image BEFORE it switches to the RAM root, while /overlay is still mounted read-write: keep a copy of misc
+# where it survives (the compare in x28_misc_select uses its own RAM copy, taken later).
+platform_pre_upgrade() {
+	local keep=$X28_UP_KEEP dev
+	x28_log "pre-upgrade: $1"
+	[ -n "$keep" ] || return 0
+	dev=$(x28_misc_dev) || return 0
+	mkdir -p "$keep" 2>/dev/null && dd if="$dev" of="$keep/misc-$(date +%Y%m%d-%H%M%S).bin" bs=65536 2>/dev/null && x28_log "misc saved in $keep"
+	return 0
+}
 
 # $1 = sysupgrade tarball: sysupgrade-x28/root (the UBI image) and sysupgrade-x28/root.sha256 (its hash).
 platform_check_image() {
