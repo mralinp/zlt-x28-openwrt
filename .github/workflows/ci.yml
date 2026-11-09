@@ -47,6 +47,7 @@ jobs:
       - run: sh tests/test_wps.sh
       - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
+      - run: node tests/test_luci.cjs
       - run: sh tests/test_bootok.sh
       - run: sh tests/test_sysupgrade.sh
       - run: sh tests/test_user_data.sh
