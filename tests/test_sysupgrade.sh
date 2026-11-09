@@ -26,7 +26,7 @@ entries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2056 + 262144 * 
 ALL() { printf '%s %s %s %s ' "$1" "$1" "$1" "$1"; }
 mkdir -p "$dir/root/etc/init.d" "$dir/root/tmp" "$dir/dump"; : > "$dir/root/etc/init.d/x28-bootok"; chmod +x "$dir/root/etc/init.d/x28-bootok"
 echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"; : > "$dir/root/tmp/x28-upgrade-ok"
-export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
+export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_LOG=$dir/up.log X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
 . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"
 
 # flip to B: B 15 tries 0, A 14, success and up-type bytes kept, in all four copies
@@ -90,6 +90,9 @@ platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e00000
 # the image is written to the right partition
 X28_UP_WRITE='echo' ; mkmisc 0f000000 0e000101
 [ "$(platform_do_upgrade "$dir/good.tar" 2>/dev/null)" = "$dir/x28-root.ubi /dev/mtd42" ]
+# the run leaves a trace in the log file
+platform_do_upgrade "$dir/good.tar" 2>/dev/null; grep -q 'stage 2 started' "$dir/up.log" && grep -q 'writing /dev/mtd' "$dir/up.log" && grep -q ' done$' "$dir/up.log"
+mkmisc 0f000000 0e000101
 # no operator confirmation: nothing is checked as flashable and nothing is written
 rm "$dir/root/tmp/x28-upgrade-ok"; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_check_image "$dir/good.tar" 2>/dev/null; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]

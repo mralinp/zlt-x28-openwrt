@@ -10,8 +10,8 @@
 
 # The environment can redirect nothing in production: these are fixed unless X28_UP_TEST is set (tests/test_sysupgrade.sh).
 if [ -z "$X28_UP_TEST" ]; then
-	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/root
-	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev
+	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/overlay/x28-dumps
+	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log
 fi
 X28_UP_SYS=${X28_UP_SYS:-/sys}
 X28_UP_DEVDIR=${X28_UP_DEVDIR:-/dev}
@@ -20,7 +20,8 @@ X28_UP_DDNAND=${X28_UP_DDNAND:-dd-nand}
 X28_UP_MISC=${X28_UP_MISC:-}		# misc device; found in /proc/mtd when empty
 X28_UP_ROOT=${X28_UP_ROOT:-}		# prefix of /etc for the marker, the confirmation file and the bootok check
 X28_UP_TMP=${X28_UP_TMP:-/tmp}
-X28_UP_DUMP=${X28_UP_DUMP:-/root}	# persistent: the overlay is on user_data
+X28_UP_DUMP=${X28_UP_DUMP:-/overlay/x28-dumps}	# persistent: /overlay is the one old mount stage 2 keeps (/root is RAM by then)
+X28_UP_LOG=${X28_UP_LOG:-}		# appended to as well as stderr, so stage 2 leaves a trace across the reboot
 # What the standard sysupgrade (common.sh run_ramfs) copies into the RAM root before stage 2 runs: everything below is used after the
 # root is gone. Busybox applets are listed by path; install_bin follows them. Unproven on the unit until the first identical-image run.
 RAMFS_COPY_BIN="/usr/sbin/ubiformat /usr/sbin/ubidetach /usr/sbin/ubiattach /usr/sbin/ubiblock /sbin/dd-nand /usr/bin/hexdump /usr/bin/cmp /bin/tar /usr/bin/sha256sum /usr/bin/cut /usr/bin/head /usr/bin/wc /bin/cp /bin/rm /bin/date /bin/sleep"
@@ -57,7 +58,11 @@ x28_ubi_verify() {
 	[ "$got" = "$X28_EXP_SHA" ] || { x28_log "the written rootfs volume does not match the image"; return 1; }
 }
 
-x28_log() { echo "x28-sysupgrade: $*" >&2; }
+x28_log() {
+	echo "x28-sysupgrade: $*" >&2
+	[ -n "$X28_UP_LOG" ] && echo "$(date +%H:%M:%S) $*" >> "$X28_UP_LOG" 2>/dev/null
+	return 0
+}
 
 x28_slot() { sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$X28_UP_PROC/cmdline"; }
 
@@ -98,6 +103,7 @@ x28_misc_select() {
 	local target=$1 flip=$2 dev e a b i v out ap bp dump exp
 	dev=$(x28_misc_dev) || { x28_log "no single misc partition"; return 1; }
 	e=$(x28_misc_entries "$dev") || return 1
+	mkdir -p "$X28_UP_DUMP" 2>/dev/null
 	dump=$X28_UP_DUMP/misc-$(date +%Y%m%d-%H%M%S).bin; exp=$X28_UP_TMP/misc-expected.bin
 	dd if="$dev" of="$dump" bs=65536 2>/dev/null
 	[ "$(wc -c < "$dump")" -eq 1048576 ] && dd if="$dev" bs=65536 2>/dev/null | cmp -s - "$dump" || { x28_log "misc dump failed; nothing written"; return 1; }
@@ -158,6 +164,7 @@ platform_check_image() {
 # Returns 2 when misc was partly changed: the caller must NOT reboot into the target then (the old slot still boots; see the dump).
 platform_do_upgrade() {
 	local f=$1 t flip mtd want img=$X28_UP_TMP/x28-root.ubi
+	x28_log "stage 2 started: $f"
 	x28_tries_zero "$(x28_misc_dev)" || return 1
 	set -- $(x28_target) || return 1; t=$1; flip=$2
 	mtd=$(x28_mtd_of "rootfs_$t"); [ -n "$mtd" ] || { x28_log "no rootfs_$t"; return 1; }
@@ -165,7 +172,9 @@ platform_do_upgrade() {
 	want=$(tar -xOf "$f" "$X28_DIR/root.sha256") && want=${want%% *}
 	set -- $(tar -xOf "$f" "$X28_DIR/root.rootfs"); X28_EXP_SHA=$1 X28_EXP_BYTES=$2
 	if ! tar -xOf "$f" "$X28_DIR/root" > "$img" || [ "$(sha256sum < "$img" | cut -d' ' -f1)" != "$want" ]; then rm -f "$img"; x28_log "cannot unpack the image to RAM; nothing written"; return 1; fi
+	x28_log "writing /dev/$mtd (rootfs_$t)"
 	$X28_UP_WRITE "$img" "/dev/$mtd" && $X28_UP_VERIFY "$img" "/dev/$mtd" || { rm -f "$img"; x28_log "write or verify failed; misc untouched"; return 1; }
 	rm -f "$img"
-	x28_misc_select "$t" "$flip"
+	x28_log "written and verified; changing misc (target $t flip $flip)"
+	x28_misc_select "$t" "$flip" && x28_log "done"
 }
