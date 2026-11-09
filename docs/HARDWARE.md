@@ -1,6 +1,6 @@
 # Hardware: CPU, RAM, flash and trees
 
-What the X28 has, what Linux gets, what uses it, and how its filesystem and device tree are laid out. Measured read-only on the test unit on 2026-10-31, on the native
+The module-by-module overview and the specification table are in [MODULES](MODULES.md). What the X28 has, what Linux gets, what uses it, and how its filesystem and device tree are laid out. Measured read-only on the test unit on 2026-10-31, on the native
 image, about 2 h 50 min after boot with the LAN, Wi-Fi and 5G up. Run-time figures vary; the sizes do not.
 
 | | |

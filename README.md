@@ -57,7 +57,7 @@ Current release: **v0.68.0** (a pre-release; the badge above shows the newest).
 
 ## Status
 
-Two units have run the native image: one X28 and one X28 PRO. Detail and evidence: [docs/STATUS.md](docs/STATUS.md) and [docs/TESTING.md](docs/TESTING.md).
+Two units have run the native image: one X28 and one X28 PRO. Detail and evidence: [docs/STATUS.md](docs/STATUS.md) and [docs/TESTING.md](docs/TESTING.md). The hardware, module by module: [docs/MODULES.md](docs/MODULES.md).
 
 | Feature | State | X28 | X28 PRO |
 |---|---|---|---|

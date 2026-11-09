@@ -28,6 +28,7 @@ docs/
 ├── PROJECT-PLAN.md           goal, strategy, phase status, roadmap to a stable release, risks, operating rules
 ├── BUILD.md                  the native image: CI userspace, private staging, first-boot profile, UBI, boot guards
 ├── HARDWARE.md               CPU, RAM and flash use, the root filesystem tree and the device tree
+├── MODULES.md                hardware specification and the modules (SoC, modem, Wi-Fi, switch, flash, LEDs) with the software that drives each
 ├── RECOVERY.md               NAND backup, USB preloader/DA access, flash sessions, UART
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
