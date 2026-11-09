@@ -26,9 +26,34 @@ x28_ud_new_image() {
 	mount -t ubifs /dev/ubi1_2 "$X28_UD_MNT" 2>/dev/null || return 0
 	if [ -f "$X28_UD_MNT/etc/.extroot-uuid" ] && [ "$(cat "$X28_UD_MNT/etc/.extroot-uuid")" != "$root" ]; then
 		# The tag goes last and only after the rest: a half-done wipe repeats next boot, old settings never meet a new image.
-		rm -rf "$X28_UD_MNT/upper" "$X28_UD_MNT/work" && rm -f "$X28_UD_MNT/etc/.extroot-uuid"
+		rm -rf "$X28_UD_MNT/upper" "$X28_UD_MNT/work" && rm -f "$X28_UD_MNT/etc/.extroot-uuid" && x28_ud_keep
+	elif [ ! -f "$X28_UD_MNT/etc/.extroot-uuid" ]; then
+		x28_ud_keep
 	fi
+	rm -f "$X28_UD_MNT"/x28-keep-*.tgz || :
 	umount "$X28_UD_MNT"
+}
+
+# Settings kept across an upgrade (#477): the old image's platform.sh left its backup here as x28-keep-<target slot>.tgz. A new image on
+# that slot hands it to 80_mount_root as OpenWrt's own /sysupgrade.tgz (restored into the fresh overlay, passwd/shadow merged), minus
+# everything that runs at boot: only etc/, and not the build guard's boot roots (ab_guard), init scripts or buttons. A bad archive is
+# dropped and the image starts with its defaults.
+x28_ud_keep() {
+	local slot keep tmp=/tmp/x28-keep p
+	slot="$(sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$X28_UD_PROC/cmdline" 2>/dev/null)"
+	keep="$X28_UD_MNT/x28-keep-$slot.tgz"
+	[ -n "$slot" ] && [ -s "$keep" ] || return 0
+	rm -rf "$tmp"
+	if tar -tzf "$keep" 2>/dev/null | grep -q '^/\|\(^\|/\)\.\.\(/\|$\)' || ! mkdir -p "$tmp/x" || ! tar -xzf "$keep" -C "$tmp/x" 2>/dev/null; then
+		echo "- x28: kept settings unreadable, starting with defaults -"; rm -rf "$tmp"; return 0
+	fi
+	for p in "$tmp/x"/* "$tmp/x"/.[!.]*; do [ "$p" = "$tmp/x/etc" ] || rm -rf "$p"; done
+	for p in rc.d init.d hotplug.d crontabs uci-defaults rc.button inittab rc.local preinit rc.common; do
+		[ -e "$tmp/x/etc/$p" ] && echo "- x28: not restoring /etc/$p (runs at boot) -" && rm -rf "$tmp/x/etc/$p"
+	done
+	mkdir -p "$X28_UD_MNT/upper" && (cd "$tmp/x" && tar -czf "$X28_UD_MNT/upper/sysupgrade.tgz" etc) &&
+		echo "- x28: settings kept by the upgrade will be restored -"
+	rm -rf "$tmp"
 }
 
 # The running slot's tries in misc, this boot's included (record at 2048, tries at byte 9 for A, 13 for B, as in x28-bootok). Read only; empty if unreadable.

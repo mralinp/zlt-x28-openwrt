@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # x28-upgrade: one-command upgrade to the newest signed X28 image (#515), like OpenWrt's owut/auc with our releases as the server.
 #   x28-upgrade       check only: running version vs the newest release with a signed x28-sysupgrade-<ver>.tar
-#   x28-upgrade -y    download it to /tmp, check its .sha256, sysupgrade -T, then sysupgrade -n (writes the other slot, reboots)
+#   x28-upgrade -y    download it to /tmp, check its .sha256, sysupgrade -T, then sysupgrade -k (writes the other slot, keeps
+#                     the settings and the installed-package list, reboots)
 #   x28-upgrade -y -b the same in the background, output in /tmp/x28-upgrade.log (what LuCI's button runs)
 # Never runs on its own. The signature is checked by sysupgrade itself (ucert); platform.sh writes only the slot not running.
 REPO=mralinp/zlt-x28-openwrt
@@ -55,4 +56,4 @@ got=$(sha256sum "$f" | cut -d' ' -f1)
 [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$f"; die "SHA-256 does not match the release's .sha256"; }
 $SYSUPGRADE -T "$f" || { rm -f "$f"; die "sysupgrade -T refused the image"; }
 echo "x28-upgrade: flashing $latest to slot $1; the unit reboots"
-$SYSUPGRADE -n "$f" || die "sysupgrade -n failed"
+$SYSUPGRADE -k "$f" || die "sysupgrade failed"

@@ -106,6 +106,15 @@ rm -f "$dir/x28-target"; ! x28_target 2>/dev/null
 platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(wc -c < "$dir/keep/$(ls "$dir/keep" | head -1)")" -eq 1048576 ]
 grep -q 'x28-sysupgrade: misc saved' "$dir/kmsg"  # /dev/kmsg takes one line per write; the file keeps the last
 rm -f "$dir/x28-target"   # the stored target is per upgrade run
+# kept settings (#477): the backup goes to user_data's root for the target slot, stale ones go; not without the extroot tag or with -n
+mkdir -p "$dir/ov/etc"; echo cfg > "$dir/bak.tgz"; : > "$dir/ov/x28-keep-a.tgz"
+X28_UP_OVERLAY=$dir/ov UPGRADE_BACKUP=$dir/bak.tgz platform_pre_upgrade "$dir/good.tar" 2>/dev/null; rm -f "$dir/x28-target"
+[ ! -e "$dir/ov/x28-keep-b.tgz" ] && [ ! -e "$dir/ov/x28-keep-a.tgz" ]                          # no tag: /overlay is not user_data
+: > "$dir/ov/etc/.extroot-uuid"
+X28_UP_OVERLAY=$dir/ov UPGRADE_BACKUP=$dir/bak.tgz platform_pre_upgrade "$dir/good.tar" 2>/dev/null; rm -f "$dir/x28-target"
+[ "$(cat "$dir/ov/x28-keep-b.tgz")" = cfg ] && [ "$(ls "$dir/ov" | grep -c keep)" = 1 ]
+X28_UP_OVERLAY=$dir/ov UPGRADE_BACKUP= platform_pre_upgrade "$dir/good.tar" 2>/dev/null; rm -f "$dir/x28-target"
+[ ! -e "$dir/ov/x28-keep-b.tgz" ]                                                               # sysupgrade -n: nothing kept
 # no operator confirmation: nothing is checked as flashable and nothing is written
 rm "$dir/root/tmp/x28-upgrade-ok"; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_check_image "$dir/good.tar" 2>/dev/null; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]

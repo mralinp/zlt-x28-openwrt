@@ -25,5 +25,7 @@ volume.
 - Anything wanted from the stock overlay (e.g. calibration, `nvram` data) must be identified by name,
   reviewed, and added as an explicit, hashed file in the profile. Calibration/NVRAM live in their own
   partitions, not in `rootfs_data`.
-- A later "preserve across upgrade" policy is a separate decision for the upgrade path (Phase 6); it must
-  re-run the boot-path guard against the preserved files.
+- Settings kept across a sysupgrade (#477) are the owner's own backup, not the stock overlay. The new image's
+  preinit hook (`x28-user-data`) restores only `etc/` from it, never the guard's boot roots (`rc.d`, `init.d`,
+  `rc.local`, `crontabs`, `hotplug.d`, `uci-defaults`, `rc.button`, `inittab`, `preinit`, `rc.common`), and only
+  into a fresh overlay of a new image on the slot it was saved for. See [sysupgrade-design](sysupgrade-design.md).

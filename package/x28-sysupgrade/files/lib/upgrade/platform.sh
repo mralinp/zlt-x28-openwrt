@@ -11,7 +11,7 @@
 # The environment can redirect nothing in production: these are fixed unless X28_UP_TEST is set (tests/test_sysupgrade.sh).
 if [ -z "$X28_UP_TEST" ]; then
 	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/tmp X28_UP_KEEP=/overlay/x28-dumps X28_UP_KMSG=/dev/kmsg
-	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log X28_UP_UCERT=/usr/bin/ucert
+	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log X28_UP_UCERT=/usr/bin/ucert X28_UP_OVERLAY=/overlay
 fi
 X28_UP_SYS=${X28_UP_SYS:-/sys}
 X28_UP_DEVDIR=${X28_UP_DEVDIR:-/dev}
@@ -24,6 +24,7 @@ X28_UP_DUMP=${X28_UP_DUMP:-/tmp}	# the dump the misc compare uses: RAM, because 
 X28_UP_KEEP=${X28_UP_KEEP:-}		# persistent copy, made by platform_pre_upgrade while /overlay is still writable
 X28_UP_LOG=${X28_UP_LOG:-}		# appended to when writable (before the pivot); in the RAM root only the kernel log (UART, pstore) survives
 X28_UP_KMSG=${X28_UP_KMSG:-}
+X28_UP_OVERLAY=${X28_UP_OVERLAY:-}	# user_data's root while it is the overlay; kept settings go there
 # What the standard sysupgrade (common.sh run_ramfs) copies into the RAM root before stage 2 runs: everything below is used after the
 # root is gone. Busybox applets are listed by path; install_bin follows them. Unproven on the unit until the first identical-image run.
 RAMFS_COPY_BIN="/usr/sbin/ubiformat /usr/sbin/ubidetach /usr/sbin/ubiattach /usr/sbin/ubiblock /sbin/dd-nand /usr/bin/hexdump /usr/bin/cmp /bin/tar /usr/bin/sha256sum /usr/bin/cut /usr/bin/head /usr/bin/wc /bin/cp /bin/rm /bin/date /bin/sleep"
@@ -166,6 +167,15 @@ platform_pre_upgrade() {
 	x28_log "pre-upgrade: $1"
 	rm -f "$X28_UP_TMP/x28-target"
 	t=$(x28_target) && echo "$t" > "$X28_UP_TMP/x28-target" && x28_log "target: $t"
+	# Kept settings (sysupgrade without -n, #477): the backup goes to user_data, the overlay both slots share, for the new image's
+	# preinit (x28-user-data) to restore. /overlay is that volume's root only when its extroot tag is there; otherwise none are kept.
+	if [ -n "$X28_UP_OVERLAY" ]; then
+		rm -f "$X28_UP_OVERLAY"/x28-keep-*.tgz
+		if [ -n "$t" ] && [ -s "$UPGRADE_BACKUP" ] && [ -f "$X28_UP_OVERLAY/etc/.extroot-uuid" ]; then
+			cp "$UPGRADE_BACKUP" "$X28_UP_OVERLAY/x28-keep.new" && mv "$X28_UP_OVERLAY/x28-keep.new" "$X28_UP_OVERLAY/x28-keep-${t%% *}.tgz" &&
+				sync && x28_log "settings kept for slot ${t%% *}"
+		fi
+	fi
 	[ -n "$keep" ] || return 0
 	dev=$(x28_misc_dev) || return 0
 	mkdir -p "$keep" 2>/dev/null && dd if="$dev" of="$keep/misc-$(date +%Y%m%d-%H%M%S).bin" bs=65536 2>/dev/null && x28_log "misc saved in $keep"

@@ -86,8 +86,13 @@ router does, and attaches `x28-sysupgrade-<version>.tar` and its `.sha256`. The 
 
 - One file: a tarball in the OpenWrt sysupgrade shape (`sysupgrade-x28/root` = the UBI image, `root.sha256` its hash, `root.rootfs` = `sha256 bytes` of the squashfs in volume 0, which the verify reads back), built by the same
   tooling as the slot image, in x28-flasher's `tools/build`. No new signing: the feed key is for packages.
-- Config: `sysupgrade -k` keeps `/etc/config` through a `sysupgrade.tgz` restored on first boot into the new overlay. The boot-path guard
-  must run over those files before they are applied ([overlay-policy](overlay-policy.md)).
+- Config (#477): a sysupgrade without `-n` (and `x28-upgrade -y`, which runs `sysupgrade -k`) keeps the settings. `platform_pre_upgrade`
+  copies OpenWrt's backup to the root of `user_data`, the overlay both slots share, as `x28-keep-<target slot>.tgz`. On the new image's
+  first boot, preinit (`x28-user-data`) wipes the old overlay as before and, only then and only on that slot, passes `etc/` from the
+  backup without the boot roots to `80_mount_root` as `/sysupgrade.tgz`, OpenWrt's own restore (passwd/shadow merged). Any other boot
+  deletes the file. Cron jobs, `rc.local` and init scripts are not kept. Takes effect from the second upgrade: stage 2 runs the old
+  image's `platform.sh`, and images up to v0.78.0 have no copy step. The package list goes to `/etc/backup/installed_packages.txt`;
+  nothing reinstalls from it yet.
 
 ## Open and untested
 
