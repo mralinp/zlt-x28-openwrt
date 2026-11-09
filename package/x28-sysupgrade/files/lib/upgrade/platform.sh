@@ -11,7 +11,7 @@
 # The environment can redirect nothing in production: these are fixed unless X28_UP_TEST is set (tests/test_sysupgrade.sh).
 if [ -z "$X28_UP_TEST" ]; then
 	X28_UP_PROC=/proc X28_UP_DDNAND=dd-nand X28_UP_MISC= X28_UP_ROOT= X28_UP_TMP=/tmp X28_UP_DUMP=/tmp X28_UP_KEEP=/overlay/x28-dumps X28_UP_KMSG=/dev/kmsg
-	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log
+	X28_UP_WRITE=x28_ubi_write X28_UP_VERIFY=x28_ubi_verify X28_UP_SYS=/sys X28_UP_DEVDIR=/dev X28_UP_LOG=/overlay/x28-sysupgrade.log X28_UP_UCERT=/usr/bin/ucert
 fi
 X28_UP_SYS=${X28_UP_SYS:-/sys}
 X28_UP_DEVDIR=${X28_UP_DEVDIR:-/dev}
@@ -28,6 +28,12 @@ X28_UP_KMSG=${X28_UP_KMSG:-}
 # root is gone. Busybox applets are listed by path; install_bin follows them. Unproven on the unit until the first identical-image run.
 RAMFS_COPY_BIN="/usr/sbin/ubiformat /usr/sbin/ubidetach /usr/sbin/ubiattach /usr/sbin/ubiblock /sbin/dd-nand /usr/bin/hexdump /usr/bin/cmp /bin/tar /usr/bin/sha256sum /usr/bin/cut /usr/bin/head /usr/bin/wc /bin/cp /bin/rm /bin/date /bin/sleep"
 RAMFS_COPY_DATA="/usr/lib/libnandapi.so"
+X28_UP_UCERT=${X28_UP_UCERT:-}
+# Signed images (#476): with `ucert` on the router OpenWrt's own check (fwtool.sh) refuses an image without a valid signature and
+# metadata; `sysupgrade -F` is the owner's override, as everywhere in OpenWrt. Without `ucert` the check cannot run, so the older
+# operator confirmation (x28_target) stays.
+x28_signed() { [ -x "$X28_UP_UCERT" ]; }
+if x28_signed; then REQUIRE_IMAGE_SIGNATURE=1; REQUIRE_IMAGE_METADATA=1; fi
 X28_COPY=262144
 X28_DIR=sysupgrade-x28
 X28_MIN_FREE_KB=32768
@@ -140,7 +146,7 @@ x28_misc_select() {
 # image's marker AND /tmp/x28-write-b-ok, so a marker carried in A's image alone can never make sysupgrade overwrite a stock B.
 x28_target() {
 	local s; s=$(x28_slot)
-	if [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
+	if ! x28_signed && [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
 	# Decided once, before the pivot (platform_pre_upgrade): in the RAM root /etc is not the router's /etc, so the marker is gone there.
 	if [ -s "$X28_UP_TMP/x28-target" ]; then cat "$X28_UP_TMP/x28-target"; return 0; fi
 	if [ ! -e "$X28_UP_ROOT/etc/x28-native-b" ]; then echo "$s 0"; return 0; fi

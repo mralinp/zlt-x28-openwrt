@@ -26,7 +26,7 @@ entries() { for i in 0 1 2 3; do dd if="$dir/misc" bs=1 skip=$((2056 + 262144 * 
 ALL() { printf '%s %s %s %s ' "$1" "$1" "$1" "$1"; }
 mkdir -p "$dir/root/etc/init.d" "$dir/root/tmp" "$dir/dump"; : > "$dir/root/etc/init.d/x28-bootok"; chmod +x "$dir/root/etc/init.d/x28-bootok"
 echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"; : > "$dir/root/tmp/x28-upgrade-ok"
-export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_KEEP=$dir/keep X28_UP_KMSG=$dir/kmsg X28_UP_LOG=$dir/up.log X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
+export X28_UP_UCERT=$dir/no-ucert X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_KEEP=$dir/keep X28_UP_KMSG=$dir/kmsg X28_UP_LOG=$dir/up.log X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
 . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"
 
 # flip to B: B 15 tries 0, A 14, success and up-type bytes kept, in all four copies
@@ -105,6 +105,12 @@ grep -q 'x28-sysupgrade: misc saved' "$dir/kmsg"  # /dev/kmsg takes one line per
 # no operator confirmation: nothing is checked as flashable and nothing is written
 rm "$dir/root/tmp/x28-upgrade-ok"; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_check_image "$dir/good.tar" 2>/dev/null; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]
+: > "$dir/root/tmp/x28-upgrade-ok"
+# with ucert on the router the signature check does the authenticating: the confirmation file is not needed, and the REQUIRE_ flags are set
+rm -f "$dir/root/tmp/x28-upgrade-ok"; : > "$dir/ucert"; chmod +x "$dir/ucert"
+( X28_UP_UCERT=$dir/ucert; . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"
+  [ "$REQUIRE_IMAGE_SIGNATURE" = 1 ] && [ "$REQUIRE_IMAGE_METADATA" = 1 ] && [ "$(x28_target)" = "a 0" ] )
+( unset REQUIRE_IMAGE_SIGNATURE; . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"; [ -z "$REQUIRE_IMAGE_SIGNATURE" ] )   # without ucert: not required
 : > "$dir/root/tmp/x28-upgrade-ok"
 # the check step: bootok missing, not enough RAM, image larger than the partition
 mkmisc 0f000000 0e000101
