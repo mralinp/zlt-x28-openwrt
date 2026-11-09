@@ -1,0 +1,16 @@
+{
+	"switch": {
+		"switch0": {
+			"enable": true,
+			"reset": true,
+			"ports": [
+				{ "num": 0, "role": "lan" },
+				{ "num": 1, "role": "lan" },
+				{ "num": 2, "role": "lan" },
+				{ "num": 4, "role": "lan" },
+				{ "num": 5, "device": "eth0" },
+				{ "num": 6, "device": "eth1" }
+			]
+		}
+	}
+}
