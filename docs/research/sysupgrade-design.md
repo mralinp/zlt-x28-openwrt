@@ -1,6 +1,6 @@
 # Sysupgrade for the A/B layout: design (#154)
 
-Research and design only; nothing here was run on a device. Inputs: [slot-b-reuse](slot-b-reuse.md) (preloader behaviour, decoded not run),
+Written as research and design before anything ran; it has since been built (`package/x28-sysupgrade`) and run on a unit ([TESTING 52 to 53d](../TESTING.md)). Inputs: [slot-b-reuse](slot-b-reuse.md) (preloader behaviour, decoded not run),
 the build guard in [BUILD](../BUILD.md), and the flasher's boot-order step. Open points are marked.
 
 ## Constraints that shape it

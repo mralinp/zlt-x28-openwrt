@@ -4,6 +4,8 @@ Scope update, 2026-10-21: the primary deliverable is now the native OpenWrt port
 
 **Status (2026-10-29):** a native OpenWrt 23.05.5 image boots from slot A of one test unit with 5G data, LuCI, LAN/DHCP, Wi-Fi and LEDs ([STATUS](STATUS.md)). There is **no public flashable image or installation guide yet**: the vendor modem stack is not redistributable, so the repository publishes build tooling and packages, and the image is assembled from the owner's own backup. Tested device: ZLT X28, MT6890/T750, Linux 4.19.205 (vendor kernel). These observations describe one unit and may differ across revisions.
 
+**Update (2026-11-10):** two units run the image, releases carry a flashable image built in CI and a signed `sysupgrade` image, and the recovery slot was dropped in favour of the flasher over DL mode; [STATUS](STATUS.md) is the current state. The two paragraphs around this one are kept as written.
+
 **Direction:** stable OpenWrt on slot A and a recovery slot on B (a small kernel and rescue path that installs OpenWrt on A and can restore stock), then `sysupgrade`, a stable release and a wiki device page ([PROJECT-PLAN](PROJECT-PLAN.md)). The milestones list below is the original draft and is kept for context.
 
 ## Goal

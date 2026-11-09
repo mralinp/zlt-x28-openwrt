@@ -40,7 +40,7 @@ Migrate in stages so the box stays usable after every stage.
 | 3 SMS and voice | 🗓️ worked on the stock overlay; to be ported to the native image |
 | 4 Source and toolchain | 🟡 stock blobs extracted and used; GPL source not obtained; own kernel parked ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)) |
 | 5 Modern OpenWrt image | ✅ boots on slot A with LAN, Wi-Fi and cellular data; stock slot B untouched |
-| 6 Release | 🟡 pre-releases on every merge; stable release and `sysupgrade` still ahead |
+| 6 Release | 🟡 pre-releases on every merge; *(updated 2026-11-10)* `sysupgrade` with signed images works and CI builds the image; stable release still ahead |
 
 ## Phases
 
@@ -98,9 +98,12 @@ state. What to do with B's storage is answered in [slot-b-reuse](research/slot-b
    baseline in [THERMAL](THERMAL.md).
 2. **Recovery (done differently).** No recovery slot: the way back is the flasher over DL mode, and the fall-back to stock B stays
    as it is (see above). Remaining work is the flasher's, in its own repository.
-3. **`sysupgrade`** for the new layout (A/B NAND with UBI and a preloader that picks the slot).
+3. **`sysupgrade`** for the new layout (A/B NAND with UBI and a preloader that picks the slot). *(updated 2026-11-10)* Works with signed
+   images and writes the slot that is not running, so stock B lasts until the first upgrade ([sysupgrade-design](research/sysupgrade-design.md),
+   [TESTING 53d](TESTING.md)). Left: keeping settings (#477), LuCI's flash page (#478), the hardware pass (#458).
 4. **Publish.** A stable tagged release, build documentation for other owners, and a device page for the OpenWrt
-   wiki. The vendor modem blobs cannot be redistributed, so this ships the tooling and packages, not a ready image.
+   wiki. *(updated 2026-11-10)* Since v0.75.0 CI builds the image from a private stock rootfs and attaches it to each release (#254);
+   the vendor files themselves still never enter the repository.
 5. **Later.** Fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), SMS and voice on the
    native image, and an own 4.19 kernel from a sibling-device SDK
    ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130); not tried yet). The kmod feed for the vendor kernel is done: [PACKAGE-FEED](PACKAGE-FEED.md).

@@ -44,7 +44,7 @@ This project puts a normal OpenWrt 23.05.5 on the ZLT X28 5G CPE (MediaTek MT689
 userspace is standard OpenWrt: LuCI, UCI, netifd, dnsmasq and the fw3 firewall. It runs on the vendor 4.19.205 kernel
 and keeps the vendor modem stack only as a hardware backend. It ships WireGuard, OpenVPN, L2TP, PPTP and Passwall2,
 and a signed `opkg` feed built for this kernel. The OpenWrt image goes on **slot A**; the stock firmware stays on **slot B** as the fallback.
-Current release: **v0.68.0** (a pre-release; the badge above shows the newest).
+Current release: **v0.77.0** (a pre-release; the badge above shows the newest).
 
 ## Terms used in these docs
 
@@ -74,14 +74,15 @@ Two units have run the native image: one X28 and one X28 PRO. Detail and evidenc
 | `opkg` and LuCI Software with the signed feed | working | tested | packaged image on two units ([TESTING 49](docs/TESTING.md)) |
 | Boot slot switch (A and B) | working | tested | tested ([TESTING 42](docs/TESTING.md)) |
 | SMS and voice | not working on the native image (worked on the stage 1 overlay) | not ported | not ported |
-| `sysupgrade`, one-command upgrade (`x28-upgrade`, LuCI notice) | built, not yet run on a unit ([Upgrading](#upgrading)) | untested | untested |
+| `sysupgrade` with signed images | working, settings not kept ([Upgrading](#upgrading)) | tested ([TESTING 53d](docs/TESTING.md)) | untested |
+| One-command upgrade (`x28-upgrade`, LuCI notice) | built, not yet run on a unit | untested | untested |
 | Fan control, own kernel | not available | planned | planned |
 
 Notes:
 
 - Slot A is deliberately **not** marked successful. This keeps the preloader fall-back to stock slot B ([BOOT-FLOW](docs/BOOT-FLOW.md)).
 - Idle SoC temperature is about 40 °C (stock: 65 °C without a fan).
-- The vendor modem stack is closed and not redistributable. This repository publishes the **build tooling and the packages**, not a ready-to-flash image. The image is assembled locally from your own unit's backup.
+- The vendor modem stack is closed and its files never enter this repository. Since v0.75.0 each release also carries a flashable image built in CI from a private stock rootfs, and a signed sysupgrade image; the flasher can download that image or assemble one locally from your own unit's backup ([BUILD](docs/BUILD.md)).
 - One SIM, one carrier were tested. IPv6 on the 5G WAN: `TODO(verify)` beyond the first unit. The 2.5G WAN port is not covered by a test note: `TODO(verify)`.
 
 ## Quick start
@@ -226,8 +227,7 @@ Note: This flasher enables SSH with root access on firmware versions up to 8.6.2
 
 Backup, root access, image assembly, flashing and the boot order all belong to the
 [x28-flasher](https://github.com/mralinp/x28-flasher) (private for now). Use it; do not run the steps by hand.
-It builds the image locally from a release's `x28-assembly-*` bundle and **your own unit's backup**, because the vendor half
-cannot be published. How the pieces work, for readers and reviewers: [docs/BUILD.md](docs/BUILD.md),
+It downloads a release's image, or builds one locally from the `x28-assembly-*` bundle and **your own unit's backup**. How the pieces work, for readers and reviewers: [docs/BUILD.md](docs/BUILD.md),
 [docs/RECOVERY.md](docs/RECOVERY.md) and [docs/research/rootfs-a-write-plan.md](docs/research/rootfs-a-write-plan.md).
 
 ## Documentation
@@ -242,8 +242,8 @@ Start with [docs/TESTING.md](docs/TESTING.md) for evidence and [docs/STATUS.md](
 
 A merge to `main` that changes shippable files is released automatically (docs-only and CI-only merges are not). The version comes from the PR title (Conventional Commits:
 `feat` → minor, `type!` → major, otherwise patch); 0.x releases are pre-releases. Each release publishes one
-`x28-assembly-vX.Y.Z.tar.gz` bundle (userspace, package files, kernel modules, extra packages). A release alone does not boot the X28 (the vendor half is
-added locally); see [docs/BUILD.md](docs/BUILD.md). What changed, release by release: [CHANGELOG.md](CHANGELOG.md).
+`x28-assembly-vX.Y.Z.tar.gz` bundle (userspace, package files, kernel modules, extra packages), the image built from it in CI
+(`x28-native-image.tar.gz`, read by the flasher) and a signed `x28-sysupgrade-<version>.tar` for [upgrading](#upgrading) a running unit; see [docs/BUILD.md](docs/BUILD.md). What changed, release by release: [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 

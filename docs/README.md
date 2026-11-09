@@ -4,7 +4,7 @@ Read in this order if you are new (or returning after a long break):
 
 1. [**STATUS.md**](STATUS.md): where the project stands today, what works and what is unproven.
 2. [**TESTING.md**](TESTING.md): what has actually been proven, with commands to reproduce it. Start here for evidence.
-3. [**ROADMAP.md**](ROADMAP.md): what comes next (recovery slot, `sysupgrade`, stable release).
+3. [**ROADMAP.md**](ROADMAP.md): what comes next (the rest of `sysupgrade`, stable release).
 4. [**PROJECT-PLAN.md**](PROJECT-PLAN.md): goal, strategy, phases, the roadmap to a stable release and the risks.
 5. [**BUILD.md**](BUILD.md): how the native image is built (open half in CI, vendor half locally).
 6. [**RECOVERY.md**](RECOVERY.md): backup, USB recovery path, UART, flash sessions, safety rules. Read before touching flash.
@@ -101,15 +101,15 @@ Older analysis and plans, kept for the evidence behind decisions in the document
 
 | Path | What |
 |---|---|
-| `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter) |
-| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `usign/` (signing image), `opkg_real_test.sh`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
+| `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter), `x28-sysupgrade` (`/lib/upgrade/platform.sh`), `x28-update` (`x28-upgrade` and the LuCI update notice), `x28-kmods`, `x28-switch`, `x28-nrband`, `x28-storage`, `x28-dhcp`, `x28-feed`; `x28-packages.ini` lists what becomes an ipk |
+| `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `usign/` (signing image), `image_sign.sh` (signs sysupgrade images), `opkg_real_test.sh`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
 | (moved) | the backup, USB and guarded flash tools live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/`, `tools/x28-flasher/`) |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
 | `tools/brand/` | `build_logo.py`: regenerates every logo SVG from parameters ([assets/BRAND.md](assets/BRAND.md)) |
 | `scripts/` | `release.py` (version and PR-title rules), `changelog.py` (regenerates the release list in CHANGELOG.md), `install.sh` (deploys the stock-firmware overlay), label sync |
-| `tests/` | shell tests of the init scripts (`test_modem.sh`, `test_bootok.sh`, `test_wifi.sh`, `test_wps.sh`) and the historical protocol and LuCI tests |
+| `tests/` | shell tests of the init scripts (`test_modem.sh`, `test_bootok.sh`, `test_wifi.sh`, `test_wps.sh`, `test_sysupgrade.sh`, `test_update.sh`, `test_image_sign.sh`), `qemu-sysupgrade/` (simulated NAND) and the historical protocol and LuCI tests |
 | `router/`, `experiments/` | the stock-firmware overlay and OEM UI experiments (historical; not part of the native image) |
-| `.github/workflows/` | `ci.yml`, `userspace.yml`, `release.yml` |
+| `.github/workflows/` | `ci.yml`, `userspace.yml`, `release.yml`, `image.yml` (the image for each release), `sign-image.yml` (owner-approved signing) |
 
 Every analysis tool has a runnable self-check: `python3 tools/firmware/inventory.py selftest`,
 `python3 scripts/release.py selftest`, `python3 scripts/changelog.py --check`

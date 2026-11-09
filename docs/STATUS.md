@@ -1,4 +1,4 @@
-# Project status — 2026-11-08
+# Project status — 2026-11-10
 
 The older status snapshot (stock-firmware overlay era, 2026-10-21) is kept in
 [archive/2026-10-21-STATUS.md](archive/2026-10-21-STATUS.md). Evidence for everything below is in
@@ -12,8 +12,8 @@ adapter. Preserve the working modem, board calibration and recoverability.
 
 ## Where it stands
 
-Release `v0.68.0` (a pre-release). The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
-is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock slot B is untouched. Most feature tests were done on the first unit; the PRO tests are in [TESTING](TESTING.md) 42 to 44 and 49.
+Release `v0.77.0` (a pre-release). The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock stays on slot B until the first `sysupgrade`, which writes the slot that is not running; on the first unit B was replaced by a native image in the sysupgrade tests ([TESTING 53c](TESTING.md)). Most feature tests were done on the first unit; the PRO tests are in [TESTING](TESTING.md) 42 to 44, 49 and 51.
 
 **Working on that unit**
 - 5G data through the `x28_mipc` netifd protocol (IPv4, IPv6, IPv4v6, APN from the SIM) and its LuCI page.
@@ -22,7 +22,9 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
 - Front panel LEDs from radio, signal and WAN state.
 - The modem stack, services and Wi-Fi defaults start at boot; settings, host keys and the root password survive reboots.
 - SSH takes the owner's key or the root password on port 22 (LAN only). Root has an empty password until the owner sets one (LuCI or `passwd`), like stock OpenWrt; dropbear never accepts an empty password, so password login starts then.
-- The A/B boot counter is reset after every good boot (`x28-bootok`), as stock does.
+- The A/B boot counter of the running slot (A or B) is reset after every good boot (`x28-bootok`), as stock does.
+- `sysupgrade` for the A/B layout (`x28-sysupgrade`): the image is written, read back and only then selected in `misc`. Proven on the first unit with an identical image, a changed image, a native slot B and an A to B to A cycle with signed images ([TESTING 52 to 53d](TESTING.md), [sysupgrade-design](research/sysupgrade-design.md)). Only signed images pass (`ucert`, a signer key certified by the offline feed key).
+- Each release carries a flashable image built in CI (`x28-native-image.tar.gz` for the flasher) and a signed `x28-sysupgrade-<version>.tar` ([BUILD](BUILD.md#getting-an-image-from-the-x28-flasher-wizard-285)).
 - About 40 °C idle on the SoC; the CPU is almost fully idle.
 - `opkg` works through our signed feed on a stable URL ([PACKAGE-FEED](PACKAGE-FEED.md)): 208 of the 976 official `kmod-*`
   packages install (180 stubs and 28 built for this kernel, WireGuard and TPROXY included), the rest are refused, and `x28-kmods` loads all 51 modules at boot ([TESTING 45](TESTING.md), [TESTING 46](TESTING.md)). OpenVPN, L2TP, PPTP and WireGuard clients are available; WireGuard uses a module
@@ -31,8 +33,8 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
 - Passwall2 runs on TPROXY and socket modules built the same way: the router's own traffic and LAN clients' TCP, UDP and
   IPv6 go through the node with no warnings, switched from LuCI, and it comes back after a reboot ([PASSWALL2](PASSWALL2.md)).
   Every image build ships it.
-- LuCI Carrier tab on the `x28_mipc` protocol: operator (automatic or manual, with a network scan), 4G and 5G band lock, cell lock, roaming (default off) and modem status (v0.54 – v0.57).
-- WPS push button, one Wi-Fi network per band (v0.38.6 – v0.39.1).
+- LuCI Carrier tab on the `x28_mipc` protocol: operator (automatic or manual, with a network scan), 4G and 5G band lock, cell lock, roaming (default off), modem status (v0.54 – v0.57), and the 5G (EN-DC) state with NR signal (v0.74).
+- WPS push button, one Wi-Fi network per band (v0.38.6 – v0.39.1). On the PRO the two-card `l1profile` is written when two Wi-Fi chips are found (v0.76.1).
 - The flasher, backup and image assembly moved to [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher), which is private for now; releases here publish the `x28-assembly` bundle it consumes (the `x28-overlay` asset until v0.57).
 
 **Open or unproven**
@@ -46,12 +48,13 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
 - SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
 - One SIM, one carrier. Differences between X28 and X28 PRO hardware are only known where [TESTING](TESTING.md) 42 to 44 record them.
 - Recovery is the flasher over DL mode, not a recovery slot: it needs a computer, USB and your own download agent. DL cannot write `misc`, so it cannot reset the A/B state ([slot-b-reuse](research/slot-b-reuse.md)).
-- `sysupgrade` and OTA are not available. L2TP and PPTP are not tested against a server.
+- Since v0.76.0 `sysupgrade` always writes the slot that is not running; that rule, the image built in CI, `x28-upgrade` and the LuCI update notice have no test record on a unit yet. Also unproven: `sysupgrade -k` (settings are not kept, [#477](https://github.com/mralinp/zlt-x28-openwrt/issues/477)), LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
+- Nothing upgrades on its own (no OTA). L2TP and PPTP are not tested against a server.
 
 ## Known limits of the base
 
-- The vendor modem userspace is closed and not redistributable, so no ready-to-flash image can be published; the build
-  copies it from the owner's own backup.
+- The vendor modem userspace is closed. Its files never enter this repository; the image CI publishes is built from a private
+  stock rootfs, and a local build copies it from the owner's own backup ([BUILD](BUILD.md)).
 - The vendor 4.19.205 kernel has no `nf_tables` (so fw3), no namespaces (so no `ujail`), and `CONFIG_MODVERSIONS`: the
   official feeds' kernel modules do not load, userspace packages do. `opkg` works through our signed
   [feed](PACKAGE-FEED.md): stubs for what the kernel has, built modules for what it lacks and can take, and a clear refusal for the
@@ -59,6 +62,5 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots; stock 
 
 ## Next
 
-See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, `sysupgrade` for the A/B layout
-([#154](https://github.com/mralinp/zlt-x28-openwrt/issues/154)), a stable release and the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
+See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, the rest of `sysupgrade` (keeping settings, LuCI's flash page, the hardware pass), a stable release and the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
 sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

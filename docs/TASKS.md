@@ -1,6 +1,6 @@
 # Tasks — native OpenWrt on the ZLT X28
 
-Status as of 2026-11-08 (release `v0.62.1`; the checklist below was last ticked at v0.22, see STATUS and the changelog for later work). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
+Status as of 2026-11-10 (release `v0.77.0`; the checklist below was last ticked at v0.22, see STATUS and the changelog for later work). The goal and rules are in [PROJECT-PLAN.md](PROJECT-PLAN.md); where things
 stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list is the overview.
 
 ## A. Hardware boundary
@@ -45,7 +45,8 @@ stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list 
 
 - [ ] 48 h soak with no unexplained reboots; idle CPU and RAM baseline; explain the load average of ~3 on an idle CPU.
 - [x] ~~Recovery slot on B~~ dropped (#152, #153): recovery is the flasher over DL mode ([slot-b-reuse](research/slot-b-reuse.md)).
-- [ ] `sysupgrade` for the new layout.
+- [x] `sysupgrade` for the new layout, with signed images ([TESTING 53d](TESTING.md)).
+- [ ] `sysupgrade` keeps settings (#477), works from LuCI's flash page (#478), and passes the hardware test with interrupted writes (#458).
 - [ ] Stable tagged release; OpenWrt wiki device page; build documentation.
 - [ ] Prove restore and independent installation on another unit.
 
