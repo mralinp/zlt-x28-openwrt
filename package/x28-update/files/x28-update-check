@@ -9,7 +9,8 @@ FETCH=${X28_UPD_FETCH:-uclient-fetch -q -T 15 -O -}
 
 ttl=30
 grep -q '"latest"' "$CACHE" 2>/dev/null && ttl=360
-[ -n "$(find "$CACHE" -mmin -$ttl 2>/dev/null)" ] && exec cat "$CACHE"
+# Only a cache this user wrote: /tmp is world-writable.
+[ -n "$(find "$CACHE" -user "$(id -u)" -mmin -$ttl 2>/dev/null)" ] && exec cat "$CACHE"
 
 semver() { grep -x '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*'; }
 newest() { sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1; }

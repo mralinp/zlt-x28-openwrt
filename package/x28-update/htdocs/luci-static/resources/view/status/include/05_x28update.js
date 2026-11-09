@@ -17,6 +17,10 @@ function follow() {
 				E('div', { 'class': 'right' }, E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Close')))
 			]);
 		}
+		else if (/up to date/.test(text)) {
+			ui.hideModal();
+			ui.addNotification(null, E('p', {}, _('Already up to date.')));
+		}
 		else if (/flashing/.test(text)) {
 			ui.showModal(_('Flashing…'), [ E('p', { 'class': 'spinning' }, last) ]);
 			ui.awaitReconnect();

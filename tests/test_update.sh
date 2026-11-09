@@ -53,4 +53,12 @@ SLOT=$((1 << 40)) upg -y | grep -q 'FAILED: /tmp has' && [ ! -e "$dir/calls" ]
 SUM=0000 upg -y | grep -q 'FAILED: SHA-256' && [ ! -e "$dir/calls" ] && [ ! -e "$dir/t/x28-sysupgrade-0.10.0.tar" ]
 FAIL_T=1 upg -y | grep -q 'FAILED: sysupgrade -T' && [ "$(cat "$dir/calls")" = "-T $dir/t/x28-sysupgrade-0.10.0.tar" ]
 printf '[]' > "$dir/api"; upg -y | grep -q 'FAILED: no release'
+mkdir "$dir/t/x28-upgrade.lock"; upg -y | grep -q 'FAILED: an upgrade is already running' && [ ! -e "$dir/calls" ]; rmdir "$dir/t/x28-upgrade.lock"
+# a crafted cache cannot steer the download path or URL
+echo '{"current":"0.9.0","latest":"../../x","newer":true}' > "$dir/cache"; sh "$up" -y | grep -q 'FAILED: bad version'
+# -b: the background run ends its log with the outcome; the lock is gone afterwards
+printf '[{"assets":[{"name":"x28-sysupgrade-0.10.0.tar"}]}]' > "$dir/api"; rm -f "$dir/cache" "$dir/calls"; sh "$up" -y -b | grep -q started
+i=0; until grep -q 'flashing\|FAILED' "$dir/t/x28-upgrade.log" 2>/dev/null || [ $i -ge 50 ]; do i=$((i + 1)); sleep 0.1; done
+tail -n 1 "$dir/t/x28-upgrade.log" | grep -q 'flashing 0.10.0'
+i=0; while [ -e "$dir/t/x28-upgrade.lock" ] && [ $i -lt 50 ]; do i=$((i + 1)); sleep 0.1; done; [ ! -e "$dir/t/x28-upgrade.lock" ]
 echo "x28-upgrade: ok"
