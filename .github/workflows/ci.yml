@@ -50,4 +50,5 @@ jobs:
       - run: node tests/test_luci.cjs
       - run: sh tests/test_bootok.sh
       - run: sh tests/test_sysupgrade.sh
+      - run: sh tests/test_update.sh
       - run: sh tests/test_user_data.sh

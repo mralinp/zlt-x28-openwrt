@@ -24,6 +24,7 @@ on:
       - "package/x28-packages.ini"
       - "package/x28-sysupgrade/**"
       - "package/x28-wifi/**"
+      - "package/x28-update/**"
       - "package/x28-kmod-stubs/**"
       - "package/luci-proto-x28-mipc/**"
       - ".github/workflows/release.yml"
@@ -85,6 +86,11 @@ jobs:
           B="x28-assembly-v${VERSION}"
           mkdir -p assets "$B/overlay" "$B/kmods" "$B/ipk"
           cp userspace/*-rootfs.tar.gz "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
+          # The image's own version, read by x28-update's notice (#511): /etc/x28-release, appended to the rootfs the image is built from.
+          mkdir -p stamp/etc && echo "$VERSION" > stamp/etc/x28-release
+          gunzip "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar.gz"
+          tar --owner=0 --group=0 --numeric-owner -rf "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar" -C stamp ./etc/x28-release
+          gzip -n "$B/openwrt-23.05.5-armsr-armv8-rootfs.tar"
           cp userspace/*.manifest "$B/userspace.manifest"
           # The package files first_boot.py reads (X28_OVERLAY).
           tar -cf - package/luci-proto-x28-mipc package/x28-bootok/files package/x28-dhcp/files package/x28-feed/files package/x28-kmod-stubs/stubs.txt package/x28-kmods/files package/x28-leds/files package/x28-mipc/files package/x28-modem/files package/x28-storage/files package/x28-sysupgrade/files package/x28-wifi/files | tar -xf - -C "$B/overlay"

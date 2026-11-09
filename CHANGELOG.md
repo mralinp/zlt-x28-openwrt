@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- LuCI Status > Overview shows a notice with links when a newer release carries a signed sysupgrade image (`x28-update`, read-only check cached in `/tmp`); the release stamps its version into the image as `/etc/x28-release` (#511).
 - The release bundle carries `package/x28-sysupgrade/files`, so the flasher can put `/lib/upgrade/platform.sh` into the image (#457).
 - `x28-bootok` resets slot B's tries byte when a native B boots, as it does A's (#451).
 - `x28-kmods` waits for the running slot's tries byte (A or B), not only A's (#452).

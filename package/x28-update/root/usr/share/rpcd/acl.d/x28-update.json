@@ -1,0 +1,10 @@
+{
+	"x28-update": {
+		"description": "Check GitHub for a newer signed X28 image (read-only, cached in /tmp)",
+		"read": {
+			"file": {
+				"/usr/libexec/x28-update-check": [ "exec" ]
+			}
+		}
+	}
+}

@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Prints, as JSON for LuCI's Overview, the newest release of the X28 image that carries a signed sysupgrade tarball (#511).
+# Read-only: one HTTPS GET to the GitHub API, cached in /tmp for 6 h (30 min after a failure). Downloads and flashes nothing.
+REPO=mralinp/zlt-x28-openwrt
+CACHE=${X28_UPD_CACHE:-/tmp/x28-update.json}
+RELEASE=${X28_UPD_RELEASE:-/etc/x28-release}
+FETCH=${X28_UPD_FETCH:-uclient-fetch -q -T 15 -O -}
+
+ttl=30
+grep -q '"latest"' "$CACHE" 2>/dev/null && ttl=360
+[ -n "$(find "$CACHE" -mmin -$ttl 2>/dev/null)" ] && exec cat "$CACHE"
+
+semver() { grep -x '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*'; }
+newest() { sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1; }
+
+cur=$(semver 2>/dev/null < "$RELEASE")
+# Only the signed name counts: x28-sysupgrade-<ver>-unsigned.tar does not match.
+latest=$($FETCH "https://api.github.com/repos/$REPO/releases?per_page=20" 2>/dev/null |
+	grep -o '"name": *"x28-sysupgrade-[0-9]*\.[0-9]*\.[0-9]*\.tar"' | sed 's/.*sysupgrade-//; s/\.tar"$//' | semver | newest)
+
+if [ -z "$latest" ]; then
+	out="{\"current\":\"$cur\",\"error\":\"no release with a signed image found\"}"
+else
+	newer=false
+	# An unknown running version (an image built before /etc/x28-release) shows the notice too.
+	[ -z "$cur" ] || [ "$(printf '%s\n%s\n' "$cur" "$latest" | newest)" != "$cur" ] && newer=true
+	out="{\"current\":\"$cur\",\"latest\":\"$latest\",\"newer\":$newer,\"page\":\"https://github.com/$REPO/releases/tag/v$latest\",\"url\":\"https://github.com/$REPO/releases/download/v$latest/x28-sysupgrade-$latest.tar\"}"
+fi
+echo "$out" > "$CACHE.$$" && mv "$CACHE.$$" "$CACHE"
+echo "$out"
