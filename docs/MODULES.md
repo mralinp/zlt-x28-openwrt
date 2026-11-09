@@ -103,8 +103,8 @@ and `x28-plmn-scan` for the operator scan and selection), `luci-proto-x28-mipc` 
 2.4 GHz (`ra0`) and 5 GHz (`rai0`) on the vendor `mt_wifi` driver, which is not `nl80211`/mac80211, with hardware offload (WED) through
 `mtk_warp`. The X28 has one combined MT7915D chip; the X28 PRO has two MT7915 chips (one per band), and this is the one hardware difference between the models. `l1profile.dat` and two
 `mt7915.dbdc.b*.dat` profiles describe them; calibration is in `nvcfg` (`e2p`). Software: the package `x28-wifi` holds a netifd wireless handler named
-`mtwifi` (with LuCI options, the region and channel tables), `x28-wifi-l1` (picks the single-card profile on a one-chip board, at S05, before the
-driver loads) and `x28-wps` (the WPS button). Not measured: Wi-Fi throughput and client behaviour (#150).
+`mtwifi` (with LuCI options, the region and channel tables), `x28-wifi-l1` (writes the one-card profile on the original X28 and the two-card one on the PRO, by
+the Wi-Fi chips on PCI, at S05, before the driver loads) and `x28-wps` (the WPS button). Not measured: Wi-Fi throughput and client behaviour (#150).
 
 ### Ethernet and switch
 

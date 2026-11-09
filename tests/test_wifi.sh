@@ -36,6 +36,11 @@ cp "$dir/l1.two" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/n
 [ "$(grep -c '^INDEX[0-9]*=' "$dir/l1.run")" = 1 ] && grep -q '^INDEX0=MT7915D$' "$dir/l1.run" || { cat "$dir/l1.run"; exit 1; }
 echo 0x028000 > "$dir/pci/c/class"; cp "$dir/l1.two" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null
 cmp -s "$dir/l1.two" "$dir/l1.run" || exit 1
+# Two chips with the original's one-card file (the general image on a PRO, #513) get the PRO's two-card file; a second run keeps it.
+cp "$dir/l1.one" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null
+grep -q '^INDEX0_EEPROM_name=e2p-5g$' "$dir/l1.run" && grep -q '^INDEX1_pcie_slot=0001$' "$dir/l1.run" || { cat "$dir/l1.run"; exit 1; }
+cp "$dir/l1.run" "$dir/l1.pro"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null; cmp -s "$dir/l1.pro" "$dir/l1.run" || exit 1
+[ "$(MTWIFI_L1=$dir/l1.run mtwifi_caps)" = "$(MTWIFI_L1=$dir/l1.two mtwifi_caps)" ] || exit 1
 # Every 5 GHz region a country maps to has its channel list.
 for r in $(cut -d' ' -f3 "$MTWIFI_REGIONS" | sort -un); do grep -q "^$r " "$MTWIFI_CHANNELS5" || { echo "no channels for region $r"; exit 1; }; done
 echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-chip capability keys"
