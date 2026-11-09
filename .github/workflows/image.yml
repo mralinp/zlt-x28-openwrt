@@ -73,7 +73,7 @@ jobs:
           cd work
           mkdir -p out && chmod 777 out   # package_ubi runs as a capability-less root in its container
           python3 - <<'EOF'
-          import subprocess, sys
+          import os, subprocess, sys
           from pathlib import Path
           sys.path.insert(0, "../flasher/tools/x28-flasher")
           import images
@@ -85,8 +85,9 @@ jobs:
                     "feed": [p for p in ipks if Path(p).name.startswith(images.FEED_PREFIXES + images.PACKAGE_PREFIXES)],
                     "extra_ipks": [p for p in ipks if Path(p).name.startswith(images.STAGE_PREFIXES)]}
           cmds = images.local_commands(inputs, w, w / "out/img", (w / "../flasher").resolve())
+          env = {**os.environ, "X28_OVERLAY": str(root / "overlay")}  # the release's package files, as the flasher app passes them
           for c in cmds[:-1]:
-              subprocess.run(c, check=True)
+              subprocess.run(c, check=True, env=env)
           subprocess.run(["chmod", "-R", "a+rX", str(w / "profile")], check=True)  # first_boot writes it 0700; the container's root has no DAC override
           subprocess.run(cmds[-1], check=True)
           EOF
