@@ -1,0 +1,51 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# x28-upgrade: one-command upgrade to the newest signed X28 image (#515), like OpenWrt's owut/auc with our releases as the server.
+#   x28-upgrade       check only: running version vs the newest release with a signed x28-sysupgrade-<ver>.tar
+#   x28-upgrade -y    download it to /tmp, check its .sha256, sysupgrade -T, then sysupgrade -n (writes the other slot, reboots)
+#   x28-upgrade -y -b the same in the background, output in /tmp/x28-upgrade.log (what LuCI's button runs)
+# Never runs on its own. The signature is checked by sysupgrade itself (ucert); platform.sh writes only the slot not running.
+CHECK=${X28_UPG_CHECK:-/usr/libexec/x28-update-check}
+PLATFORM=${X28_UPG_PLATFORM:-/lib/upgrade/platform.sh}
+GET=${X28_UPG_GET:-uclient-fetch -q -T 30 -O}
+SYSUPGRADE=${X28_UPG_SYSUPGRADE:-sysupgrade}
+TMP=${X28_UPG_TMP:-/tmp}
+LOG=$TMP/x28-upgrade.log
+
+die() { echo "x28-upgrade: FAILED: $*"; exit 1; }
+field() { echo "$info" | sed -n "s/.*\"$1\":\"*\([^\",}]*\).*/\1/p"; }
+
+case "$*" in
+	''|-y) ;;
+	'-y -b') : > "$LOG"; ("$0" -y > "$LOG" 2>&1 < /dev/null &); echo "started; output in $LOG"; exit 0 ;;
+	*) echo "usage: x28-upgrade [-y [-b]]" >&2; exit 2 ;;
+esac
+
+info=$($CHECK)
+latest=$(field latest); cur=$(field current)
+[ -n "$latest" ] || die "$(field error) (is the WAN up?)"
+echo "x28-upgrade: running ${cur:-unknown}, newest signed image $latest"
+[ "$(field newer)" = true ] || { echo "x28-upgrade: up to date"; exit 0; }
+[ "$1" = -y ] || { echo "x28-upgrade: run 'x28-upgrade -y' to install it: the other A/B slot is written, then the unit reboots"; exit 0; }
+
+# Refuse before downloading what sysupgrade -T would refuse after it.
+[ -r "$PLATFORM" ] || die "no $PLATFORM: this image cannot sysupgrade"
+. "$PLATFORM"
+x28_tries_zero "$(x28_misc_dev)" || die "the running slot still counts boot tries; wait for x28-bootok (or reboot) and retry"
+t=$(x28_target) || die "no target slot"
+set -- $t
+# The image cannot be bigger than the slot; it sits in /tmp (RAM), and stage 2 needs room besides.
+need=$(($(x28_mtd_of_size "rootfs_$1") / 1024 + X28_MIN_FREE_KB))
+avail=$(df -kP "$TMP" | tail -n 1 | awk '{print $(NF-2)}')
+[ "${avail:-0}" -ge "$need" ] || die "/tmp has ${avail:-0} kB free, needs $need kB"
+
+f=$TMP/x28-sysupgrade-$latest.tar
+url=$(field url)
+echo "x28-upgrade: downloading $url"
+$GET "$f" "$url" || { rm -f "$f"; die "download failed"; }
+want=$($GET - "$url.sha256" | cut -d' ' -f1)
+got=$(sha256sum "$f" | cut -d' ' -f1)
+[ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$f"; die "SHA-256 does not match the release's .sha256"; }
+$SYSUPGRADE -T "$f" || { rm -f "$f"; die "sysupgrade -T refused the image"; }
+echo "x28-upgrade: flashing $latest to slot $1; the unit reboots"
+exec $SYSUPGRADE -n "$f"

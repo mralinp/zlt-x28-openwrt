@@ -74,7 +74,7 @@ Two units have run the native image: one X28 and one X28 PRO. Detail and evidenc
 | `opkg` and LuCI Software with the signed feed | working | tested | packaged image on two units ([TESTING 49](docs/TESTING.md)) |
 | Boot slot switch (A and B) | working | tested | tested ([TESTING 42](docs/TESTING.md)) |
 | SMS and voice | not working on the native image (worked on the stage 1 overlay) | not ported | not ported |
-| `sysupgrade`, OTA | not available | planned | planned |
+| `sysupgrade`, one-command upgrade (`x28-upgrade`, LuCI notice) | built, not yet run on a unit ([Upgrading](#upgrading)) | untested | untested |
 | Fan control, own kernel | not available | planned | planned |
 
 Notes:
@@ -96,6 +96,21 @@ system, building the image for your unit, flashing slot A and switching the boot
 
 The flasher downloads the newest `x28-assembly-*` bundle from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases) itself.
 What each step does is in [The flasher app](#the-flasher-app) below. A UART is not needed to flash. It is only for development and debugging.
+
+## Upgrading
+
+Every release with a signed `x28-sysupgrade-<version>.tar` can be installed from the running image; the router checks the signature
+itself (`ucert`), writes the A/B slot it is **not** running, verifies it, and only then boots it. The running slot stays as the fall-back.
+
+- **LuCI**: Status > Overview shows *Firmware update* when a newer signed image is out (checked at most every 6 h, cached in `/tmp`).
+  *Upgrade now* asks for confirmation, then downloads, checks and flashes; the unit reboots.
+- **SSH**: `x28-upgrade` only checks; `x28-upgrade -y` downloads the image to `/tmp`, checks its `.sha256`, runs `sysupgrade -T` and then
+  `sysupgrade -n` (settings are not kept). It refuses when the running slot still counts boot tries or `/tmp` is too small.
+- **By hand**: download the signed tarball from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases) and upload it in
+  System > Backup / Flash Firmware.
+
+Nothing upgrades on its own. Images up to v0.75.0 have no `x28-upgrade` and their `sysupgrade` writes the **running** slot unless
+`/etc/x28-native-b` and `/tmp/x28-write-b-ok` name B; upgrade those by hand once (design: [sysupgrade-design](docs/research/sysupgrade-design.md)).
 
 ## VPN and Passwall2
 

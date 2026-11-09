@@ -1,9 +1,15 @@
 {
 	"x28-update": {
-		"description": "Check GitHub for a newer signed X28 image (read-only, cached in /tmp)",
+		"description": "Check GitHub for a newer signed X28 image (read-only, cached in /tmp) and follow an upgrade's log",
 		"read": {
 			"file": {
-				"/usr/libexec/x28-update-check": [ "exec" ]
+				"/usr/libexec/x28-update-check": [ "exec" ],
+				"/tmp/x28-upgrade.log": [ "read" ]
+			}
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/x28-upgrade -y -b": [ "exec" ]
 			}
 		}
 	}
