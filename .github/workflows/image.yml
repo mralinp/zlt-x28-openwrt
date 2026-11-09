@@ -2,7 +2,7 @@ name: Image
 
 # The general native image (#254): the release's assembly + the private stock rootfs (mralinp/x28-vendor-inputs, release inputs-1)
 # -> the flasher's own build steps (stage_native, first_boot without a key, package_ubi) -> attached to the release as
-#   x28-native-image.tar.gz + sha256sums   what the flasher's "download an image" reads (manifest.json + rootfs-a-experimental.bin)
+#   x28-native-image.tar.gz (listed in SHA256SUMS)   what the flasher's "download an image" reads (manifest.json + rootfs-a-experimental.bin)
 #   x28-sysupgrade-<version>-unsigned.tar  for Sign image, which this job starts; the owner approves it in the release-signing environment
 # X28_INPUTS_TOKEN: fine-grained, Contents read-only on x28-vendor-inputs and x28-flasher. Without it the job only warns.
 # The stock rootfs stays private; the check step fails the build if the image carries a key, a password or a vendor private key.
@@ -122,9 +122,11 @@ jobs:
           V=${TAG#v}
           python3 ../flasher/tools/build/sysupgrade_tar.py --image out/img --output "x28-sysupgrade-${V}-unsigned.tar"
           tar --owner=0 --group=0 --numeric-owner -czf x28-native-image.tar.gz -C out/img manifest.json rootfs-a-experimental.bin
-          sha256sum x28-native-image.tar.gz > sha256sums
           sha256sum "x28-sysupgrade-${V}-unsigned.tar" | tee unsigned.sha256
-          gh release upload "$TAG" x28-native-image.tar.gz sha256sums "x28-sysupgrade-${V}-unsigned.tar" --clobber
+          # One checksum file per release (asset names are case-insensitive): the image lines join the release's SHA256SUMS.
+          { grep -v -e ' x28-native-image.tar.gz$' -e " x28-sysupgrade-${V}-unsigned.tar\$" in/SHA256SUMS; sha256sum x28-native-image.tar.gz; cat unsigned.sha256; } > SHA256SUMS
+          gh release upload "$TAG" x28-native-image.tar.gz "x28-sysupgrade-${V}-unsigned.tar" --clobber
+          gh release upload "$TAG" SHA256SUMS --clobber
 
       - name: Start Sign image
         if: steps.token.outputs.ok == 'true'
