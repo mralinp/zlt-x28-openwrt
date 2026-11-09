@@ -122,6 +122,13 @@ ubiformat() { return 1; }; ! x28_ubi_write img /dev/mtd42 2>/dev/null
 X28_EXP_SHA=$(head -c 1000 "$dir/t/sysupgrade-x28/root" | sha256sum | cut -d' ' -f1) X28_EXP_BYTES=1000
 : > "$ULOG"; x28_ubi_verify img /dev/mtd42 2>/dev/null; grep -q '^ubiattach /dev/ubi_ctrl -m 42 -d 9$' "$ULOG" && grep -q '^ubidetach -d 9$' "$ULOG"
 X28_EXP_SHA=0000; ! x28_ubi_verify img /dev/mtd42 2>/dev/null; X28_EXP_SHA=; ! x28_ubi_verify img /dev/mtd42 2>/dev/null
+# no device node after the attach (no hotplug in the RAM root): it is made from sysfs
+rm -f "$dir/devx/ubi9_0"; mkdir -p "$dir/sys/class/ubi/ubi9_0"; echo 245:1 > "$dir/sys/class/ubi/ubi9_0/dev"
+ubiattach() { echo "ubiattach $*" >> "$ULOG"; }
+mknod() { echo "mknod $*" >> "$ULOG"; head -c 1000 "$dir/t/sysupgrade-x28/root" > "$1"; head -c 24 /dev/zero >> "$1"; }
+X28_EXP_SHA=$(head -c 1000 "$dir/t/sysupgrade-x28/root" | sha256sum | cut -d' ' -f1) X28_EXP_BYTES=1000
+: > "$ULOG"; x28_ubi_verify img /dev/mtd42 2>/dev/null; grep -q "^mknod $dir/devx/ubi9_0 c 245 1\$" "$ULOG"
+unset -f mknod
 unset -f ubiformat ubidetach ubiblock ubiattach
 # without X28_UP_TEST the environment redirects nothing
 [ "$(env -u X28_UP_TEST X28_UP_MISC=/tmp/evil X28_UP_PROC="$dir/proc" sh -c '. "$1"; echo "$X28_UP_MISC|$X28_UP_DDNAND"' x "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh")" = "|dd-nand" ]

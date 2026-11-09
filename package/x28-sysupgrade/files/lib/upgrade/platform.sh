@@ -50,12 +50,17 @@ x28_ubi_write() {
 }
 
 x28_ubi_verify() {
-	local dev=$2 n got i
+	local dev=$2 n got i node
 	n=${dev#/dev/mtd}
 	[ -n "$X28_EXP_SHA" ] && [ "${X28_EXP_BYTES:-0}" -gt 0 ] || { x28_log "no expected rootfs hash"; return 1; }
 	ubiattach /dev/ubi_ctrl -m "$n" -d "$X28_SCRATCH" >/dev/null 2>&1 || { x28_log "cannot attach the written mtd$n"; return 1; }
-	i=0; while [ ! -e "$X28_UP_DEVDIR/ubi${X28_SCRATCH}_0" ] && [ "$i" -lt 20 ]; do sleep 1; i=$((i + 1)); done
-	got=$(head -c "$X28_EXP_BYTES" "$X28_UP_DEVDIR/ubi${X28_SCRATCH}_0" 2>/dev/null | sha256sum | cut -d' ' -f1)
+	# The RAM root has no hotplug/mdev to create the node, so make it from sysfs (seen on the unit: the verify waited 20 s for nothing).
+	node=$X28_UP_DEVDIR/ubi${X28_SCRATCH}_0
+	i=0; while [ ! -e "$node" ] && [ ! -r "$X28_UP_SYS/class/ubi/ubi${X28_SCRATCH}_0/dev" ] && [ "$i" -lt 10 ]; do sleep 1; i=$((i + 1)); done
+	if [ ! -e "$node" ] && [ -r "$X28_UP_SYS/class/ubi/ubi${X28_SCRATCH}_0/dev" ]; then
+		mknod "$node" c $(sed 's/:/ /' "$X28_UP_SYS/class/ubi/ubi${X28_SCRATCH}_0/dev") 2>/dev/null
+	fi
+	got=$(head -c "$X28_EXP_BYTES" "$node" 2>/dev/null | sha256sum | cut -d' ' -f1)
 	ubidetach -d "$X28_SCRATCH" >/dev/null 2>&1
 	[ "$got" = "$X28_EXP_SHA" ] || { x28_log "the written rootfs volume does not match the image"; return 1; }
 }
