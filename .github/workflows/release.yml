@@ -97,8 +97,11 @@ jobs:
           R=https://downloads.openwrt.org/releases/23.05.5
           curl -fsSL -o "$B/ipk/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk" "$R/packages/aarch64_cortex-a53/packages/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk"
           curl -fsSL -o "$B/ipk/libstdcpp6_12.3.0-4_aarch64_generic.ipk" "$R/targets/armsr/armv8/packages/libstdcpp6_12.3.0-4_aarch64_generic.ipk"
+          # ucert (verify only): with it on the router OpenWrt's own sysupgrade check requires a signed image (#476).
+          curl -fsSL -o "$B/ipk/ucert_2020-05-24-00b921d8-1_aarch64_generic.ipk" "$R/packages/aarch64_generic/base/ucert_2020-05-24-00b921d8-1_aarch64_generic.ipk"
           echo "4cca89805578f18778b5da41221256c2f87ea33cd1dfd083d151ed936cd9db37  $B/ipk/alsa-lib_1.2.9-1_aarch64_cortex-a53.ipk
-          3f174e78dead3941736971da0bd99a2b4dd0b3411bbd6ea4870ae677c49dfef4  $B/ipk/libstdcpp6_12.3.0-4_aarch64_generic.ipk" | sha256sum -c
+          3f174e78dead3941736971da0bd99a2b4dd0b3411bbd6ea4870ae677c49dfef4  $B/ipk/libstdcpp6_12.3.0-4_aarch64_generic.ipk
+          a75d5dfcba49b62b0f0feed441ef2968f5d6e5c73abbd85fe372265334906c04  $B/ipk/ucert_2020-05-24-00b921d8-1_aarch64_generic.ipk" | sha256sum -c
           (cd "$B" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           tar --owner=0 --group=0 --numeric-owner -czf "assets/$B.tar.gz" "$B"
           (cd assets && sha256sum -- * > SHA256SUMS)
