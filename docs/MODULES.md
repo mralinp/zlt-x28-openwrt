@@ -21,9 +21,13 @@ nobody has measured or written it down yet (it is left blank on purpose rather t
 | USB | an MTU3 controller; the USB-C port is the recovery port (preloader and download agent). Host mode is **not established** | the same |
 | Console | UART at 921600 8N1, 1.8 V logic, an unpopulated 3-hole footprint on the back ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)) | not recorded |
 | Front panel | LEDs: cellular radio (green), cellular quality (green), system (red) (observed in sysfs); reset and WPS buttons | not recorded |
-| Cooling | no fan from the factory; a 12 V fan and a "smart fan" pin exist ([THERMAL](THERMAL.md)) | not recorded |
+| Power | 12 V DC; the adapter must supply at least 0.7 A (owner, 2026-11-09) | not recorded |
+| SIM | one slot (size not recorded) | not recorded |
+| Antennas | 4 for cellular, 4 for Wi-Fi (owner) | 4 for cellular; 4 or 8 for Wi-Fi (owner is not sure which; two chips suggest 8) |
+| Case ports | 4 LAN sockets and one USB-C port; no USB-A (owner) | not recorded |
+| Cooling | no fan from the factory and **no fan header**; the owner's fan is wired by hand to the 12 V input and runs at full speed ([THERMAL](THERMAL.md)) | not recorded |
 | Kernel | vendor Linux 4.19.205 (aarch64, musl userspace), the same image in both slots | the same |
-| Not recorded for either | power supply rating, number of SIM slots, number and kind of antennas, the 5G/LTE band list, case ports and labels | |
+| Not recorded for either | the SIM size, the antenna connector type, the 5G/LTE band list, the labels on the sockets | |
 
 ## How the modules fit together
 
@@ -120,7 +124,8 @@ hold that clears the overlay is planned (#267).
 
 Seven or more sensors (`soc_max`, `cpu_little0`, `md_4g`, `md_3g`, `soc_dram_ntc`, `nrpa_ntc`, `ltepa_ntc`, `rf_ntc`, PMIC rails). The SoC idles near 40 C
 on the native image; kernel trip points are 85, 95 and 115 C, and the vendor `ql_ntc` policy has its own limits. A 12 V fan helps by 16 to 20
-degrees; the board's smart-fan pin and its control are not recorded (#47). [THERMAL](THERMAL.md).
+degrees. The board has no fan header (owner, 2026-11-09): the fan is wired by hand to the 12 V input, so it cannot be speed-controlled from
+software today; smart fan control (#47) would need a modification. [THERMAL](THERMAL.md).
 
 ## Software map
 
@@ -137,6 +142,6 @@ degrees; the board's smart-fan pin and its control are not recorded (#47). [THER
 
 ## Gaps in this page
 
-Not recorded yet, add them when someone measures or reads the label: power input and its rating, SIM slot count and size, antenna connectors,
-the supported 5G/LTE bands, the case's port labels, the X28 PRO's board name string, its RAM and its Ethernet details, and whether the USB-C
-port can act as a host.
+Not recorded yet, add them when someone measures or reads the label: the SIM size, the antenna connector type, the supported 5G/LTE bands, the
+labels on the sockets, the X28 PRO's board name string, its RAM, CPU and Ethernet details, its Wi-Fi antenna count (4 or 8), and whether the
+USB-C port can act as a host. The 2.5 G PHY seen in code comments does not match four LAN sockets: unverified.

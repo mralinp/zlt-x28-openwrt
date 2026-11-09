@@ -54,6 +54,9 @@ during them, so they are not a valid baseline. Use the 65 C figure above (modem 
 | Power | _not recorded yet_: currently from a separate 12 V source (owner to confirm). Before moving it to the board's smart-fan pin, measure that pin's voltage and check its current rating against the fan's rated current |
 | Control | none: it runs at full speed whenever it has power |
 
+**Update (owner, 2026-11-09): the board has no fan header; the fan is wired by hand to the 12 V input.** The note below about a smart-fan pin is from
+2026-10-27 and is not confirmed; control of the fan from software (#47) needs a hardware change.
+
 **Smart-fan pin (owner, 2026-10-27):** the board has a smart-fan pin that the fan will be soldered to later. Its
 location, voltage and whether it is on/off or PWM are _not recorded yet_ (#47). The stock "Smart temperature control" page
 (vendor UI, `cmd 372`: off / always on / smart, threshold 50–90 C) is the firmware side of that feature; its fan-status fields
