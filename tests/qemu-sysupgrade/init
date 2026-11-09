@@ -1,0 +1,7 @@
+#!/bin/sh
+export PATH=/bin:/usr/sbin:/usr/bin:/sbin
+mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev 2>/dev/null
+for m in $(cat /mod/order); do [ "$m" = nandsim ] && continue; insmod /mod/$m.ko || echo "x28 insmod $m failed"; done
+sh /x28/test_guest.sh 2>&1
+echo "x28 guest done rc=$?"
+poweroff -f 2>/dev/null || echo o > /proc/sysrq-trigger

@@ -724,3 +724,10 @@ a boot-critical package that is not `x28-kmods`; the full package list on the fl
 - The load average is cosmetic: it counts the vendor threads that sleep in `msleep`.
 
 **Not verified:** the NR band lock (neither SIM can show it) and the LuCI cell lock page; Wi-Fi clients, speed and LEDs; VPN traffic; a reboot of the fresh images; whether unit 2 is the two-chip variant; why unit 2 gets no aggregation (the SIM profile is the likeliest cause; a 4G-only run of unit 1 would tell).
+
+## 52. Sysupgrade hooks on simulated NAND in QEMU (2026-11-09)
+
+- **Question**: do `package/x28-sysupgrade`'s write, verify and `misc` steps work with the real `ubiformat`, `ubiattach`, `ubidetach`, busybox `cmp`/`tar`/`dd` and a NAND with the X28's 4 KiB pages and 256 KiB blocks?
+- **Run**: `sh tests/qemu-sysupgrade/run.sh` (Docker, Ubuntu 5.15 arm64 kernel with `nandsim`, QEMU TCG, a few minutes). Not in CI.
+- **Result**: 16 of 16 checks pass: a corrupt tarball is refused and `misc` is untouched; an in-place upgrade over an attached `ubi0` writes `rootfs_a`, the volume hash matches and the 1 MiB `misc` dump is saved; with the native-B marker and confirmation file, `rootfs_b` is written, `rootfs_a` is untouched and the priorities flip; a failing write leaves `misc` untouched.
+- **Not proven**: the vendor `dd-nand` (replaced by `flash_erase` + `nandwrite`), the X28's real NAND (nandsim reports a 1024-byte sub-page, the X28 may not), the 4.19 kernel, the unit's busybox, and power loss. Those need the unit.
