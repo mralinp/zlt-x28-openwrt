@@ -1,7 +1,7 @@
 name: Sign image
 
 # Manual (#476): signs a sysupgrade image that the owner attached to a release as x28-sysupgrade-<version>-unsigned.tar. The signer key and
-# its ucert certificate are secrets of the `release-signing` environment (restrict it to main and require a reviewer); the feed key is NOT
+# its ucert certificate (base64: `base64 < signer.ucert | gh secret set X28_IMAGE_SIGNER_CERT --env release-signing`) are secrets of the `release-signing` environment (restrict it to main and require a reviewer); the feed key is NOT
 # here: it stayed offline and only certified the signer (tools/build/image_sign.sh gen-signer). The signed file x28-sysupgrade-<version>.tar
 # and its SHA-256 are uploaded to the same release. Nothing runs from a pull request.
 
@@ -72,7 +72,7 @@ jobs:
           cd work
           VERSION=${TAG#v}
           printf '%s\n' "$SIGNER_KEY" > signer.sec
-          printf '%s' "$SIGNER_CERT" > signer.ucert
+          printf '%s' "$SIGNER_CERT" | base64 -d > signer.ucert   # the ucert blob is binary; the secret holds it base64-encoded
           devs=$(echo "$DEVICES" | sed 's/,/","/g')
           printf '{"supported_devices":["%s"],"version":{"release":"%s","kernel":"4.19.205"}}\n' "$devs" "$TAG" > meta.json
           cp "x28-sysupgrade-${VERSION}-unsigned.tar" "x28-sysupgrade-${VERSION}.tar"
