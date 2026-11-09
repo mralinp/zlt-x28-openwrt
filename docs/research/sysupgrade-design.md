@@ -49,6 +49,15 @@ one. So no write happens without the operator creating `/tmp/x28-upgrade-ok` on 
 the image marker and `/tmp/x28-write-b-ok`. A tarball uploaded through the web UI fails `platform_check_image` until then. Signing the
 tarball is the proper fix and is not done (#457).
 
+## Signing images (#476)
+
+OpenWrt's own scheme, no custom crypto: `fwtool` appends metadata and a certificate to the image, and the router checks it with `ucert`
+against `/etc/opkg/keys` (`REQUIRE_IMAGE_SIGNATURE=1` makes an unsigned image fail). The certificate chains a **separate image-signing
+key** to a trusted key, so the feed key (trusted on the router) stays offline: it issues the signer certificate once
+(`tools/build/image_sign.sh gen-signer`, valid one year, revocable), and only the signer key and its certificate go into CI.
+`image_sign.sh sign` adds the metadata, signs and appends the certificate; `verify` does what the router does. The `ucert` ipk
+(verify only) must be on the image before the check is turned on, or every upgrade would fail.
+
 ## Failure behaviour
 
 | Failure | Result |
