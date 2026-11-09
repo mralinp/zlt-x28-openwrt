@@ -16,27 +16,31 @@ the build guard in [BUILD](../BUILD.md), and the flasher's boot-order step. Open
 - The overlay lives on `user_data` and is reset when the image UUID changes ([overlay-policy](overlay-policy.md)). A kept config is a
   separate decision.
 
-## Two modes
+## Target: the slot that is not running (#509)
 
-| | **Native B** (#450) | **In place on A** (no native B) |
-|---|---|---|
-| Target | The inactive slot's `rootfs_x` (and `boot_x` if the kernel changes) | `rootfs_a`, the running root |
-| Runs from | RAM (the usual `nand_do_upgrade` stage 2) | RAM, same |
-| Backstop if the new image does not boot | Preloader flips back to the old slot at 6 tries; the old slot is untouched | Stock B repairs A (erases it), then the flasher over DL; or DL directly |
-| Power loss mid-write | Old slot untouched; new slot half-written but not selected yet | A half-written and selected: it boots, fails, and falls to B at 6 tries |
+Every sysupgrade writes the slot the unit is **not** running (`rootfs_b` when running A, `rootfs_a` when running B), verifies it, and only
+then gives it the boot priority. The running slot is never written and stays the fall-back.
 
-Native B is the safe design; the in-place mode is what exists today. Both share the steps below.
+| | |
+|---|---|
+| Runs from | RAM (the usual stage 2) |
+| Backstop if the new image does not boot | Preloader goes back to the old slot at 6 tries; the old slot is untouched (not yet proven between two native slots) |
+| Power loss mid-write | Old slot untouched and still selected; the new slot is half-written but not selected |
+
+On a unit whose other slot still holds stock (native on A, stock on B), the first sysupgrade replaces stock: stock stays only until then
+(x28-flasher#89), and the backup is the way back to it. Until #509 the image was written **in place** on the running slot unless
+`/etc/x28-native-b` and `/tmp/x28-write-b-ok` named B; images up to v0.75.0 still do that (an upgrade runs the old image's `platform.sh`).
 
 ## Steps (OpenWrt `platform_check_image` / `platform_do_upgrade` shape)
 
 1. **Check** (running system, no writes): the file is a UBI image for this board, its size fits the mtd, the manifest hash matches, and
    `x28-bootok` is installed. Refuse if the running slot's tries are not 0, since a counting slot is not a good base.
-2. **Pick the target** from `bootslot` on the command line (native B: the other slot; in place: A). Read `misc`, check the magic in all four
-   copies, and refuse otherwise.
+2. **Pick the target**: the slot that is not the `bootslot` on the command line. Read `misc`, check the magic in all four copies, and refuse
+   otherwise.
 3. **Write from RAM**: stop services, `ubiformat` the target mtd with the image, then verify it. *(Corrected in #457: `ubiformat` rewrites erase counters, so a whole-mtd hash cannot match; the verify attaches the result and compares the volumes. Untested.)*
    Touch nothing else and **do not touch `misc` yet**.
-4. **Only then change `misc`** (native B): target priority above the other (15 and 14), target tries 0, success untouched; four copies, last
-   first, each read back. In place there is no flip: A stays selected, A's tries are reset to 0 after the verify.
+4. **Only then change `misc`**: target priority above the other (15 and 14), target tries 0, success untouched; four copies, last first,
+   each read back.
 5. **Reboot.** The new image's `x28-bootok` resets its slot's tries after a healthy boot. A boot that never gets there counts to 6 and the
    preloader falls back.
 
@@ -45,9 +49,8 @@ Never reset tries or flip priorities before step 3 verifies: a half-written slot
 ## Who may flash
 
 `/sbin/sysupgrade` and LuCI's flash page work once the stage 2 files are in the image, and the root password is empty until the owner sets
-one. So no write happens without the operator creating `/tmp/x28-upgrade-ok` on the router first (RAM, gone at reboot); native B also needs
-the image marker and `/tmp/x28-write-b-ok`. A tarball uploaded through the web UI fails `platform_check_image` until then. Signing the
-tarball is the proper fix and is not done (#457).
+one. With `ucert` on the router (every image since #476) only a signed image passes OpenWrt's own check, and that signature is the
+authentication. Without `ucert` no write happens unless the operator creates `/tmp/x28-upgrade-ok` on the router first (RAM, gone at reboot).
 
 ## Signing images (#476)
 
@@ -73,10 +76,10 @@ router does, and attaches `x28-sysupgrade-<version>.tar` and its `.sha256`. The 
 | Failure | Result |
 |---|---|
 | Image check fails (1, 2) | Nothing written. |
-| Write or read-back mismatch (3) | Target left unselected (native B) and the old slot boots as before. In place: A is damaged; the next boot counts tries toward the fall-back. |
+| Write or read-back mismatch (3) | Target left unselected; the old slot boots as before. |
 | Power loss in 3 | As above. |
 | Power loss in 4 | At most one `misc` copy is mid-write. The preloader takes the first copy with a valid magic, so copy 1 (written last) still says the old state until the end. |
-| New image boots but is bad | Tries count to 6, preloader flips back (native B), old slot boots. |
+| New image boots but is bad | Tries count to 6, preloader flips back, old slot boots. |
 | Both slots bad | Loop or hang; only DL with the flasher. |
 
 ## Image format and config

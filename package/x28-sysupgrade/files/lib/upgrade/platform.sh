@@ -141,18 +141,16 @@ x28_misc_select() {
 	rm -f "$exp"
 }
 
-# The slot that gets the image: the running slot (in place) unless B is native. Any write needs the operator's /tmp/x28-upgrade-ok, so
-# a tarball uploaded through LuCI or rpcd by whoever has the (initially empty) root password cannot flash anything. Native B needs the
-# image's marker AND /tmp/x28-write-b-ok, so a marker carried in A's image alone can never make sysupgrade overwrite a stock B.
+# The slot that gets the image: always the one NOT running (A/B, #509). It is written and verified, and only then given the boot priority;
+# the running slot is never touched and stays the fall-back. Signed images (ucert on the router) are authenticated by fwtool's check;
+# without ucert any write still needs the operator's /tmp/x28-upgrade-ok, so a tarball uploaded through LuCI or rpcd cannot flash anything.
 x28_target() {
 	local s; s=$(x28_slot)
 	# Decided once, before the pivot (platform_pre_upgrade), where the signature check and /usr/bin/ucert are still there: in the RAM root
-	# /etc and /usr are the RAM root's, so x28_signed and the marker would answer differently.
+	# /usr is the RAM root's, so x28_signed would answer differently.
 	if [ -s "$X28_UP_TMP/x28-target" ]; then cat "$X28_UP_TMP/x28-target"; return 0; fi
 	if ! x28_signed && [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
-	if [ ! -e "$X28_UP_ROOT/etc/x28-native-b" ]; then echo "$s 0"; return 0; fi
-	if [ ! -e "$X28_UP_ROOT/tmp/x28-write-b-ok" ]; then x28_log "slot B is marked native: create /tmp/x28-write-b-ok to confirm writing it"; return 1; fi
-	if [ "$s" = a ]; then echo "b 1"; else echo "a 1"; fi
+	case "$s" in a) echo "b 1" ;; b) echo "a 1" ;; *) x28_log "no bootslot on the kernel command line"; return 1 ;; esac
 }
 
 x28_mtd_of() { sed -n "s/^\\(mtd[0-9]*\\): [0-9a-f]* [0-9a-f]* \"$1\"\$/\\1/p" "$X28_UP_PROC/mtd"; }

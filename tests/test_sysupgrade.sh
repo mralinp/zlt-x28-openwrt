@@ -63,11 +63,11 @@ mkmisc 0f050000 0e000101; ! x28_tries_zero "$dir/misc" 2>/dev/null
 mkmisc 0f000000 0e000101; x28_tries_zero "$dir/misc" 2>/dev/null
 echo 'bootslot=b' > "$dir/proc/cmdline"; mkmisc 0e000101 0f030000; ! x28_tries_zero "$dir/misc" 2>/dev/null
 echo 'bootslot=a' > "$dir/proc/cmdline"
-# target: in place without the marker, the other slot with it
-[ "$(x28_target)" = "a 0" ]; : > "$dir/root/etc/x28-native-b"
-! x28_target 2>/dev/null                                                              # marker alone is not enough
-: > "$dir/root/tmp/x28-write-b-ok"; [ "$(x28_target)" = "b 1" ]
-echo 'bootslot=b' > "$dir/proc/cmdline"; [ "$(x28_target)" = "a 1" ]; echo 'bootslot=a' > "$dir/proc/cmdline"; rm "$dir/root/etc/x28-native-b" "$dir/root/tmp/x28-write-b-ok"
+# target: always the slot that is not running, which then gets the priority (#509)
+[ "$(x28_target)" = "b 1" ]
+echo 'bootslot=b' > "$dir/proc/cmdline"; [ "$(x28_target)" = "a 1" ]
+echo 'console=ttyS0' > "$dir/proc/cmdline"; ! x28_target 2>/dev/null                   # no bootslot: nothing is chosen
+echo 'bootslot=a' > "$dir/proc/cmdline"
 
 # the tarball
 mkdir -p "$dir/t/sysupgrade-x28"; head -c 4096 /dev/urandom > "$dir/t/sysupgrade-x28/root"
@@ -80,7 +80,6 @@ echo hello > "$dir/junk"; (cd "$dir" && tar -cf junk.tar junk); ! platform_check
 mkmisc 0f050000 0e000101; ! platform_check_image "$dir/good.tar" 2>/dev/null        # tries still counting
 
 # the order: a failed write or verify leaves misc alone; success changes it only afterwards
-: > "$dir/root/etc/x28-native-b"; : > "$dir/root/tmp/x28-write-b-ok"
 X28_UP_WRITE=false X28_UP_VERIFY=true; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ] && [ "$(entries)" = "$(ALL 0f0000000e000101)" ] && [ ! -e "$dir/x28-root.ubi" ]
 X28_UP_WRITE=true X28_UP_VERIFY=false
@@ -93,15 +92,14 @@ X28_UP_WRITE='echo' ; mkmisc 0f000000 0e000101
 # the run leaves a trace in the log file
 platform_do_upgrade "$dir/good.tar" 2>/dev/null; grep -q 'stage 2 started' "$dir/up.log" && grep -q 'writing /dev/mtd' "$dir/up.log" && grep -q ' done$' "$dir/up.log"
 mkmisc 0f000000 0e000101
-# the target is decided before the pivot: with the marker gone (as in the RAM root) the upgrade still goes to the slot chosen then
-: > "$dir/root/etc/x28-native-b"; : > "$dir/root/tmp/x28-write-b-ok"; X28_UP_WRITE=true X28_UP_VERIFY=true; mkmisc 0f000000 0e000101
+# the target is decided before the pivot and stored; stage 2 uses it (the RAM root case without ucert is below)
+X28_UP_WRITE=true X28_UP_VERIFY=true; mkmisc 0f000000 0e000101
 platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(cat "$dir/x28-target")" = "b 1" ]
-rm "$dir/root/etc/x28-native-b" "$dir/root/tmp/x28-write-b-ok"
-platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e0000000f000101)" ]    # B first, from the stored target
+platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e0000000f000101)" ]    # B, from the stored target
 rm -f "$dir/x28-target"; mkmisc 0f000000 0e000101
 # stage 2 in the RAM root: ucert and the confirmation file are not there, the target stored before the pivot still decides
-rm -f "$dir/root/tmp/x28-upgrade-ok" "$dir/ucert"; echo "a 0" > "$dir/x28-target"
-[ "$(x28_target)" = "a 0" ]                                                                       # without it the same state refuses
+rm -f "$dir/root/tmp/x28-upgrade-ok" "$dir/ucert"; echo "b 1" > "$dir/x28-target"
+[ "$(x28_target)" = "b 1" ]                                                                       # without it the same state refuses
 rm -f "$dir/x28-target"; ! x28_target 2>/dev/null
 : > "$dir/root/tmp/x28-upgrade-ok"
 # the pre-upgrade hook keeps a whole copy of misc where it survives, and the log reaches the kernel log
@@ -115,7 +113,7 @@ rm "$dir/root/tmp/x28-upgrade-ok"; mkmisc 0f000000 0e000101; : > "$CALLS"
 # with ucert on the router the signature check does the authenticating: the confirmation file is not needed, and the REQUIRE_ flags are set
 rm -f "$dir/root/tmp/x28-upgrade-ok"; : > "$dir/ucert"; chmod +x "$dir/ucert"
 ( X28_UP_UCERT=$dir/ucert; . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"
-  [ "$REQUIRE_IMAGE_SIGNATURE" = 1 ] && [ "$REQUIRE_IMAGE_METADATA" = 1 ] && [ "$(x28_target)" = "a 0" ] )
+  [ "$REQUIRE_IMAGE_SIGNATURE" = 1 ] && [ "$REQUIRE_IMAGE_METADATA" = 1 ] && [ "$(x28_target)" = "b 1" ] )
 ( unset REQUIRE_IMAGE_SIGNATURE; . "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"; [ -z "$REQUIRE_IMAGE_SIGNATURE" ] )   # without ucert: not required
 : > "$dir/root/tmp/x28-upgrade-ok"
 # the check step: bootok missing, not enough RAM, image larger than the partition
@@ -123,8 +121,8 @@ mkmisc 0f000000 0e000101
 chmod -x "$dir/root/etc/init.d/x28-bootok"; ! platform_check_image "$dir/good.tar" 2>/dev/null; chmod +x "$dir/root/etc/init.d/x28-bootok"
 echo 'MemAvailable:      20000 kB' > "$dir/proc/meminfo"; ! platform_check_image "$dir/good.tar" 2>/dev/null
 echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"; platform_check_image "$dir/good.tar" 2>/dev/null
-sed -i.bak 's/"rootfs_a"/"rootfs_a"/; s/^mtd28: 04000000/mtd28: 00000800/' "$dir/proc/mtd"; ! platform_check_image "$dir/good.tar" 2>/dev/null
-sed -i.bak 's/^mtd28: 00000800/mtd28: 04000000/' "$dir/proc/mtd"
+sed -i.bak 's/^mtd42: 04000000/mtd42: 00000800/' "$dir/proc/mtd"; ! platform_check_image "$dir/good.tar" 2>/dev/null   # the target (B) is too small
+sed -i.bak 's/^mtd42: 00000800/mtd42: 04000000/' "$dir/proc/mtd"
 # the upgrade itself re-checks the running slot's tries
 mkmisc 0f050000 0e000101; : > "$CALLS"; X28_UP_WRITE=true X28_UP_VERIFY=true; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]
 # the device steps with fake ubi-utils: detach only when attached, then ubiformat; the verify hashes the scratch volume
@@ -154,4 +152,4 @@ unset -f ubiformat ubidetach ubiblock ubiattach
 for b in ubiformat ubidetach ubiattach ubiblock dd-nand hexdump cmp tar sha256sum cut head wc; do
 	case " $RAMFS_COPY_BIN " in *"/$b "*) ;; *) echo "missing from RAMFS_COPY_BIN: $b"; exit 1 ;; esac
 done
-echo "PASS: x28-sysupgrade checks first, writes and verifies the target, and changes misc only afterwards, copy 1 last"
+echo "PASS: x28-sysupgrade checks first, writes and verifies the slot that is not running, and changes misc only afterwards, copy 1 last"

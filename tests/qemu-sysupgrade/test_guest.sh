@@ -62,25 +62,25 @@ before=$(entries)
 nt "bad hash refused" platform_check_image /tmp/bad.tar
 t "misc untouched" [ "$(entries)" = "$before" ]
 
-echo "x28 == 2. in place on A (ubi0 attached, running)"
+echo "x28 == 2. running A: B gets the image and the priority, A (attached, running) is untouched"
+mkimg old2 "second old"; ubiformat /dev/mtd2 -y -f /tmp/old2.ubi >/dev/null 2>&1
+oldsha=$(sha256sum /tmp/old.sqfs | cut -d' ' -f1); oldn=$(wc -c < /tmp/old.sqfs)
+ubidetach -d 0 >/dev/null 2>&1; t "rootfs_a holds the old squashfs" [ "$(volhash 1 $oldn)" = "$oldsha" ]; ubiattach /dev/ubi_ctrl -m 1 -d 0 >/dev/null 2>&1
 t "check passes" platform_check_image /tmp/new.tar
 platform_do_upgrade /tmp/new.tar; rc=$?
 t "upgrade rc=0" [ $rc -eq 0 ]
-t "rootfs_a now holds the new squashfs" [ "$(volhash 1 $newn)" = "$newsha" ]
-t "misc: A 0f tries 0, B unchanged" [ "$(entries)" = "0f0000000e000101 0f0000000e000101 0f0000000e000101 0f0000000e000101 " ]
+t "rootfs_b now holds the new squashfs" [ "$(volhash 2 $newn)" = "$newsha" ]
+ubidetach -d 0 >/dev/null 2>&1; t "rootfs_a still holds the old squashfs" [ "$(volhash 1 $oldn)" = "$oldsha" ]
+t "misc: B 0f tries 0, A 0e" [ "$(entries)" = "0e0000000f000101 0e0000000f000101 0e0000000f000101 0e0000000f000101 " ]
 t "dump saved, 1 MiB" [ "$(wc -c < "$(ls /tmp/dump/misc-* | head -1)")" -eq 1048576 ]
 
-echo "x28 == 3. native B: write B, flip priorities"
-mkimg old2 "second old"; ubiformat /dev/mtd2 -y -f /tmp/old2.ubi >/dev/null 2>&1; mktar newer new
-: > /x28/root/etc/x28-native-b
-before=$(entries)
-nt "marker alone refused" platform_do_upgrade /tmp/newer.tar
-t "misc untouched without confirmation" [ "$(entries)" = "$before" ]
-: > /x28/root/tmp/x28-write-b-ok
+echo "x28 == 3. running B: A gets the next image and the priority back"
+echo 'console=x bootslot=b' > /tmp/fp/cmdline; rm -f /tmp/x28-target; mktar newer new
 platform_do_upgrade /tmp/newer.tar; rc=$?
 t "upgrade rc=0" [ $rc -eq 0 ]
-t "rootfs_b now holds the new squashfs" [ "$(volhash 2 $newn)" = "$newsha" ]
-t "misc: B 0f tries 0, A 0e" [ "$(entries)" = "0e0000000f000101 0e0000000f000101 0e0000000f000101 0e0000000f000101 " ]
+t "rootfs_a now holds the new squashfs" [ "$(volhash 1 $newn)" = "$newsha" ]
+t "misc: A 0f tries 0, B 0e" [ "$(entries)" = "0f0000000e000101 0f0000000e000101 0f0000000e000101 0f0000000e000101 " ]
+echo 'console=x bootslot=a' > /tmp/fp/cmdline
 
 echo "x28 == 4. a failed write leaves misc alone"
 mkmisc '\017\000\000\000' '\016\000\001\001'; before=$(entries)
