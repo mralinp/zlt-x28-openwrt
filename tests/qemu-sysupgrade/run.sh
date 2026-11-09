@@ -6,5 +6,5 @@
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 w=$(mktemp -d); trap 'rm -rf "$w"' EXIT
-cp "$here"/build.sh "$here"/init "$here"/test_guest.sh "$here/../../package/x28-sysupgrade/files/lib/upgrade/x28.sh" "$w/"
+cp "$here"/build.sh "$here"/init "$here"/test_guest.sh "$here/../../package/x28-sysupgrade/files/lib/upgrade/platform.sh" "$w/"
 docker run --rm --platform linux/arm64 -v "$w:/x28:ro" ubuntu:22.04 bash /x28/build.sh

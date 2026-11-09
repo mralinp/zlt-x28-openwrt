@@ -17,7 +17,7 @@ mods="nandsim ubi squashfs"
 mkdir -p $R/mod; : > $R/mod/order
 for m in $mods; do modprobe -S $K --show-depends $m 2>/dev/null | awk '/^insmod/{print $2}' ; done | awk '!s[$0]++' > /tmp/order
 while read f; do b=$(basename $f); b=${b%.xz}; b=${b%.zst}; b=${b%.ko}; case $f in *.xz) xz -dc $f > $R/mod/$b.ko;; *.zst) zstd -dc $f > $R/mod/$b.ko;; *) cp $f $R/mod/$b.ko;; esac; echo $b >> $R/mod/order; done < /tmp/order
-cp /x28/x28.sh /x28/test_guest.sh $R/x28/
+cp /x28/platform.sh /x28/test_guest.sh $R/x28/
 cp /x28/init $R/init; chmod +x $R/init
 (cd $R && find . | cpio -o -H newc 2>/dev/null | gzip -1 > /tmp/initrd.gz)
 cp /boot/vmlinuz-$K /tmp/vmlinuz; if gzip -t /tmp/vmlinuz 2>/dev/null; then zcat /tmp/vmlinuz > /tmp/Image; mv /tmp/Image /tmp/vmlinuz; fi

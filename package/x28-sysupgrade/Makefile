@@ -20,7 +20,7 @@ endef
 
 define Package/x28-sysupgrade/install
 	$(INSTALL_DIR) $(1)/lib/upgrade
-	$(INSTALL_DATA) ./files/lib/upgrade/x28.sh $(1)/lib/upgrade/x28.sh
+	$(INSTALL_DATA) ./files/lib/upgrade/platform.sh $(1)/lib/upgrade/platform.sh
 endef
 
 $(eval $(call BuildPackage,x28-sysupgrade))

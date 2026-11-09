@@ -27,7 +27,7 @@ ALL() { printf '%s %s %s %s ' "$1" "$1" "$1" "$1"; }
 mkdir -p "$dir/root/etc/init.d" "$dir/root/tmp" "$dir/dump"; : > "$dir/root/etc/init.d/x28-bootok"; chmod +x "$dir/root/etc/init.d/x28-bootok"
 echo 'MemAvailable:     300000 kB' > "$dir/proc/meminfo"
 export X28_UP_TEST=1 X28_UP_PROC=$dir/proc X28_UP_MISC=$dir/misc X28_UP_DDNAND=$dir/dd-nand X28_UP_ROOT=$dir/root X28_UP_TMP=$dir X28_UP_DUMP=$dir/dump X28_UP_SYS=$dir/sys X28_UP_DEVDIR=$dir/devx
-. "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh"
+. "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh"
 
 # flip to B: B 15 tries 0, A 14, success and up-type bytes kept, in all four copies
 mkmisc 0f000000 0e000101; : > "$CALLS"; x28_misc_select b 1 2>/dev/null
@@ -114,5 +114,9 @@ X28_EXP_SHA=$(head -c 1000 "$dir/t/sysupgrade-x28/root" | sha256sum | cut -d' ' 
 X28_EXP_SHA=0000; ! x28_ubi_verify img /dev/mtd42 2>/dev/null; X28_EXP_SHA=; ! x28_ubi_verify img /dev/mtd42 2>/dev/null
 unset -f ubiformat ubidetach ubiblock ubiattach
 # without X28_UP_TEST the environment redirects nothing
-[ "$(env -u X28_UP_TEST X28_UP_MISC=/tmp/evil X28_UP_PROC="$dir/proc" sh -c '. "$1"; echo "$X28_UP_MISC|$X28_UP_DDNAND"' x "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/x28.sh")" = "|dd-nand" ]
+[ "$(env -u X28_UP_TEST X28_UP_MISC=/tmp/evil X28_UP_PROC="$dir/proc" sh -c '. "$1"; echo "$X28_UP_MISC|$X28_UP_DDNAND"' x "$(dirname "$0")/../package/x28-sysupgrade/files/lib/upgrade/platform.sh")" = "|dd-nand" ]
+# every tool the upgrade runs after the root is gone is in the list the standard sysupgrade copies to RAM
+for b in ubiformat ubidetach ubiattach ubiblock dd-nand hexdump cmp tar sha256sum cut head wc; do
+	case " $RAMFS_COPY_BIN " in *"/$b "*) ;; *) echo "missing from RAMFS_COPY_BIN: $b"; exit 1 ;; esac
+done
 echo "PASS: x28-sysupgrade checks first, writes and verifies the target, and changes misc only afterwards, copy 1 last"

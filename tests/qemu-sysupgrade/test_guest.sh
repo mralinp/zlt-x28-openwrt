@@ -49,7 +49,7 @@ mktar() { # tarball name, image name
 }
 mktar new new
 export X28_UP_TEST=1 X28_UP_PROC=/tmp/fp X28_UP_DDNAND=/usr/sbin/dd-nand X28_UP_MISC=/dev/mtd0 X28_UP_ROOT=/x28/root X28_UP_TMP=/tmp X28_UP_DUMP=/tmp/dump X28_UP_SYS=/sys X28_UP_DEVDIR=/dev
-. /x28/x28.sh
+. /x28/platform.sh
 X28_UP_WRITE=x28_ubi_write; X28_UP_VERIFY=x28_ubi_verify
 volhash() { # mtd, bytes: sha of the first bytes of volume 0 after attaching it as ubi4
 	ubiattach /dev/ubi_ctrl -m $1 -d 4 >/dev/null 2>&1; sleep 1; head -c "$2" /dev/ubi4_0 | sha256sum | cut -d' ' -f1; ubidetach -d 4 >/dev/null 2>&1

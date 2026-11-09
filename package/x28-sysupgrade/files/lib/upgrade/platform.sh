@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
-# Platform hooks and the misc writer for sysupgrade on the X28 A/B layout (#457, design: docs/research/sysupgrade-design.md).
+# /lib/upgrade/platform.sh: the platform hooks and the misc writer for OpenWrt's own sysupgrade (/sbin/sysupgrade, common.sh, do_stage2
+# supply the RAM root and the kill-and-pivot; this file only says what to copy there and what to write), for sysupgrade on the X28 A/B layout (#457, design: docs/research/sysupgrade-design.md).
 # NOT in any image yet: the build guard refuses these tools until the reviewed exception exists (x28-flasher#81).
 #
 # Order is the point: check, write the target from RAM, verify it, and only then touch misc (priority flip and tries 0).
@@ -20,6 +21,10 @@ X28_UP_MISC=${X28_UP_MISC:-}		# misc device; found in /proc/mtd when empty
 X28_UP_ROOT=${X28_UP_ROOT:-}		# prefix of /etc for the marker, the confirmation file and the bootok check
 X28_UP_TMP=${X28_UP_TMP:-/tmp}
 X28_UP_DUMP=${X28_UP_DUMP:-/root}	# persistent: the overlay is on user_data
+# What the standard sysupgrade (common.sh run_ramfs) copies into the RAM root before stage 2 runs: everything below is used after the
+# root is gone. Busybox applets are listed by path; install_bin follows them. Unproven on the unit until the first identical-image run.
+RAMFS_COPY_BIN="/usr/sbin/ubiformat /usr/sbin/ubidetach /usr/sbin/ubiattach /usr/sbin/ubiblock /sbin/dd-nand /usr/bin/hexdump /usr/bin/cmp /bin/tar /usr/bin/sha256sum /usr/bin/cut /usr/bin/head /usr/bin/wc /bin/cp /bin/rm /bin/date /bin/sleep"
+RAMFS_COPY_DATA="/usr/lib/libnandapi.so"
 X28_COPY=262144
 X28_DIR=sysupgrade-x28
 X28_MIN_FREE_KB=32768
