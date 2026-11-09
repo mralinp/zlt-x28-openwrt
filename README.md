@@ -44,7 +44,7 @@ This project puts a normal OpenWrt 23.05.5 on the ZLT X28 5G CPE (MediaTek MT689
 userspace is standard OpenWrt: LuCI, UCI, netifd, dnsmasq and the fw3 firewall. It runs on the vendor 4.19.205 kernel
 and keeps the vendor modem stack only as a hardware backend. It ships WireGuard, OpenVPN, L2TP, PPTP and Passwall2,
 and a signed `opkg` feed built for this kernel. The OpenWrt image goes on **slot A**; the stock firmware stays on **slot B** as the fallback.
-Current release: **v0.77.0** (a pre-release; the badge above shows the newest).
+Current release: **v0.78.0** (a pre-release; the badge above shows the newest).
 
 ## Terms used in these docs
 
@@ -110,7 +110,7 @@ itself (`ucert`), writes the A/B slot it is **not** running, verifies it, and on
 - **By hand**: download the signed tarball from the [releases](https://github.com/mralinp/zlt-x28-openwrt/releases) and upload it in
   System > Backup / Flash Firmware.
 
-Nothing upgrades on its own. Images up to v0.75.0 have no `x28-upgrade` and their `sysupgrade` writes the **running** slot unless
+Nothing upgrades on its own. `x28-upgrade` and the *Upgrade now* button are in images from v0.78.0 (the notice from v0.77.0). In images up to v0.75.0 `sysupgrade` writes the **running** slot unless
 `/etc/x28-native-b` and `/tmp/x28-write-b-ok` name B; upgrade those by hand once (design: [sysupgrade-design](docs/research/sysupgrade-design.md)).
 
 ## VPN and Passwall2

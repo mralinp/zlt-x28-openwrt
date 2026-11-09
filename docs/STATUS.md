@@ -12,7 +12,7 @@ adapter. Preserve the working modem, board calibration and recoverability.
 
 ## Where it stands
 
-Release `v0.77.0` (a pre-release). The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
+Release `v0.78.0` (a pre-release). The native image (OpenWrt 23.05.5 userspace on the vendor 4.19.205 kernel, fw3 + iptables-legacy)
 is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock stays on slot B until the first `sysupgrade`, which writes the slot that is not running; on the first unit B was replaced by a native image in the sysupgrade tests ([TESTING 53c](TESTING.md)). Most feature tests were done on the first unit; the PRO tests are in [TESTING](TESTING.md) 42 to 44, 49 and 51.
 
 **Working on that unit**
