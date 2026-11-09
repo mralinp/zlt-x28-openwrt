@@ -58,6 +58,14 @@ key** to a trusted key, so the feed key (trusted on the router) stays offline: i
 `image_sign.sh sign` adds the metadata, signs and appends the certificate; `verify` does what the router does. The `ucert` ipk
 (verify only) must be on the image before the check is turned on, or every upgrade would fail.
 
+### Release flow for signed images
+
+CI cannot build the image (the vendor parts are private, #254), so the owner builds the sysupgrade tarball locally and attaches it to a
+release as `x28-sysupgrade-<version>-unsigned.tar`. The manual workflow **Sign image** (`.github/workflows/sign-image.yml`) takes the tag, the
+owner's SHA-256 of that file and the board names, runs in the `release-signing` environment (restrict it to `main` and require a reviewer),
+signs with the image-signer secrets (`X28_IMAGE_SIGNER_KEY`, `X28_IMAGE_SIGNER_CERT`), checks the result against the feed's public key as a
+router does, and attaches `x28-sysupgrade-<version>.tar` and its `.sha256`. The feed key is never in GitHub.
+
 ## Failure behaviour
 
 | Failure | Result |
