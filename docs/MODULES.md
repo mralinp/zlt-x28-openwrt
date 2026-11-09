@@ -9,25 +9,31 @@ nobody has measured or written it down yet (it is left blank on purpose rather t
 
 ## At a glance
 
-| | X28 | X28 PRO |
+The X28 and the X28 PRO have the same specification **except the Wi-Fi** (owner, 2026-11-09). The table gives one value for both, and the
+Wi-Fi rows give each model.
+
+| | Both models |
+|---|---|
+| SoC | MediaTek MT6890 / T750, 4x Cortex-A55, aarch64, 0.5 to 2.0 GHz (observed) |
+| Memory | 1 GiB DRAM, Linux sees about 628 MiB; the rest is reserved for the modem and firmware ([HARDWARE](HARDWARE.md#ram)) |
+| Flash | 1 GiB NAND, 4 KiB pages, 256 KiB erase blocks, 51 partitions, A/B slots ([HARDWARE](HARDWARE.md#flash)) |
+| Cellular | Quectel RG500L-EU 5G NR + LTE, inside the platform (not a USB or PCIe modem), 4 antennas on IPX connectors (owner); one nano-SIM slot (owner). Bands the modem supports and the band lock accepts (`x28_mipc.sh`): **LTE** 1, 3, 5, 7, 8, 20, 28, 32, 38, 40, 41, 42, 43; **5G NR** n1, n3, n5, n7, n8, n20, n28, n38, n40, n41, n77, n78 |
+| Ethernet | MT6890 MAC (`eth0`, `eth1`) into an MT7531AE switch; 4 LAN sockets bridged, 1 Gb on the cabled one (docs) |
+| USB | one USB-C port, also the recovery port (preloader and download agent), no USB-A; an MTU3 dual-role controller. Runs as a **device** (AT serial console, and an Ethernet link with a patched NCM module, #488); host mode starts but the board supplies no 5 V (VBUS), so bus-powered drives are not detected. Role is set by `cmode` (see the USB section) |
+| Console | UART at 921600 8N1, 1.8 V logic, an unpopulated 3-hole footprint on the back ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)) |
+| Front panel | LEDs: cellular radio (green), cellular quality (green), system (red) (observed in sysfs); reset and WPS buttons |
+| Power | 12 V DC; the adapter must supply at least 0.7 A (owner) |
+| Cooling | no fan from the factory and **no fan header**; the owner's fan is wired by hand to the 12 V input and runs at full speed ([THERMAL](THERMAL.md)) |
+| Kernel | vendor Linux 4.19.205 (aarch64, musl userspace), the same image in both slots |
+| Board name (`/tmp/sysinfo/board_name`) | X28: `Tozed,X28` (observed; board marking `TZ7.823.432 X28`). PRO: not recorded (board `TZ7.823.805A`, stock firmware 8.6.8 of 2024-02-20) |
+
+| Wi-Fi | X28 | X28 PRO |
 |---|---|---|
-| Board name (`/tmp/sysinfo/board_name`) | `Tozed,X28` (observed). Board marking `TZ7.823.432 X28` on the back of the first unit | not recorded (board `TZ7.823.805A`, stock firmware 8.6.8 of 2024-02-20) |
-| SoC | MediaTek MT6890 / T750, 4x Cortex-A55, aarch64, 0.5 to 2.0 GHz (observed) | the same boot chain and kernel image ([flash-other-units](research/flash-other-units.md)) |
-| Memory | 1 GiB DRAM, Linux sees about 628 MiB; the rest is reserved for the modem and firmware ([HARDWARE](HARDWARE.md#ram)) | not recorded separately |
-| Flash | 1 GiB NAND, 4 KiB pages, 256 KiB erase blocks, 51 partitions, A/B slots ([HARDWARE](HARDWARE.md#flash)) | the same layout |
-| Cellular | Quectel RG500L-EU 5G NR + LTE, inside the platform (not a USB or PCIe modem); the RF, SIM and antenna side is not recorded | the same family |
-| Wi-Fi | one combined dual-band MT7915D chip on PCIe (`14c3:7915`), the `mt_wifi` vendor driver (observed) | two cards, one MT7915 chip per band (docs) |
-| Ethernet | MT6890 MAC (`eth0`, `eth1`) into an MT7531AE switch; four LAN sockets bridged, 1 Gb on the cabled one (docs) | not recorded |
-| USB | an MTU3 controller; the USB-C port is the recovery port (preloader and download agent). Host mode is **not established** | the same |
-| Console | UART at 921600 8N1, 1.8 V logic, an unpopulated 3-hole footprint on the back ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)) | not recorded |
-| Front panel | LEDs: cellular radio (green), cellular quality (green), system (red) (observed in sysfs); reset and WPS buttons | not recorded |
-| Power | 12 V DC; the adapter must supply at least 0.7 A (owner, 2026-11-09) | not recorded |
-| SIM | one slot (size not recorded) | not recorded |
-| Antennas | 4 for cellular, 4 for Wi-Fi (owner) | 4 for cellular; 4 or 8 for Wi-Fi (owner is not sure which; two chips suggest 8) |
-| Case ports | 4 LAN sockets and one USB-C port; no USB-A (owner) | not recorded |
-| Cooling | no fan from the factory and **no fan header**; the owner's fan is wired by hand to the 12 V input and runs at full speed ([THERMAL](THERMAL.md)) | not recorded |
-| Kernel | vendor Linux 4.19.205 (aarch64, musl userspace), the same image in both slots | the same |
-| Not recorded for either | the SIM size, the antenna connector type, the 5G/LTE band list, the labels on the sockets | |
+| Chips | one combined dual-band MT7915D on PCIe (`14c3:7915`) (observed) | two MT7915 cards, one per band, PCIe slots 0 and 1 (docs) |
+| Driver | the vendor `mt_wifi`; profile `l1profile.dat` with one card | the same driver; two cards |
+| Antennas | 4, IPX connectors (owner) | 8, IPX connectors (owner said "4 or 8", not confirmed) |
+
+Not recorded for either model: the labels on the sockets.
 
 ## How the modules fit together
 
@@ -95,7 +101,7 @@ and `x28-plmn-scan` for the operator scan and selection), `luci-proto-x28-mipc` 
 ### Wi-Fi (MediaTek MT7915)
 
 2.4 GHz (`ra0`) and 5 GHz (`rai0`) on the vendor `mt_wifi` driver, which is not `nl80211`/mac80211, with hardware offload (WED) through
-`mtk_warp`. The X28 has one combined MT7915D chip; the X28 PRO has two MT7915 chips (one per band). `l1profile.dat` and two
+`mtk_warp`. The X28 has one combined MT7915D chip; the X28 PRO has two MT7915 chips (one per band), and this is the one hardware difference between the models. `l1profile.dat` and two
 `mt7915.dbdc.b*.dat` profiles describe them; calibration is in `nvcfg` (`e2p`). Software: the package `x28-wifi` holds a netifd wireless handler named
 `mtwifi` (with LuCI options, the region and channel tables), `x28-wifi-l1` (picks the single-card profile on a one-chip board, at S05, before the
 driver loads) and `x28-wps` (the WPS button). Not measured: Wi-Fi throughput and client behaviour (#150).
@@ -110,8 +116,34 @@ guard for the X28 PRO's slow bridge ([BUILD](BUILD.md#observed-socket-4-switch-p
 ### USB-C and the console UART
 
 The USB-C port is the recovery port: the preloader exposes a USB device for about a second after power-up, and the flasher loads the download
-agent through it; it needs a USB-A to USB-C cable (C to C does not work). The port as a USB host for storage is not established. The console is a
-1.8 V UART footprint on the back, read-only capture needs a level shifter. Software: [x28-flasher](https://github.com/mralinp/x28-flasher).
+agent through it; it needs a USB-A to USB-C cable (C to C does not work).
+
+**Roles and `cmode`** (read and tested on the old unit, 2026-11-09, runtime only). The controller is MediaTek `mtu3` at `0x11201000`,
+`dr_mode = otg`, super-speed, with an xHCI child node and a `usb_iddig` input (GPIO 52) for role detection. `/sys/devices/platform/11201000.usb/cmode`
+picks the role: `1` is the boot default (automatic; no VBUS is detected, the gadget reads "not attached"), `2` forces **host**, `3` forces **device**
+(VBUS valid, the gadget goes to "configured"). A write lasts until reboot. The stock `usb.init` writes `3` ("force on usb") before it builds its
+gadget; the native image's `x28-modem` does not, so the port does nothing on a computer today.
+
+**Device mode.** `x28-modem` builds a configfs gadget `g1` (Quectel VID `2c7c`, PID `7003`) with one function, a serial port (ACM) for the modem's AT
+daemon. With `cmode 3` a computer sees it and the AT console answers plain commands (`AT` gives `OK`, `ATI` gives `Quectel RG500L-EU`, revision
+`RG500LEUAPR04A01M1G_OCPU_BQN_BETA20240115`). The stock gadget has `rndis.gs4`, `acm.gs0-2`, `mass_storage.usb0` and (non-`usr` builds) `ffs.adb`; in normal
+boot (`mipcboot=0`) it links RNDIS + adb + two ACM. The kernel has the RNDIS function (`CONFIG_USB_CONFIGFS_RNDIS=y`), `OBEX`, `mass_storage`, `FunctionFS` and HID, but not ECM,
+NCM or EEM. RNDIS works on Windows and Linux; **macOS has no RNDIS driver**. An NCM function built out of tree from the vendor tree (`usb_f_ncm.ko`) was loaded
+and the Mac saw a USB Ethernet adapter ("X28 OpenWrt") with no driver; 200 pings of 1400 bytes over the cable all came back (the new `usb0` needs a
+firewall zone, or it is rejected). The unpatched module **panics the kernel**: the vendor `u_ether.c` calls `eth_hw_nat(skb)` and `skb_shinfo(skb)` before any NULL
+check, and NCM's flush timer calls `ndo_start_xmit(NULL)`. The fix is in the module (send every bundle at once, no flush timer). Details and the patch: #488.
+
+**Host mode.** With `cmode 2` the xHCI controller comes up (`usb1` and `usb2` root hubs, `mailbox ID_GROUND`), but the kernel logs `supply vbus not found, using dummy regulator`
+and the controller's device-tree node has only the `usb_iddig` GPIO, no VBUS enable pin. A USB-C flash drive was not detected. The board probably has no 5 V
+supply wired to this port (it is a 12 V-input router); bus-powered drives and printers will not work. A self-powered drive, printer or powered hub is
+**untested**. The `fusb304` named in the device tree is only a SuperSpeed orientation mux (`drivers/misc/mediatek/typec/switch/fusb304.c`, built in with
+`CONFIG_MTK_USB_TYPEC=y`); it is not a role controller, so there is no missing driver to add.
+
+**ADB.** The X28 PRO's vendor UI has an ADB option. Stock `usb.init` starts `adbd_usb` and adds the FunctionFS ADB function only on non-`usr` firmware, the
+`adbd_usb` binary is not in the PRO backup, and nothing listens on TCP 5555, so on retail firmware it is probably inert. The SDK has the (Apache-2.0 AOSP)
+`adbd` source; making ADB work would take a package, the `ffs.adb` function and `cmode 3`. Not planned.
+
+The console is a 1.8 V UART footprint on the back, read-only capture needs a level shifter. Software: [x28-flasher](https://github.com/mralinp/x28-flasher).
 
 ### LEDs and buttons
 
@@ -142,6 +174,5 @@ software today; smart fan control (#47) would need a modification. [THERMAL](THE
 
 ## Gaps in this page
 
-Not recorded yet, add them when someone measures or reads the label: the SIM size, the antenna connector type, the supported 5G/LTE bands, the
-labels on the sockets, the X28 PRO's board name string, its RAM, CPU and Ethernet details, its Wi-Fi antenna count (4 or 8), and whether the
-USB-C port can act as a host. The 2.5 G PHY seen in code comments does not match four LAN sockets: unverified.
+Not recorded yet, add them when someone measures or reads the label: the labels on the sockets, the X28 PRO's board name string, its Wi-Fi antenna
+count (4 or 8), and a USB host test with a self-powered device or hub. The 2.5 G PHY seen in code comments does not match four LAN sockets: unverified.
