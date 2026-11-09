@@ -93,6 +93,12 @@ X28_UP_WRITE='echo' ; mkmisc 0f000000 0e000101
 # the run leaves a trace in the log file
 platform_do_upgrade "$dir/good.tar" 2>/dev/null; grep -q 'stage 2 started' "$dir/up.log" && grep -q 'writing /dev/mtd' "$dir/up.log" && grep -q ' done$' "$dir/up.log"
 mkmisc 0f000000 0e000101
+# the target is decided before the pivot: with the marker gone (as in the RAM root) the upgrade still goes to the slot chosen then
+: > "$dir/root/etc/x28-native-b"; : > "$dir/root/tmp/x28-write-b-ok"; X28_UP_WRITE=true X28_UP_VERIFY=true; mkmisc 0f000000 0e000101
+platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(cat "$dir/x28-target")" = "b 1" ]
+rm "$dir/root/etc/x28-native-b" "$dir/root/tmp/x28-write-b-ok"
+platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e0000000f000101)" ]    # B first, from the stored target
+rm -f "$dir/x28-target"; mkmisc 0f000000 0e000101
 # the pre-upgrade hook keeps a whole copy of misc where it survives, and the log reaches the kernel log
 platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(wc -c < "$dir/keep/$(ls "$dir/keep" | head -1)")" -eq 1048576 ]
 grep -q 'x28-sysupgrade: misc saved' "$dir/kmsg"  # /dev/kmsg takes one line per write; the file keeps the last

@@ -141,6 +141,8 @@ x28_misc_select() {
 x28_target() {
 	local s; s=$(x28_slot)
 	if [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
+	# Decided once, before the pivot (platform_pre_upgrade): in the RAM root /etc is not the router's /etc, so the marker is gone there.
+	if [ -s "$X28_UP_TMP/x28-target" ]; then cat "$X28_UP_TMP/x28-target"; return 0; fi
 	if [ ! -e "$X28_UP_ROOT/etc/x28-native-b" ]; then echo "$s 0"; return 0; fi
 	if [ ! -e "$X28_UP_ROOT/tmp/x28-write-b-ok" ]; then x28_log "slot B is marked native: create /tmp/x28-write-b-ok to confirm writing it"; return 1; fi
 	if [ "$s" = a ]; then echo "b 1"; else echo "a 1"; fi
@@ -155,8 +157,10 @@ x28_free_kb() { sed -n 's/^MemAvailable: *\([0-9]*\) kB.*/\1/p' "$X28_UP_PROC/me
 # Called by stage2 with the image BEFORE it switches to the RAM root, while /overlay is still mounted read-write: keep a copy of misc
 # where it survives (the compare in x28_misc_select uses its own RAM copy, taken later).
 platform_pre_upgrade() {
-	local keep=$X28_UP_KEEP dev
+	local keep=$X28_UP_KEEP dev t
 	x28_log "pre-upgrade: $1"
+	rm -f "$X28_UP_TMP/x28-target"
+	t=$(x28_target) && echo "$t" > "$X28_UP_TMP/x28-target" && x28_log "target: $t"
 	[ -n "$keep" ] || return 0
 	dev=$(x28_misc_dev) || return 0
 	mkdir -p "$keep" 2>/dev/null && dd if="$dev" of="$keep/misc-$(date +%Y%m%d-%H%M%S).bin" bs=65536 2>/dev/null && x28_log "misc saved in $keep"
