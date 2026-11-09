@@ -18,7 +18,7 @@ Wi-Fi rows give each model.
 | Memory | 1 GiB DRAM, Linux sees about 628 MiB; the rest is reserved for the modem and firmware ([HARDWARE](HARDWARE.md#ram)) |
 | Flash | 1 GiB NAND, 4 KiB pages, 256 KiB erase blocks, 51 partitions, A/B slots ([HARDWARE](HARDWARE.md#flash)) |
 | Cellular | Quectel RG500L-EU 5G NR + LTE, inside the platform (not a USB or PCIe modem), 4 antennas on IPX connectors (owner); one nano-SIM slot (owner). Bands the modem supports and the band lock accepts (`x28_mipc.sh`): **LTE** 1, 3, 5, 7, 8, 20, 28, 32, 38, 40, 41, 42, 43; **5G NR** n1, n3, n5, n7, n8, n20, n28, n38, n40, n41, n77, n78 |
-| Ethernet | MT6890 MAC (`eth0`, `eth1`) into an MT7531AE switch; 4 LAN sockets bridged, 1 Gb on the cabled one (docs) |
+| Ethernet | MT6890 MAC (`eth0`, `eth1`) into an MT7531AE switch; 4 LAN sockets bridged: LAN 1 is a 2.5 G Realtek RTL8226B port on its own MAC (`eth1`), LAN 2 to 4 are 1 Gb switch ports (owner, observed) |
 | USB | one USB-C port, also the recovery port (preloader and download agent), no USB-A; an MTU3 dual-role controller. Runs as a **device** (AT serial console, and an Ethernet link with a patched NCM module, #488); host mode starts but the board supplies no 5 V (VBUS), so bus-powered drives are not detected. Role is set by `cmode` (see the USB section) |
 | Console | UART at 921600 8N1, 1.8 V logic, an unpopulated 3-hole footprint on the back ([RECOVERY](RECOVERY.md#uart-debug-console-2-read-side-confirmed)) |
 | Front panel | LEDs: cellular radio (green), cellular quality (green), system (red) (observed in sysfs); reset and WPS buttons |
@@ -33,7 +33,7 @@ Wi-Fi rows give each model.
 | Driver | the vendor `mt_wifi`; profile `l1profile.dat` with one card | the same driver; two cards |
 | Antennas | 4, IPX connectors (owner) | 8, IPX connectors (owner said "4 or 8", not confirmed) |
 
-Not recorded for either model: the labels on the sockets.
+Not recorded for either model: whether LAN 3 is switch port 2 (by elimination only).
 
 ## How the modules fit together
 
@@ -108,9 +108,16 @@ driver loads) and `x28-wps` (the WPS button). Not measured: Wi-Fi throughput and
 
 ### Ethernet and switch
 
-The SoC's Ethernet MAC (`eth0`, `eth1`) feeds a MediaTek MT7531AE switch (7 ports, VLAN mode); the observed table gives sockets 1, 2, 4 and 0
-their own VLANs, bridged into `br-lan`. The code and DT comments also mention a separate 2.5 G PHY and a spare switch port: not verified on a
-board. Software: `x28-switch` loads the observed VLAN table at boot with `swconfig`; netifd, `dnsmasq` and fw3 do the rest, with `x28-dhcp` as a
+The SoC's Ethernet block (`ethernet@15100000`, netdevs `eth0` and `eth1`) has two MACs. One (`mac@1`, `sgmii`, fixed link) feeds a MediaTek MT7531AE
+switch (7 ports, VLAN mode; CPU ports 5 and 6); the observed table gives switch ports 1, 2, 4 and 0 their own VLANs, bridged into `br-lan`. The other
+(`mac@0`, `2500base-x`, with a `phy-handle`) goes to a **Realtek RTL8226B 2.5 G PHY** (`phy_id 0x001cc849`, MDIO address 1; the vendor driver sets its SerDes
+mode), which is not behind the switch.
+
+**Sockets** (owner, 2026-11-09, checked on the old unit with `swconfig` and the bridge table): **LAN 1 is the 2.5 G socket.** Traffic from it arrives on `eth1`
+and the switch driver never reports a link for it (`swconfig` port 0 reads down while the PHY has link), so LuCI's Switch page cannot show it as plugged in.
+LuCI lists switch port 0 as LAN 1; how that port relates to the 2.5 G socket is not established. **LAN 2 is switch port 1** (cable plugged in:
+`mt753x Port 1 Link is Up - 1Gbps/Full`, the page showed LAN 2) and **LAN 4 is switch port 4**, both 1 Gb; LAN 3 is port 2 by elimination (not plugged yet).
+`x28-switch` ships the layout in `/etc/board.json` (#489) with LAN 1 to 4 = ports 0, 1, 2, 4. Software: `x28-switch` loads the observed VLAN table at boot with `swconfig`; netifd, `dnsmasq` and fw3 do the rest, with `x28-dhcp` as a
 guard for the X28 PRO's slow bridge ([BUILD](BUILD.md#observed-socket-4-switch-profile-86)).
 
 ### USB-C and the console UART
@@ -174,5 +181,5 @@ software today; smart fan control (#47) would need a modification. [THERMAL](THE
 
 ## Gaps in this page
 
-Not recorded yet, add them when someone measures or reads the label: the labels on the sockets, the X28 PRO's board name string, its Wi-Fi antenna
-count (4 or 8), and a USB host test with a self-powered device or hub. The 2.5 G PHY seen in code comments does not match four LAN sockets: unverified.
+Not recorded yet, add them when someone measures or reads the label: LAN 3's port, how switch port 0 relates to the 2.5 G socket, the X28 PRO's board name string, its Wi-Fi antenna
+count (4 or 8), and a USB host test with a self-powered device or hub.
