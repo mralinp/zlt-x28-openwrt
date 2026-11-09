@@ -242,7 +242,7 @@ class Build(unittest.TestCase):
             b = Path(d) / 'x28-nrband'
             b.write_bytes(b'\x7fELF')
             name, depends, _, files, arch, scripts, version = f.nrband_package(b)
-            self.assertEqual((name, depends, arch, scripts, version), ('x28-nrband', '', 'aarch64_generic', (), '0.1.0-1'))
+            self.assertEqual((name, depends, arch, scripts, version), ('x28-nrband', '', 'aarch64_generic', (), '0.1.0-2'))
             self.assertEqual(files, [('./usr/sbin/x28-nrband', b'\x7fELF', 0o755)])
 
     def test_epoch_keeps_the_stub_above_the_feed(self):

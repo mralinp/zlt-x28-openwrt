@@ -202,7 +202,7 @@ def nrband_package(binary):
     package: built locally, published on the feed release and pinned by hash, like the module packages."""
     return ('x28-nrband', '', 'Reads and sets the 5G (NR) band mask of the X28 modem over MIPC, for the band lock of the x28_mipc protocol; '
             'needs libmipc_msg.so from the image', [('./usr/sbin/x28-nrband', pathlib.Path(binary).read_bytes(), 0o755)],
-            'aarch64_generic', (), '0.1.0-1')
+            'aarch64_generic', (), '0.1.0-2')
 
 
 def read_real(manifest, kmods):
