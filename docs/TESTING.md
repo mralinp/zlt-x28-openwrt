@@ -747,3 +747,10 @@ a boot-critical package that is not `x28-kmods`; the full package list on the fl
 - **Seen**: the new image has a new root UUID, so the overlay was started fresh as designed (`-n`): new SSH host key, defaults, and the overlay copy of `platform.sh` with the `mknod` fix is gone. An upgrade always runs the **running** image's `platform.sh`, so a fix reaches the unit only with the next image, and the one after it uses it.
 - **Not proven**: an interrupted write or power loss, the tries-6 fall-back, a failing `misc` write, the native-slot-B flow, `sysupgrade -k`, and a change of `misc` priorities from inside stage 2.
 
+### 53c. Native slot B: write B and boot it (2026-11-09)
+
+- **Setup**: image running on slot A (the changed one of 53b), `/etc/x28-native-b` in the overlay, `/tmp/x28-upgrade-ok` and `/tmp/x28-write-b-ok` created by the operator, the same tarball, UART/USB connected, a backup of the stock slot B in hand. `platform.sh` with the target decided before the pivot (#474) copied into the overlay.
+- **First try (before #474)**: `platform_check_image` said B, but stage 2 wrote `rootfs_a` and left `misc` alone (the marker is not visible in the RAM root's `/etc`). Harmless: A got its own bytes back.
+- **Result**: the kernel log shows `target: b 1` in the pre-upgrade hook, `writing /dev/mtd42 (rootfs_b)`, `ubi9: attached mtd42`, `written and verified; changing misc (target b flip 1)`, `done`. The unit rebooted into `bootslot=b` with `ubi.mtd=42`, `/x28-sysupgrade-marker` present, WAN up; `misc` reads A `0e000000`, B `0f000100` in all four copies; `x28-bootok` has B's tries at 0. The stock firmware in slot B is gone.
+- **Not proven**: the way back from B (sysupgrade from B targets A; the flasher's Boot order step), the tries-6 fall-back between two native slots, an interrupted write, a different image per slot (each change of image resets the shared overlay), and a power cut during the `misc` change.
+
