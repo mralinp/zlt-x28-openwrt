@@ -15,7 +15,7 @@ on:
         description: "SHA-256 of the unsigned image, computed by you when you attached it"
         required: true
       devices:
-        description: "supported_devices, comma separated (the router's /tmp/sysinfo/board_name)"
+        description: "supported_devices, space separated; each is a router's whole /tmp/sysinfo/board_name, which has a comma (Tozed,X28)"
         required: true
         default: "Tozed,X28"
 
@@ -40,7 +40,7 @@ jobs:
         run: |
           echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$' || { echo "bad tag"; exit 1; }
           echo "$SHA" | grep -Eq '^[0-9a-f]{64}$' || { echo "bad sha256"; exit 1; }
-          echo "$DEVICES" | grep -Eq '^[A-Za-z0-9,._-]+$' || { echo "bad device list"; exit 1; }
+          echo "$DEVICES" | grep -Eq '^[A-Za-z0-9,._-]+( [A-Za-z0-9,._-]+)*$' || { echo "bad device list"; exit 1; }
 
       - uses: docker/setup-qemu-action@v3
         with:
@@ -73,7 +73,7 @@ jobs:
           VERSION=${TAG#v}
           printf '%s\n' "$SIGNER_KEY" > signer.sec
           printf '%s' "$SIGNER_CERT" | base64 -d > signer.ucert   # the ucert blob is binary; the secret holds it base64-encoded
-          devs=$(echo "$DEVICES" | sed 's/,/","/g')
+          devs=$(echo "$DEVICES" | sed 's/ /","/g')   # one entry per board name; fwtool.sh compares each with the whole board_name
           printf '{"supported_devices":["%s"],"version":{"release":"%s","kernel":"4.19.205"}}\n' "$devs" "$TAG" > meta.json
           cp "x28-sysupgrade-${VERSION}-unsigned.tar" "x28-sysupgrade-${VERSION}.tar"
           export X28_ROOTFS="$PWD/$(ls openwrt-*-rootfs.tar.gz | head -n1)"
