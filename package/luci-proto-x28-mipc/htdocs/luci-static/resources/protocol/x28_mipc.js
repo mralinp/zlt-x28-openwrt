@@ -45,9 +45,6 @@ return network.registerProtocol('x28_mipc', {
   return device != null && network.getIfnameOf(ifname) === device;
  },
  renderFormOptions: function(section) {
-  // LuCI can call this again for a section that already has our options (closing and reopening the interface dialog);
-  // form.js throws on a second section.tab('carrier'), so stop once the tab is there.
-  if (section.tabs && section.tabs.carrier) return;
   var option = section.taboption('general', form.Value, 'apn', _('APN'),
    _('Leave empty to use the SIM\'s APN automatically, pick one of the SIM\'s APNs, or type one. No PAP/CHAP.'));
   option.placeholder = _('Automatic (from SIM)');
@@ -69,7 +66,9 @@ return network.registerProtocol('x28_mipc', {
   option.value('2', _('IPv6 only'));
   option.default = '3';
   // Carrier-related vendor settings (roaming now; operator, network mode, bands, PCI lock later) live together here.
-  section.tab('carrier', _('Carrier'));
+  // Every dialog open builds a new section that shares the interface list's tab table (form.js: s.tabs = this.tabs), so the
+  // tab can already exist from an earlier open; declaring it again throws, and skipping all options leaves the tab empty and hidden.
+  if (!(section.tabs && section.tabs.carrier)) section.tab('carrier', _('Carrier'));
   // One call of the read-only status helper per page load; its lines are "key<TAB>value...".
   var modemStatus = function() {
    return modemStatus.cache || (modemStatus.cache = fs.exec('/sbin/x28-modem-status').then(function(res) {
