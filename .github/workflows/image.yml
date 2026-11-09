@@ -1,0 +1,129 @@
+name: Image
+
+# The general native image (#254): the release's assembly + the private stock rootfs (mralinp/x28-vendor-inputs, release inputs-1)
+# -> the flasher's own build steps (stage_native, first_boot without a key, package_ubi) -> attached to the release as
+#   x28-native-image.tar.gz + sha256sums   what the flasher's "download an image" reads (manifest.json + rootfs-a-experimental.bin)
+#   x28-sysupgrade-<version>-unsigned.tar  for Sign image, which this job starts; the owner approves it in the release-signing environment
+# X28_INPUTS_TOKEN: fine-grained, Contents read-only on x28-vendor-inputs and x28-flasher. Without it the job only warns.
+# The stock rootfs stays private; the check step fails the build if the image carries a key, a password or a vendor private key.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      X28_INPUTS_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build the image for, for example v0.75.0"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # attach the image to the release
+      actions: write    # start Sign image
+    env:
+      TAG: ${{ inputs.tag }}
+      INPUTS: inputs-1
+      STOCK_SHA256: 030d9e10df09ad069f5dd609241510984071bacba36d9ee6816467c2ec5200fb
+    steps:
+      - name: Inputs token present?
+        id: token
+        env:
+          T: ${{ secrets.X28_INPUTS_TOKEN }}
+        run: |
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "bad tag"; exit 1; }
+          if [ -z "$T" ]; then echo "::warning::X28_INPUTS_TOKEN is not set: no image for $TAG"; echo "ok=false" >> "$GITHUB_OUTPUT"; else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          repository: mralinp/x28-flasher
+          token: ${{ secrets.X28_INPUTS_TOKEN }}
+          path: flasher
+          persist-credentials: false
+
+      - name: Fetch the assembly and the stock rootfs
+        if: steps.token.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUTS_TOKEN: ${{ secrets.X28_INPUTS_TOKEN }}
+        run: |
+          mkdir -p work/in && cd work/in
+          gh release download "$TAG" -p 'x28-assembly-*.tar.gz' -p SHA256SUMS
+          grep " x28-assembly-" SHA256SUMS | sha256sum -c -
+          GH_TOKEN="$INPUTS_TOKEN" gh release download "$INPUTS" --repo mralinp/x28-vendor-inputs -p rootfs-b-system.tar.gz
+          echo "$STOCK_SHA256  rootfs-b-system.tar.gz" | sha256sum -c -
+
+      - name: Build (stage, first_boot without a key, package_ubi)
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          cd work
+          mkdir -p out && chmod 777 out   # package_ubi runs as a capability-less root in its container
+          python3 - <<'EOF'
+          import subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, "../flasher/tools/x28-flasher")
+          import images
+          w = Path.cwd()
+          root = images.extract_bundle(next((w / "in").glob("x28-assembly-*.tar.gz")), w / "asm")
+          ipks = sorted(str(p) for p in root.glob("ipk/*.ipk"))
+          inputs = {"stock": str(w / "in/rootfs-b-system.tar.gz"), "modern": str(next(root.glob("openwrt-*-rootfs.tar.gz"))),
+                    "kmods": str(root / "kmods"),
+                    "feed": [p for p in ipks if Path(p).name.startswith(images.FEED_PREFIXES + images.PACKAGE_PREFIXES)],
+                    "extra_ipks": [p for p in ipks if Path(p).name.startswith(images.STAGE_PREFIXES)]}
+          for c in images.local_commands(inputs, w, w / "out/img", (w / "../flasher").resolve()):
+              subprocess.run(c, check=True)
+          EOF
+          sudo chown -R "$(id -u):$(id -g)" out
+
+      - name: Check the image is generic
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          cd work
+          python3 - <<'EOF'
+          import json, re, tarfile
+          m = json.load(open("profile/manifest.json"))
+          assert m.get("public_key_sha256") is None, "image carries an SSH key"
+          bad = []
+          with tarfile.open("profile/rootfs-management.tar.gz") as t:
+              for f in t:
+                  if not f.isfile(): continue
+                  d = t.extractfile(f).read()
+                  if f.name.endswith("authorized_keys"): bad.append(f.name)
+                  if f.name == "etc/shadow" and not re.search(rb"^root::", d, re.M): bad.append("root password set")
+                  if d[:4] != b"\x7fELF" and re.search(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----", d): bad.append(f.name)
+          assert not bad, f"not generic: {bad}"
+          print("generic: no SSH key, empty root password, no private keys")
+          EOF
+
+      - name: Wrap and attach
+        if: steps.token.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd work
+          V=${TAG#v}
+          python3 ../flasher/tools/build/sysupgrade_tar.py --image out/img --output "x28-sysupgrade-${V}-unsigned.tar"
+          tar --owner=0 --group=0 --numeric-owner -czf x28-native-image.tar.gz -C out/img manifest.json rootfs-a-experimental.bin
+          sha256sum x28-native-image.tar.gz > sha256sums
+          sha256sum "x28-sysupgrade-${V}-unsigned.tar" | tee unsigned.sha256
+          gh release upload "$TAG" x28-native-image.tar.gz sha256sums "x28-sysupgrade-${V}-unsigned.tar" --clobber
+
+      - name: Start Sign image
+        if: steps.token.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sign-image.yml --ref main -f tag="$TAG" -f unsigned_sha256="$(cut -d' ' -f1 work/unsigned.sha256)"

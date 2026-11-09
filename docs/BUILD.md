@@ -603,7 +603,7 @@ The wizard's **Build** entry puts a flashable image folder (`manifest.json` and 
 
 - **Download:** the newest release that carries the asset `x28-native-image.tar.gz` (exactly those two files) and a
   `sha256sums` file naming it. The wizard checks the archive against `sha256sums` and the image against the manifest, and
-  unpacks the two files by name. This is what #254 must publish; until then the wizard says no release has an image.
+  unpacks the two files by name. The **Image** workflow attaches them to each release once the `X28_INPUTS_TOKEN` secret is set (#254).
   The checksum only proves the download is intact: Flash still asks the owner to type the image hash.
 - **Local build** (source checkout and Docker only, #311): fetches what is public into `private/build/inputs`, each file checked
   against a SHA-256 (the newest release's userspace tarball and the `feed-2` ipset packages by GitHub's asset digest; `alsa-lib`

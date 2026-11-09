@@ -49,6 +49,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -137,3 +140,14 @@ jobs:
           docs/RECOVERY.md and CHANGELOG.md.
           EOF
           gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag --latest=false $PRE
+
+  image:
+    needs: release
+    if: needs.release.outputs.skip != 'true'
+    permissions:
+      contents: write
+      actions: write
+    uses: ./.github/workflows/image.yml
+    with:
+      tag: v${{ needs.release.outputs.version }}
+    secrets: inherit

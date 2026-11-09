@@ -60,8 +60,10 @@ key** to a trusted key, so the feed key (trusted on the router) stays offline: i
 
 ### Release flow for signed images
 
-CI cannot build the image (the vendor parts are private, #254), so the owner builds the sysupgrade tarball locally and attaches it to a
-release as `x28-sysupgrade-<version>-unsigned.tar`. The manual workflow **Sign image** (`.github/workflows/sign-image.yml`) takes the tag, the
+Since #254 the **Image** workflow (`.github/workflows/image.yml`, called by Release) builds the general image from the release's assembly
+and the private stock rootfs (`mralinp/x28-vendor-inputs`, read with the `X28_INPUTS_TOKEN` secret), wraps it with the flasher's
+`sysupgrade_tar.py` and attaches `x28-sysupgrade-<version>-unsigned.tar` (plus `x28-native-image.tar.gz` and `sha256sums` for the flasher),
+then starts Sign image. Without the secret it only warns; a tarball built locally can still be attached by hand. The manual workflow **Sign image** (`.github/workflows/sign-image.yml`) takes the tag, the
 owner's SHA-256 of that file and the board names, runs in the `release-signing` environment (restrict it to `main` and require a reviewer),
 signs with the image-signer secrets (`X28_IMAGE_SIGNER_KEY`, `X28_IMAGE_SIGNER_CERT`), checks the result against the feed's public key as a
 router does, and attaches `x28-sysupgrade-<version>.tar` and its `.sha256`. The feed key is never in GitHub.
