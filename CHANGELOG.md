@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- The release bundle carries `package/x28-sysupgrade/files`, so the flasher can put `/lib/upgrade/platform.sh` into the image (#457).
 - `x28-bootok` resets slot B's tries byte when a native B boots, as it does A's (#451).
 - `x28-kmods` waits for the running slot's tries byte (A or B), not only A's (#452).
 - Test 51: two units flashed with the v0.68.1 image, checked read-only (#436).
