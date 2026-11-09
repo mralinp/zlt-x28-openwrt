@@ -99,9 +99,15 @@ platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(cat "$dir/x28-target")" =
 rm "$dir/root/etc/x28-native-b" "$dir/root/tmp/x28-write-b-ok"
 platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ "$(entries)" = "$(ALL 0e0000000f000101)" ]    # B first, from the stored target
 rm -f "$dir/x28-target"; mkmisc 0f000000 0e000101
+# stage 2 in the RAM root: ucert and the confirmation file are not there, the target stored before the pivot still decides
+rm -f "$dir/root/tmp/x28-upgrade-ok" "$dir/ucert"; echo "a 0" > "$dir/x28-target"
+[ "$(x28_target)" = "a 0" ]                                                                       # without it the same state refuses
+rm -f "$dir/x28-target"; ! x28_target 2>/dev/null
+: > "$dir/root/tmp/x28-upgrade-ok"
 # the pre-upgrade hook keeps a whole copy of misc where it survives, and the log reaches the kernel log
 platform_pre_upgrade "$dir/good.tar" 2>/dev/null; [ "$(wc -c < "$dir/keep/$(ls "$dir/keep" | head -1)")" -eq 1048576 ]
 grep -q 'x28-sysupgrade: misc saved' "$dir/kmsg"  # /dev/kmsg takes one line per write; the file keeps the last
+rm -f "$dir/x28-target"   # the stored target is per upgrade run
 # no operator confirmation: nothing is checked as flashable and nothing is written
 rm "$dir/root/tmp/x28-upgrade-ok"; mkmisc 0f000000 0e000101; : > "$CALLS"
 ! platform_check_image "$dir/good.tar" 2>/dev/null; ! platform_do_upgrade "$dir/good.tar" 2>/dev/null; [ ! -s "$CALLS" ]

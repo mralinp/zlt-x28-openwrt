@@ -146,9 +146,10 @@ x28_misc_select() {
 # image's marker AND /tmp/x28-write-b-ok, so a marker carried in A's image alone can never make sysupgrade overwrite a stock B.
 x28_target() {
 	local s; s=$(x28_slot)
-	if ! x28_signed && [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
-	# Decided once, before the pivot (platform_pre_upgrade): in the RAM root /etc is not the router's /etc, so the marker is gone there.
+	# Decided once, before the pivot (platform_pre_upgrade), where the signature check and /usr/bin/ucert are still there: in the RAM root
+	# /etc and /usr are the RAM root's, so x28_signed and the marker would answer differently.
 	if [ -s "$X28_UP_TMP/x28-target" ]; then cat "$X28_UP_TMP/x28-target"; return 0; fi
+	if ! x28_signed && [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
 	if [ ! -e "$X28_UP_ROOT/etc/x28-native-b" ]; then echo "$s 0"; return 0; fi
 	if [ ! -e "$X28_UP_ROOT/tmp/x28-write-b-ok" ]; then x28_log "slot B is marked native: create /tmp/x28-write-b-ok to confirm writing it"; return 1; fi
 	if [ "$s" = a ]; then echo "b 1"; else echo "a 1"; fi
