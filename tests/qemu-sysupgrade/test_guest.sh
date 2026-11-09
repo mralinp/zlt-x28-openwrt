@@ -10,7 +10,7 @@ ws=$(cat /sys/class/mtd/mtd1/writesize); es=$(cat /sys/class/mtd/mtd1/erasesize)
 mkdir -p /tmp/fp /x28/root/etc/init.d /x28/root/tmp /tmp/dump
 printf 'dev:    size   erasesize  name\nmtd0: 00100000 %08x "misc"\nmtd1: 04000000 %08x "rootfs_a"\nmtd2: 04000000 %08x "rootfs_b"\n' $es $es $es > /tmp/fp/mtd
 echo 'console=x bootslot=a' > /tmp/fp/cmdline; echo 'MemAvailable:   900000 kB' > /tmp/fp/meminfo
-: > /x28/root/etc/init.d/x28-bootok; chmod +x /x28/root/etc/init.d/x28-bootok
+: > /x28/root/etc/init.d/x28-bootok; chmod +x /x28/root/etc/init.d/x28-bootok; : > /x28/root/tmp/x28-upgrade-ok
 cat > /usr/sbin/dd-nand <<'SH'
 #!/bin/sh
 for a in "$@"; do case $a in of=*) f=${a#of=};; seek=*) s=${a#seek=};; count=*) c=${a#count=};; esac; done

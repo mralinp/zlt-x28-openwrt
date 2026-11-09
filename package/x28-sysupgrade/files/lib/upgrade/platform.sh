@@ -121,10 +121,12 @@ x28_misc_select() {
 	rm -f "$exp"
 }
 
-# The slot that gets the image: the running slot (in place) unless B is native. Native B needs the image's marker AND the operator's
-# confirmation file, so a marker carried in A's image alone can never make sysupgrade overwrite a stock B.
+# The slot that gets the image: the running slot (in place) unless B is native. Any write needs the operator's /tmp/x28-upgrade-ok, so
+# a tarball uploaded through LuCI or rpcd by whoever has the (initially empty) root password cannot flash anything. Native B needs the
+# image's marker AND /tmp/x28-write-b-ok, so a marker carried in A's image alone can never make sysupgrade overwrite a stock B.
 x28_target() {
 	local s; s=$(x28_slot)
+	if [ ! -e "$X28_UP_ROOT/tmp/x28-upgrade-ok" ]; then x28_log "create /tmp/x28-upgrade-ok on the router to confirm flashing"; return 1; fi
 	if [ ! -e "$X28_UP_ROOT/etc/x28-native-b" ]; then echo "$s 0"; return 0; fi
 	if [ ! -e "$X28_UP_ROOT/tmp/x28-write-b-ok" ]; then x28_log "slot B is marked native: create /tmp/x28-write-b-ok to confirm writing it"; return 1; fi
 	if [ "$s" = a ]; then echo "b 1"; else echo "a 1"; fi

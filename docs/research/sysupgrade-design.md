@@ -42,6 +42,13 @@ Native B is the safe design; the in-place mode is what exists today. Both share 
 
 Never reset tries or flip priorities before step 3 verifies: a half-written slot with a fresh budget is the worst case.
 
+## Who may flash
+
+`/sbin/sysupgrade` and LuCI's flash page work once the stage 2 files are in the image, and the root password is empty until the owner sets
+one. So no write happens without the operator creating `/tmp/x28-upgrade-ok` on the router first (RAM, gone at reboot); native B also needs
+the image marker and `/tmp/x28-write-b-ok`. A tarball uploaded through the web UI fails `platform_check_image` until then. Signing the
+tarball is the proper fix and is not done (#457).
+
 ## Failure behaviour
 
 | Failure | Result |
