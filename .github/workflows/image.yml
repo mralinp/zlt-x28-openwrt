@@ -84,8 +84,11 @@ jobs:
                     "kmods": str(root / "kmods"),
                     "feed": [p for p in ipks if Path(p).name.startswith(images.FEED_PREFIXES + images.PACKAGE_PREFIXES)],
                     "extra_ipks": [p for p in ipks if Path(p).name.startswith(images.STAGE_PREFIXES)]}
-          for c in images.local_commands(inputs, w, w / "out/img", (w / "../flasher").resolve()):
+          cmds = images.local_commands(inputs, w, w / "out/img", (w / "../flasher").resolve())
+          for c in cmds[:-1]:
               subprocess.run(c, check=True)
+          subprocess.run(["chmod", "-R", "a+rX", str(w / "profile")], check=True)  # first_boot writes it 0700; the container's root has no DAC override
+          subprocess.run(cmds[-1], check=True)
           EOF
           sudo chown -R "$(id -u):$(id -g)" out
 
