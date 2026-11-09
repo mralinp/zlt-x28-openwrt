@@ -76,6 +76,7 @@ return network.registerProtocol('x28_mipc', {
     (res.stdout || '').split('\n').forEach(function(line) {
      var f = line.split('\t');
      if (f[0] == 'serving' || f[0] == 'cell' || f[0] == 'nrcell') out.cells.push({ serving: f[0] == 'serving', nr: f[0] == 'nrcell', id: f[1], band: f[2], rsrp: f[3], rsrq: f[4] });
+     else if (f[0] == 'nrsig') out.nrsig = f;
      else if (f[0]) out.info.push(f);
     });
     return out;
@@ -90,9 +91,12 @@ return network.registerProtocol('x28_mipc', {
   option.load = function() {
    return modemStatus().then(L.bind(function(st) {
     var esc = function(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
-    var text = st.info.map(function(f) { return '%s: %s'.format(f[0], f[1] || '-'); });
+    var rat = { lte: '4G', lte_ca: '4G with carrier aggregation', endc: '4G + 5G (EN-DC)', nr: '5G', other: 'other' };
+    var text = st.info.map(function(f) { return f[0] == 'rat' ? 'network: %s'.format(rat[f[1]] || f[1]) : '%s: %s'.format(f[0], f[1] || '-'); });
+    if (st.nrsig) text.push('5G signal: RSRP %s dBm, RSRQ %s dB'.format(st.nrsig[1], st.nrsig[2]));
     st.cells.forEach(function(c) {
-     text.push('%s: %s %s, band %s, RSRP %s dBm, RSRQ %s dB'.format(c.serving ? 'serving cell' : (c.nr ? '5G cell' : 'cell'), c.nr ? 'NR-ARFCN:PCI' : 'EARFCN:PCI', c.id, c.band, c.rsrp, c.rsrq));
+     text.push('%s: %s %s, band %s, %s'.format(c.serving ? 'serving cell' : (c.nr ? '5G cell' : 'cell'), c.nr ? 'NR-ARFCN:PCI' : 'EARFCN:PCI', c.id, c.band,
+      c.rsrp == '?' ? 'no measurement' : 'RSRP %s dBm, RSRQ %s dB'.format(c.rsrp, c.rsrq)));
     });
     this.status = '<pre>' + esc(text.join('\n') || _('Modem status unavailable')) + '</pre>';
    }, this));
