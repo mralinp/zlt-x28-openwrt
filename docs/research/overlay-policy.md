@@ -26,6 +26,8 @@ volume.
   reviewed, and added as an explicit, hashed file in the profile. Calibration/NVRAM live in their own
   partitions, not in `rootfs_data`.
 - Settings kept across a sysupgrade (#477) are the owner's own backup, not the stock overlay. The new image's
-  preinit hook (`x28-user-data`) restores only `etc/` from it, never the guard's boot roots (`rc.d`, `init.d`,
-  `rc.local`, `crontabs`, `hotplug.d`, `uci-defaults`, `rc.button`, `inittab`, `preinit`, `rc.common`), and only
-  into a fresh overlay of a new image on the slot it was saved for. See [sysupgrade-design](sysupgrade-design.md).
+  preinit hook (`x28-user-data`) restores only an allowlist from it (`/etc/config`, passwd, group, shadow,
+  `/etc/dropbear`, the uhttpd certificate, `/etc/luci-uploads`, `/etc/backup`): nothing a boot script runs or
+  sources, since restored files never pass the build guard. It drops an archive with symlinks or `..` names,
+  and restores only into a fresh overlay of a new image on the slot the backup was saved for. See
+  [sysupgrade-design](sysupgrade-design.md).

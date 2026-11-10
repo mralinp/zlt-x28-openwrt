@@ -46,7 +46,7 @@ upg() { rm -f "$dir/cache" "$dir/calls"; sh "$up" "$@"; }
 upg | grep -q "running 0.9.0, newest signed image 0.10.0" && [ ! -e "$dir/calls" ]    # check only: nothing downloaded or run
 upg -x 2>/dev/null && exit 1
 upg -y | grep -q 'flashing 0.10.0 to slot b' && [ "$(cat "$dir/calls")" = "-T $dir/t/x28-sysupgrade-0.10.0.tar
--k $dir/t/x28-sysupgrade-0.10.0.tar" ]   # -k: settings and the package list are kept (#477)
+-k -u $dir/t/x28-sysupgrade-0.10.0.tar" ]   # -k: settings and the package list are kept (#477)
 echo 0.10.0 > "$dir/release"; upg -y | grep -q 'up to date' && [ ! -e "$dir/calls" ]; echo 0.9.0 > "$dir/release"
 TRIES=1 upg -y 2>/dev/null | grep -q 'FAILED: the running slot' && [ ! -e "$dir/calls" ]
 SLOT=$((1 << 40)) upg -y | grep -q 'FAILED: /tmp has' && [ ! -e "$dir/calls" ]

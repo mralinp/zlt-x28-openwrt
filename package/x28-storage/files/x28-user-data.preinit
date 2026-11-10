@@ -30,29 +30,33 @@ x28_ud_new_image() {
 	elif [ ! -f "$X28_UD_MNT/etc/.extroot-uuid" ]; then
 		x28_ud_keep
 	fi
-	rm -f "$X28_UD_MNT"/x28-keep-*.tgz || :
+	rm -f "$X28_UD_MNT"/x28-keep-*.tgz "$X28_UD_MNT/x28-keep.new" || :
 	umount "$X28_UD_MNT"
 }
 
 # Settings kept across an upgrade (#477): the old image's platform.sh left its backup here as x28-keep-<target slot>.tgz. A new image on
-# that slot hands it to 80_mount_root as OpenWrt's own /sysupgrade.tgz (restored into the fresh overlay, passwd/shadow merged), minus
-# everything that runs at boot: only etc/, and not the build guard's boot roots (ab_guard), init scripts or buttons. A bad archive is
-# dropped and the image starts with its defaults.
+# that slot hands it to 80_mount_root as OpenWrt's own /sysupgrade.tgz (restored into the fresh overlay, passwd/shadow merged), with
+# only the files below: settings and keys, nothing a boot script runs or sources (those never passed the build guard). An archive
+# with a symlink, an absolute or ../ name, or that does not unpack is dropped and the image starts with its defaults.
+X28_UD_KEEP="etc/config etc/passwd etc/group etc/shadow etc/dropbear etc/uhttpd.crt etc/uhttpd.key etc/luci-uploads etc/backup"
 x28_ud_keep() {
-	local slot keep tmp=/tmp/x28-keep p
+	local slot keep tmp=/tmp/x28-keep p out
 	slot="$(sed -n 's/.*bootslot=\([ab]\).*/\1/p' "$X28_UD_PROC/cmdline" 2>/dev/null)"
 	keep="$X28_UD_MNT/x28-keep-$slot.tgz"
 	[ -n "$slot" ] && [ -s "$keep" ] || return 0
 	rm -rf "$tmp"
-	if tar -tzf "$keep" 2>/dev/null | grep -q '^/\|\(^\|/\)\.\.\(/\|$\)' || ! mkdir -p "$tmp/x" || ! tar -xzf "$keep" -C "$tmp/x" 2>/dev/null; then
-		echo "- x28: kept settings unreadable, starting with defaults -"; rm -rf "$tmp"; return 0
+	if tar -tzf "$keep" 2>/dev/null | grep -q '^/\|\(^\|/\)\.\.\(/\|$\)' || ! mkdir -p "$tmp/x" "$tmp/y/etc" ||
+	   ! tar -xzf "$keep" -C "$tmp/x" 2>/dev/null || [ -n "$(find "$tmp/x" -type l)" ]; then
+		echo "- x28: kept settings unusable, starting with defaults -"; rm -rf "$tmp"; return 0
 	fi
-	for p in "$tmp/x"/* "$tmp/x"/.[!.]*; do [ "$p" = "$tmp/x/etc" ] || rm -rf "$p"; done
-	for p in rc.d init.d hotplug.d crontabs uci-defaults rc.button inittab rc.local preinit rc.common; do
-		[ -e "$tmp/x/etc/$p" ] && echo "- x28: not restoring /etc/$p (runs at boot) -" && rm -rf "$tmp/x/etc/$p"
-	done
-	mkdir -p "$X28_UD_MNT/upper" && (cd "$tmp/x" && tar -czf "$X28_UD_MNT/upper/sysupgrade.tgz" etc) &&
+	for p in $X28_UD_KEEP; do [ ! -e "$tmp/x/$p" ] || mv "$tmp/x/$p" "$tmp/y/$p"; done
+	# Written aside and renamed: 80_mount_root ignores tar's status, so a truncated archive would restore half an /etc.
+	out="$X28_UD_MNT/upper/.x28-restore.tgz"
+	if mkdir -p "$X28_UD_MNT/upper" && (cd "$tmp/y" && tar -czf "$out" etc) && mv "$out" "$X28_UD_MNT/upper/sysupgrade.tgz"; then
 		echo "- x28: settings kept by the upgrade will be restored -"
+	else
+		rm -f "$out"
+	fi
 	rm -rf "$tmp"
 }
 

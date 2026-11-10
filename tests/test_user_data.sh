@@ -57,26 +57,28 @@ reset; echo 'mtd0: 00400000 00040000 "preloader"' > "$dir/proc/mtd"; do_x28_user
 printf 'mtd3: 00100000 00040000 "misc"\nmtd50: 1ab80000 00040000 "user_data"\n' > "$dir/proc/mtd"; tries 0
 mkdir -p "$dir/src/etc/config" "$dir/src/etc/init.d" "$dir/src/etc/crontabs" "$dir/src/usr/bin"
 echo net > "$dir/src/etc/config/network"; echo x > "$dir/src/etc/init.d/evil"; echo x > "$dir/src/etc/rc.local"
-echo x > "$dir/src/etc/crontabs/root"; echo x > "$dir/src/usr/bin/evil"
+echo x > "$dir/src/etc/crontabs/root"; echo x > "$dir/src/usr/bin/evil"; echo x > "$dir/src/etc/sysctl.conf"
+mkdir -p "$dir/src/etc/dropbear"; echo k > "$dir/src/etc/dropbear/authorized_keys"
 (cd "$dir/src" && tar -czf "$dir/keep.tgz" etc usr)
 kept() { tar -tzf "$dir/mnt/upper/sysupgrade.tgz" | sed 's|^\./||' | grep -v '/$' | sort | tr '\n' ' '; }
 reset; echo OLD > "$dir/mnt/etc/.extroot-uuid"; cp "$dir/keep.tgz" "$dir/mnt/x28-keep-a.tgz"; cp "$dir/keep.tgz" "$dir/mnt/x28-keep-b.tgz"
 do_x28_user_data >/dev/null
-[ "$(kept)" = "etc/config/network " ] && [ ! -e "$dir/mnt/x28-keep-a.tgz" ] && [ ! -e "$dir/mnt/x28-keep-b.tgz" ] || { kept; exit 1; }
+[ "$(kept)" = "etc/config/network etc/dropbear/authorized_keys " ] && [ ! -e "$dir/mnt/x28-keep-a.tgz" ] && [ ! -e "$dir/mnt/x28-keep-b.tgz" ] || { kept; exit 1; }
 # Same image (e.g. back on the old slot): the backup is dropped, the overlay untouched.
 /bin/rm -rf "$dir/mnt/upper"; reset; echo NEW > "$dir/mnt/etc/.extroot-uuid"; cp "$dir/keep.tgz" "$dir/mnt/x28-keep-a.tgz"; do_x28_user_data >/dev/null
 [ ! -e "$dir/mnt/upper/sysupgrade.tgz" ] && [ ! -e "$dir/mnt/x28-keep-a.tgz" ] || exit 1
 # Saved for the other slot, or an archive with ../ or unreadable: nothing restored.
-for bad in b dotdot junk; do
+for bad in b dotdot junk link; do
 	/bin/rm -rf "$dir/mnt/upper"; reset; echo OLD > "$dir/mnt/etc/.extroot-uuid"
 	case $bad in
 		b) cp "$dir/keep.tgz" "$dir/mnt/x28-keep-b.tgz" ;;
 		dotdot) (cd "$dir/src/etc" && tar -czf "$dir/mnt/x28-keep-a.tgz" ../etc/config/network) ;;
 		junk) echo junk > "$dir/mnt/x28-keep-a.tgz" ;;
+		link) mkdir -p "$dir/l/etc"; ln -s /nonexistent "$dir/l/etc/inittab"; echo n > "$dir/l/etc/passwd"; (cd "$dir/l" && tar -czf "$dir/mnt/x28-keep-a.tgz" etc) ;;
 	esac
 	do_x28_user_data >/dev/null; [ ! -e "$dir/mnt/upper/sysupgrade.tgz" ] && [ -z "$(ls "$dir/mnt" | grep keep)" ] || { echo "case $bad"; exit 1; }
 done
 # First use of the volume (no tag yet) takes them too.
 /bin/rm -rf "$dir/mnt/upper"; reset; /bin/rm -f "$dir/mnt/etc/.extroot-uuid"; cp "$dir/keep.tgz" "$dir/mnt/x28-keep-a.tgz"; do_x28_user_data >/dev/null
-[ "$(kept)" = "etc/config/network " ] || exit 1
-echo "PASS: user_data attach, new-image reset, boot-tries bypass and every fall-back; kept settings restored only for a new image, minus boot scripts"
+[ "$(kept)" = "etc/config/network etc/dropbear/authorized_keys " ] || exit 1
+echo "PASS: user_data attach, new-image reset, boot-tries bypass and every fall-back; kept settings restored only for a new image, settings and keys only"

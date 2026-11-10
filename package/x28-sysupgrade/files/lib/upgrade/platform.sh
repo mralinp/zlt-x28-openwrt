@@ -170,10 +170,10 @@ platform_pre_upgrade() {
 	# Kept settings (sysupgrade without -n, #477): the backup goes to user_data, the overlay both slots share, for the new image's
 	# preinit (x28-user-data) to restore. /overlay is that volume's root only when its extroot tag is there; otherwise none are kept.
 	if [ -n "$X28_UP_OVERLAY" ]; then
-		rm -f "$X28_UP_OVERLAY"/x28-keep-*.tgz
+		rm -f "$X28_UP_OVERLAY"/x28-keep-*.tgz "$X28_UP_OVERLAY/x28-keep.new"
 		if [ -n "$t" ] && [ -s "$UPGRADE_BACKUP" ] && [ -f "$X28_UP_OVERLAY/etc/.extroot-uuid" ]; then
 			cp "$UPGRADE_BACKUP" "$X28_UP_OVERLAY/x28-keep.new" && mv "$X28_UP_OVERLAY/x28-keep.new" "$X28_UP_OVERLAY/x28-keep-${t%% *}.tgz" &&
-				sync && x28_log "settings kept for slot ${t%% *}"
+				sync && x28_log "settings kept for slot ${t%% *}" || rm -f "$X28_UP_OVERLAY/x28-keep.new"
 		fi
 	fi
 	[ -n "$keep" ] || return 0
