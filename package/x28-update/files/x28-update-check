@@ -15,7 +15,9 @@ grep -q '"latest"' "$CACHE" 2>/dev/null && ttl=360
 semver() { grep -x '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*'; }
 newest() { sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1; }
 
-cur=$(semver 2>/dev/null < "$RELEASE")
+# A develop image says X.Y.Z-rc.N: its X.Y.Z is what it is measured against, and that release itself is newer than the rc.
+cur=$(grep -x '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(-rc\.[0-9][0-9]*\)\{0,1\}' 2>/dev/null < "$RELEASE")
+base=${cur%%-*}
 # Only the signed name counts: x28-sysupgrade-<ver>-unsigned.tar does not match.
 latest=$($FETCH "https://api.github.com/repos/$REPO/releases?per_page=20" 2>/dev/null |
 	grep -o '"name": *"x28-sysupgrade-[0-9]*\.[0-9]*\.[0-9]*\.tar"' | sed 's/.*sysupgrade-//; s/\.tar"$//' | semver | newest)
@@ -25,7 +27,10 @@ if [ -z "$latest" ]; then
 else
 	newer=false
 	# An unknown running version (an image built before /etc/x28-release) shows the notice too.
-	[ -z "$cur" ] || [ "$(printf '%s\n%s\n' "$cur" "$latest" | newest)" != "$cur" ] && newer=true
+	if [ -z "$cur" ]; then newer=true
+	elif [ "$latest" = "$base" ]; then [ "$cur" = "$base" ] || newer=true
+	elif [ "$(printf '%s\n%s\n' "$base" "$latest" | newest)" = "$latest" ]; then newer=true
+	fi
 	out="{\"current\":\"$cur\",\"latest\":\"$latest\",\"newer\":$newer,\"page\":\"https://github.com/$REPO/releases/tag/v$latest\",\"url\":\"https://github.com/$REPO/releases/download/v$latest/x28-sysupgrade-$latest.tar\"}"
 fi
 echo "$out" > "$CACHE.$$" && mv "$CACHE.$$" "$CACHE"

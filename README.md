@@ -240,8 +240,8 @@ Start with [docs/TESTING.md](docs/TESTING.md) for evidence and [docs/STATUS.md](
 
 ## Releases
 
-A merge to `main` that changes shippable files is released automatically (docs-only and CI-only merges are not). The version comes from the PR title (Conventional Commits:
-`feat` → minor, `type!` → major, otherwise patch); 0.x releases are pre-releases. Each release publishes one
+Work lands on `develop`, and each merge that changes shippable files is released automatically as a `vX.Y.Z-rc.N` pre-release; merging `develop` into `main` releases `vX.Y.Z`, stable from 1.0.0 (docs-only and CI-only merges release nothing). The version comes from the PR title (Conventional Commits:
+`feat` → minor, `type!` → major, otherwise patch); 0.x releases are pre-releases. Routers only offer stable-form releases ([WORKFLOW](docs/WORKFLOW.md)). Each release publishes one
 `x28-assembly-vX.Y.Z.tar.gz` bundle (userspace, package files, kernel modules, extra packages), the image built from it in CI
 (`x28-native-image.tar.gz`, read by the flasher) and a signed `x28-sysupgrade-<version>.tar` for [upgrading](#upgrading) a running unit; see [docs/BUILD.md](docs/BUILD.md). What changed, release by release: [CHANGELOG.md](CHANGELOG.md).
 

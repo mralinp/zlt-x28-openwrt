@@ -48,7 +48,7 @@ docs/
 ├── RECOVERY-BACKUP.md        the verified partition backup and how it is stored
 ├── DEVICE-AUDIT.md           early read-only audit of the stock firmware
 ├── DEVELOPMENT.md            repository layout and local checks
-├── WORKFLOW.md               trunk-based flow, labels, Conventional Commits, release and changelog rules
+├── WORKFLOW.md               develop/main flow, labels, Conventional Commits, release and changelog rules
 ├── COMMUNITY-BRIEF.md        the project's public-facing brief
 ├── research/                 boot-flow, signature, slot-selection and flash-session research and plans
 ├── firmware/                 the stock kernel's embedded config (identical in both slots) and the device tree

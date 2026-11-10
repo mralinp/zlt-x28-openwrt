@@ -41,7 +41,7 @@ jobs:
         env:
           T: ${{ secrets.X28_INPUTS_TOKEN }}
         run: |
-          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "bad tag"; exit 1; }
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || { echo "bad tag"; exit 1; }
           if [ -z "$T" ]; then echo "::warning::X28_INPUTS_TOKEN is not set: no image for $TAG"; echo "ok=false" >> "$GITHUB_OUTPUT"; else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
 
       - uses: actions/checkout@v4

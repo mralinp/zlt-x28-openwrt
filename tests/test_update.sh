@@ -15,6 +15,13 @@ echo "$out" | grep -q '"url":"https://github.com/mralinp/zlt-x28-openwrt/release
 echo 0.10.0 > "$dir/release"; run | grep -q '"newer":false'
 echo 0.11.0 > "$dir/release"; run | grep -q '"newer":false'
 rm "$dir/release"; run | grep -q '"current":"","latest":"0.10.0","newer":true'
+# develop images (X.Y.Z-rc.N): their stable release is newer, a lower stable never is; rc images are never offered
+cp "$dir/api" "$dir/api.stable"; sed 's/"x28-sysupgrade-0.9.0.tar"/"x28-sysupgrade-0.9.0.tar"},{"name":"x28-sysupgrade-0.12.0-rc.1.tar"/' "$dir/api.stable" > "$dir/api"
+echo 0.10.0-rc.2 > "$dir/release"; run | grep -q '"current":"0.10.0-rc.2","latest":"0.10.0","newer":true'
+echo 0.11.0-rc.1 > "$dir/release"; run | grep -q '"latest":"0.10.0","newer":false'
+echo 0.9.0-rc.3 > "$dir/release"; run | grep -q '"newer":true'
+echo 0.10.0-beta > "$dir/release"; run | grep -q '"current":"","latest":"0.10.0","newer":true'   # not a form we publish: unknown
+mv "$dir/api.stable" "$dir/api"
 # cached: a changed API is not asked again within the period
 echo 0.10.0 > "$dir/release"; run >/dev/null; : > "$dir/api"; sh "$check" | grep -q '"latest":"0.10.0"'
 # no signed image, or the fetch fails: no notice, and the error is cached too

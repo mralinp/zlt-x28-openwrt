@@ -1,13 +1,13 @@
 name: Release
 
-# A merge to main that touches the paths below is a release (docs-only and CI-only merges are not; run this by hand to force one): CI and the builds run,
-# the next SemVer is derived from the Conventional Commits since the last vX.Y.Z tag
-# (scripts/release.py), then the tag and a GitHub release are created. 0.x releases are
-# pre-releases. Asset is the OPEN userspace (the flasher lives in mralinp/x28-flasher): vendor files never enter this public repo.
+# A merge to develop or main that touches the paths below is a release (docs-only and CI-only merges are not; run this by hand to force one):
+# CI and the builds run, the next SemVer is derived from the Conventional Commits since the newest vX.Y.Z tag (scripts/release.py),
+# then the tag and a GitHub release are created. develop: vX.Y.Z-rc.N pre-releases. main: vX.Y.Z, stable from 1.0.0 (0.x
+# releases stay pre-releases). Routers only offer vX.Y.Z (x28-update-check). Asset is the OPEN userspace (the flasher lives in mralinp/x28-flasher): vendor files never enter this public repo.
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:  # only what ends up in the release assets: userspace build inputs
       - "tools/build/**"
       - "package/iwinfo-mtwifi/**"
@@ -66,7 +66,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          VERSION="$(python3 scripts/release.py next-version)"
+          VERSION="$(python3 scripts/release.py next-version $([ "$GITHUB_REF_NAME" = main ] || echo --pre))"  # only main cuts X.Y.Z
           echo "Next version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -135,17 +135,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          PRE=""
-          case "$VERSION" in 0.*) PRE="--prerelease" ;; esac
-          cat > notes.md <<'EOF'
-          **Beta pre-release.** The attached assembly bundle holds the open OpenWrt 23.05.5 userspace, our package
+          PRE="--latest=false --prerelease" KIND="Pre-release"
+          case "$VERSION" in 0.*|*-*) ;; *) PRE="--latest" KIND="Stable release" ;; esac
+          echo "**$KIND.**" > notes.md
+          cat >> notes.md <<'EOF'
+          The attached assembly bundle holds the open OpenWrt 23.05.5 userspace, our package
           files, kernel modules and extra packages. It does not boot the X28 by itself: the stock kernel and vendor
           binaries are added by the flasher from your own unit's backup. The native image has been flashed to slot A and boots on one tested unit; flashing it
           is a guarded, owner-approved procedure that needs UART and a verified backup. The flasher is the
           separate mralinp/x28-flasher repo. See docs/BUILD.md,
           docs/RECOVERY.md and CHANGELOG.md.
           EOF
-          gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag --latest=false $PRE
+          gh release create "v$VERSION" assets/* --title "v$VERSION" --notes-file notes.md --generate-notes --verify-tag $PRE
 
   image:
     needs: release

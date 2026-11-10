@@ -1,7 +1,8 @@
 """Release helper used by CI. Standard library only (same rules as the maintainer's MQute).
 
     python3 scripts/release.py check-title "feat(build): attach rootfs to releases"
-    python3 scripts/release.py next-version
+    python3 scripts/release.py next-version          # main: X.Y.Z
+    python3 scripts/release.py next-version --pre    # develop: X.Y.Z-rc.N
     python3 scripts/release.py selftest
 
 Versions follow SemVer and are derived from Conventional Commits since the
@@ -10,8 +11,11 @@ latest ``vX.Y.Z`` tag:
 * ``type!:`` or a ``BREAKING CHANGE:`` footer -> major (minor while < 1.0)
 * ``feat:``                                    -> minor
 * anything else                                -> patch
+* a ``Release-As: X.Y.Z`` footer                  -> exactly that version (e.g. 1.0.0)
 
-The first release is 0.1.0. Every 0.x release is published as a GitHub pre-release.
+The base is the newest stable-form tag (vX.Y.Z, any branch). develop publishes X.Y.Z-rc.N pre-releases
+of the version main will get; main publishes X.Y.Z, stable from 1.0.0 (0.x stays a pre-release).
+develop is merged into main with a merge commit, not squashed, so the tag's commit leads back into develop.
 """
 
 from __future__ import annotations
@@ -54,15 +58,41 @@ def next_version(current, messages):
     return f"{major}.{minor}.{patch + 1}"
 
 
+RELEASE_AS = re.compile(r"^Release-As: *v?(\d+\.\d+\.\d+) *$", re.MULTILINE)
+STABLE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+RC = re.compile(r"^v(\d+\.\d+\.\d+)-rc\.(\d+)$")
+
+
+def key(version):
+    return tuple(int(p) for p in version.split("."))
+
+
+def release_version(current, messages):
+    """next_version, unless a Release-As footer names a higher one."""
+    asked = [m.group(1) for msg in messages for m in RELEASE_AS.finditer(msg)]
+    if asked:
+        want = max(asked, key=key)
+        if current is None or key(want) > key(current):
+            return want
+    return next_version(current, messages)
+
+
+def rc_number(base, tags):
+    return 1 + max((int(m.group(2)) for t in tags if (m := RC.match(t)) and m.group(1) == base), default=0)
+
+
 def _git(*args):
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
-def latest_tag():
-    try:
-        return _git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*").strip() or None
-    except subprocess.CalledProcessError:
-        return None
+def tags():
+    return _git("tag", "-l", "v*").split()
+
+
+def latest_tag(all_tags):
+    """The newest vX.Y.Z by version, from any branch: develop must see main's releases."""
+    stable = [t for t in all_tags if STABLE.match(t)]
+    return max(stable, key=lambda t: key(t[1:])) if stable else None
 
 
 def commit_messages(since):
@@ -80,6 +110,10 @@ def selftest():
     assert next_version("0.2.0", ["fix: a\n\nBREAKING CHANGE: b"]) == "0.3.0"
     assert next_version("1.4.2", ["refactor!: c"]) == "2.0.0"
     assert next_version("1.4.2", []) == "1.4.3"
+    assert release_version("0.79.0", ["feat: x", "chore: go stable\n\nRelease-As: 1.0.0"]) == "1.0.0"
+    assert release_version("1.2.0", ["fix: a\n\nRelease-As: 1.0.0"]) == "1.2.1"  # never backwards
+    tags = ["v0.79.0", "v0.80.0-rc.1", "v0.80.0-rc.2", "v0.9.0", "v0.81.0-rc.7", "feed-2"]
+    assert latest_tag(tags) == "v0.79.0" and rc_number("0.80.0", tags) == 3 and rc_number("0.82.0", tags) == 1
     print("release.py self-check OK")
 
 
@@ -90,10 +124,11 @@ def main(argv):
         print(f"PR title {argv[1]!r} is not a Conventional Commit, e.g. 'feat(build): attach rootfs to releases'.")
         print(f"Allowed types: {', '.join(TYPES)}. Add '!' after the type for breaking changes.")
         return 1
-    if argv == ["next-version"]:
-        tag = latest_tag()
-        current = tag[1:] if tag else None
-        print(next_version(current, commit_messages(tag)))
+    if argv in (["next-version"], ["next-version", "--pre"]):
+        all_tags = tags()
+        tag = latest_tag(all_tags)
+        version = release_version(tag[1:] if tag else None, commit_messages(tag))
+        print(f"{version}-rc.{rc_number(version, all_tags)}" if argv[1:] else version)
         return 0
     if argv == ["selftest"]:
         selftest()
