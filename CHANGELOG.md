@@ -6,6 +6,8 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Use curl for firmware downloads so upgrades work through Passwall2 when uclient-fetch times out; keep transfer errors visible.
+
 - Fix releases shipping the stale slot-A-only module loader: build x28-kmods r3 from current source, restoring Passwall2 transparent proxy on slot B.
 
 ## Milestones

@@ -9,7 +9,7 @@
 REPO=mralinp/zlt-x28-openwrt
 CHECK=${X28_UPG_CHECK:-/usr/libexec/x28-update-check}
 PLATFORM=${X28_UPG_PLATFORM:-/lib/upgrade/platform.sh}
-GET=${X28_UPG_GET:-uclient-fetch -q -T 30 -O}
+GET=${X28_UPG_GET:-curl -fL -sS --connect-timeout 30 --retry 2 -o}
 SYSUPGRADE=${X28_UPG_SYSUPGRADE:-sysupgrade}
 TMP=${X28_UPG_TMP:-/tmp}
 LOG=$TMP/x28-upgrade.log
