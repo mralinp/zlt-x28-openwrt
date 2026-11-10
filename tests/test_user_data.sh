@@ -72,7 +72,7 @@ for bad in b dotdot junk link; do
 	/bin/rm -rf "$dir/mnt/upper"; reset; echo OLD > "$dir/mnt/etc/.extroot-uuid"
 	case $bad in
 		b) cp "$dir/keep.tgz" "$dir/mnt/x28-keep-b.tgz" ;;
-		dotdot) (cd "$dir/src/etc" && tar -czf "$dir/mnt/x28-keep-a.tgz" ../etc/config/network) ;;
+		dotdot) (cd "$dir/src/etc" && tar -P -czf "$dir/mnt/x28-keep-a.tgz" ../etc/config/network) ;;  # -P: GNU tar strips ../ otherwise
 		junk) echo junk > "$dir/mnt/x28-keep-a.tgz" ;;
 		link) mkdir -p "$dir/l/etc"; ln -s /nonexistent "$dir/l/etc/inittab"; echo n > "$dir/l/etc/passwd"; (cd "$dir/l" && tar -czf "$dir/mnt/x28-keep-a.tgz" etc) ;;
 	esac

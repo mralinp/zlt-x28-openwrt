@@ -2,13 +2,13 @@
 
 <h1 dir="rtl" align="right">یادداشت‌های تحریریه مجموعه ZLT X28 برای سیسوگ</h1>
 
-**نویسنده مقالات: علی نادری پاریزی — تاریخ بازبینی منابع: ۲۰۲۶-۱۱-۰۴**
+**نویسنده مقالات: علی نادری پاریزی — تاریخ بازبینی منابع: ۲۰۲۶-۱۱-۱۰؛ چهار قسمت نخست با مبنای تاریخی ۲۰۲۶-۱۱-۰۴**
 
-این پوشه در حال حاضر چهار مقاله Markdown برای بازبینی فنی و تحریریه دارد؛ تعداد نهایی قسمت‌های مجموعه محدود به چهار نیست. عنوان ثابت مجموعه در ابتدای هر مقاله «مهندسی معکوس مودم 5G مدل ZLT X28» است و زیر آن، شماره قسمت و عنوان موضوعی مثل عنوان فصل کتاب می‌آید؛ عبارت «از چهار قسمت» استفاده نمی‌شود. فقط همین پوشه به پروژه افزوده شده است؛ هیچ اتصال به روتر، build فریمور، فلش، تغییر تنظیمات، commit یا push در آماده‌سازی مقالات انجام نشده است. اعداد و نتایج سخت‌افزاری نقل از شواهد موجود پروژه‌اند، نه آزمون تازه این نگارش.
+این پوشه حالا ده مقاله Markdown و یک نقشه مجموعه برای بازبینی فنی و تحریریه دارد. چهار قسمت نخست snapshot تاریخی‌اند و شش قسمت جدید ادامه توسعه تا بازبینی ۲۰۲۶-۱۱-۱۰ را پوشش می‌دهند. عنوان ثابت مجموعه در ابتدای هر مقاله «مهندسی معکوس مودم‌های 5G مدل ZLT X28 و X28 PRO» است و زیر آن، شماره قسمت و عنوان موضوعی مثل عنوان فصل کتاب می‌آید؛ عبارت «از چهار قسمت» استفاده نمی‌شود. فقط همین پوشه به پروژه افزوده شده است؛ هیچ اتصال به روتر، build فریمور، فلش، تغییر تنظیمات، commit یا push در آماده‌سازی مقالات انجام نشده است. اعداد و نتایج سخت‌افزاری نقل از شواهد موجود پروژه‌اند، نه آزمون تازه این نگارش.
 
 <h2 dir="rtl" align="right">مبنا، دامنه و نقشه شواهد</h2>
 
-مبنای ثابت، commit [`b9c1a96`](https://github.com/mralinp/zlt-x28-openwrt/tree/b9c1a96) است. عنوان بعضی سندها تاریخ قدیمی دارد، اما متن آن‌ها به‌روزرسانی‌های بعدی را در خود دارد. اولویت در نتیجه‌گیری: کد و interface فعلی برای رفتار ابزار؛ ثبت آزمون تاریخ‌دار برای نتیجه دستگاه؛ تحلیل artifact برای معماری؛ برنامه و TODO فقط برای کار آینده. نبود شاهد، به موفقیت تعبیر نشده است.
+مبنای چهار قسمت نخست، commit [`b9c1a96`](https://github.com/mralinp/zlt-x28-openwrt/tree/b9c1a96) است. عنوان بعضی سندها تاریخ قدیمی دارد، اما متن آن‌ها به‌روزرسانی‌های بعدی را در خود دارد. اولویت در نتیجه‌گیری: کد و interface فعلی برای رفتار ابزار؛ ثبت آزمون تاریخ‌دار برای نتیجه دستگاه؛ تحلیل artifact برای معماری؛ برنامه و TODO فقط برای کار آینده. نبود شاهد، به موفقیت تعبیر نشده است.
 
 <div dir="rtl" align="center">
 
@@ -34,28 +34,28 @@
 | MT7531AE و اختلاف config با شبکه زنده | [DEVICE-AUDIT](../../docs/DEVICE-AUDIT.md)، [پیش‌نیاز LAN](../../docs/research/live-native-boot-prerequisites.md)، [BUILD](../../docs/BUILD.md) | مشاهده switch و مسیر VLAN؛ از `eth1` فرضی به mapping آزموده‌شده |
 | سابقه LuCI، SSH 2222 و نبود netifd فعال | [luci-fix-notes](../../docs/luci-fix-notes.md)، [luci-on-stock](../../docs/luci-on-stock.md)، [README قدیمی](../../docs/archive/2026-10-20-README.md) | تاریخچه stock؛ نقص روایت دسترسی اولیه با آثار محلی و چت اولیه تکمیل شد؛ بخش بعدی را ببینید |
 | UART، 1.8 V، pinout و 921600 8N1 | [RECOVERY، Verified setup](../../docs/RECOVERY.md)، [لاگ UART](../../docs/research/uart-boot-log.md) | تأیید نهایی متأخر بر candidate و آزمون پیوستگی نادرست مقدم است |
-| ۵۱ پارتیشن و backup | [RECOVERY-BACKUP](../../docs/RECOVERY-BACKUP.md)، [RECOVERY](../../docs/RECOVERY.md)، [dump_partitions.py](../../tools/recovery/dump_partitions.py)، [common.py](../../tools/recovery/common.py) | main data بدون OOB؛ اندازه کل 1,072,168,960 بایت |
-| جدول کامل MTD مقاله دوم | metadata خصوصی `private/recovery/20261020-capture-prepared-20261021/metadata/mtd.txt`؛ تطبیق با [slot_session](../../tools/recovery/slot_session.py) و [RECOVERY](../../docs/RECOVERY.md) | فقط نام، شماره و اندازه منتشر شده؛ فایل خصوصی یا محتوای پارتیشن به مقالات کپی نشده |
-| استخراج UBI/SquashFS و حساسیت حروف | [FIRMWARE-EXTRACTION](../../docs/FIRMWARE-EXTRACTION.md)، [Dockerfile](../../tools/firmware/Dockerfile) | ابزارهای shell داخل container؛ tree استخراجی و firmware خصوصی باقی می‌مانند |
+| ۵۱ پارتیشن و backup | [RECOVERY-BACKUP](../../docs/RECOVERY-BACKUP.md)، [RECOVERY](../../docs/RECOVERY.md)، [dump_partitions.py](https://github.com/mralinp/x28-flasher/blob/main/tools/recovery/dump_partitions.py)، [common.py](https://github.com/mralinp/x28-flasher/blob/main/tools/recovery/common.py) | main data بدون OOB؛ اندازه کل 1,072,168,960 بایت |
+| جدول کامل MTD مقاله دوم | metadata خصوصی `private/recovery/20261020-capture-prepared-20261021/metadata/mtd.txt`؛ تطبیق با [slot_session](https://github.com/mralinp/x28-flasher/blob/main/tools/recovery/slot_session.py) و [RECOVERY](../../docs/RECOVERY.md) | فقط نام، شماره و اندازه منتشر شده؛ فایل خصوصی یا محتوای پارتیشن به مقالات کپی نشده |
+| استخراج UBI/SquashFS و حساسیت حروف | [FIRMWARE-EXTRACTION](../../docs/FIRMWARE-EXTRACTION.md)، [Dockerfile](https://github.com/mralinp/zlt-x28-openwrt/blob/b9c1a96/tools/firmware/Dockerfile) | ابزارهای shell داخل container؛ tree استخراجی و firmware خصوصی باقی می‌مانند |
 | Preloader و LK و A/B | [BOOT-FLOW](../../docs/BOOT-FLOW.md)، [UART](../../docs/research/uart-boot-log.md)، [slot-selection](../../docs/research/slot-selection.md)، [TESTING ۲۷ تا ۲۹](../../docs/TESTING.md) | مدل اولیه tries با مشاهده زنده بعدی تصحیح شده؛ rollback جامع هنوز آزمون نشده |
 | امضای RSA-PSS و SquashFS به طول 31,274,410 | [rootfs-signed-content](../../docs/research/rootfs-signed-content.md)، [content-enforcement](../../docs/research/content-enforcement.md) | بررسی host و live hash؛ احراز metadata از enforcement محتوا تفکیک شده |
 | RootFS جدید با LK و boot اصلی | [BOOT-FLOW، به‌روزرسانی ابتدای سند](../../docs/BOOT-FLOW.md)، [LK authentication](../../docs/research/lk-authentication-ghidra.md) | hash زنده مراحل بوت اصلی؛ فقط دامنه پیکربندی آزمایش‌شده |
 | دو تغییر شاخه در LK | [lk-boot-auth-preview](../../docs/research/lk-boot-auth-preview.md)، [اسکریپت preview](../../tools/firmware/LkBootAuthPreview.java) | تنها database Ghidra؛ binary export و hardware test انجام نشده |
-| DA و نسخه mtkclient و ACK | [RECOVERY](../../docs/RECOVERY.md)، [setup_mtkclient](../../tools/recovery/setup_mtkclient.py)، [نتیجه identical](../../docs/research/patched-identical-write-result.md) | موفقیت نشست خواندن/نوشتن مشخص؛ خطاهای تاریخی به نسخه و ترتیب پروتکل وابسته بودند |
+| DA و نسخه mtkclient و ACK | [RECOVERY](../../docs/RECOVERY.md)، [setup_mtkclient](https://github.com/mralinp/x28-flasher/blob/main/tools/recovery/setup_mtkclient.py)، [نتیجه identical](../../docs/research/patched-identical-write-result.md) | موفقیت نشست خواندن/نوشتن مشخص؛ خطاهای تاریخی به نسخه و ترتیب پروتکل وابسته بودند |
 | restore صفحه تغییرکرده | [changed-page-restore-result](../../docs/research/changed-page-restore-result.md) | صفحه ۴ KiB؛ دو write یک MiB؛ ۱۸ read و stock-B return |
 | محدودیت مستقل Recovery | [recovery-route-proof](../../docs/research/recovery-route-proof.md)، [misc-probe-plan](../../docs/research/misc-probe-plan.md)، [rootfs-a-write-plan](../../docs/research/rootfs-a-write-plan.md) | طرح‌های محدود؛ خرابی misc ممکن است قبل از پنجره USB اثر بگذارد |
-| build و چهار compat library | [BUILD](../../docs/BUILD.md)، [FIRMWARE-INVENTORY](../../docs/FIRMWARE-INVENTORY.md)، [userspace.sh](../../tools/build/userspace.sh)، [stage_native.py](../../tools/build/stage_native.py) | ImageBuilder عمومی + assembly خصوصی؛ تصویر رسمی target برد نیست |
-| نخستین بوت، overlay و boot counter | [first_boot.py](../../tools/build/first_boot.py)، [package_ubi.py](../../tools/build/package_ubi.py)، [x28-bootok](../../package/x28-bootok/files/x28-bootok.init)، [preinit ذخیره‌سازی](../../package/x28-storage/files/x28-user-data.preinit) | UUID و tries اثر واقعی دارند؛ دستور حذف overlay زنده ارائه نشده |
+| build و چهار compat library | [BUILD](../../docs/BUILD.md)، [FIRMWARE-INVENTORY](../../docs/FIRMWARE-INVENTORY.md)، [userspace.sh](../../tools/build/userspace.sh)، [stage_native.py](https://github.com/mralinp/x28-flasher/blob/main/tools/build/stage_native.py) | ImageBuilder عمومی + assembly خصوصی؛ تصویر رسمی target برد نیست |
+| نخستین بوت، overlay و boot counter | [first_boot.py](https://github.com/mralinp/x28-flasher/blob/main/tools/build/first_boot.py)، [package_ubi.py](https://github.com/mralinp/x28-flasher/blob/main/tools/build/package_ubi.py)، [x28-bootok](../../package/x28-bootok/files/x28-bootok.init)، [preinit ذخیره‌سازی](../../package/x28-storage/files/x28-user-data.preinit) | UUID و tries اثر واقعی دارند؛ دستور حذف overlay زنده ارائه نشده |
 | console اولیه و `/dev/console` | [native-image-completeness](../../docs/research/native-image-completeness.md)، [BUILD](../../docs/BUILD.md) | Kernel فاقد devtmpfs؛ askfirst فعلی با getty stock متفاوت است |
 | MIPC، CID، validation، IPv6 | [NATIVE-CELLULAR](../../docs/NATIVE-CELLULAR.md)، [x28_mipc.sh](../../package/x28-mipc/files/x28_mipc.sh)، [x28-modem.init](../../package/x28-modem/files/x28-modem.init)، [تست‌های mocked](../../tests/test_native.py) | پیاده‌سازی و آزمون زنده جدا گزارش شده؛ یک SIM؛ ۳۱ case تاریخی mock |
 | Wi-Fi فعلی و شروع باز | [mtwifi.detect](../../package/x28-wifi/files/mtwifi.detect)، [mtwifi.sh](../../package/x28-wifi/files/mtwifi.sh)، [TESTING ۳۶/۳۸/۳۹](../../docs/TESTING.md) | درایور vendor؛ open default با WPA2 تنظیم‌شده در برخی snapshotها متفاوت است |
 | feed و subset واقعی ipset | [vendor-ipset-packaging](../../docs/research/vendor-ipset-packaging.md)، [signed-package-feed](../../docs/research/signed-package-feed.md)، [kmod stubs](../../package/x28-kmod-stubs/stubs.txt)، [TESTING ۳۶](../../docs/TESTING.md) | نصب موفق، شاهد همه set typeها نیست؛ `hash:ip,mac` غایب |
 | CRC و ماژول‌های بدون version | [kernel-module-crc](../../docs/research/kernel-module-crc.md)، [x28-kmods](../../package/x28-kmods/README.md)، [loader](../../package/x28-kmods/files/x28-kmods.init) | ریسک ABI باقی است؛ محل جدید moduleها بعد از آخرین reboot ثبت‌شده تغییر کرده |
 | VPN و Passwall2، اعداد CPU/سرعت | [TESTING ۳۷ تا ۴۱](../../docs/TESTING.md)، [PASSWALL2](../../docs/PASSWALL2.md) | مسیر، جهت و backend هر عدد در مقاله آمده؛ تخمین ۳۰۰–۴۵۰ با اندازه‌گیری تفکیک شده |
-| guard و ICMP/Direct/localhost | [PASSWALL2](../../docs/PASSWALL2.md)، [x28-killswitch.sh](../../tools/build/x28-killswitch.sh)، [TESTING ۴۰](../../docs/TESTING.md) | همه‌پروتکل/همه‌مبدأ نیست؛ clean-flash و tunnel-down کامل آزمون نشده |
+| guard و ICMP/Direct/localhost | [PASSWALL2](../../docs/PASSWALL2.md)، [x28-killswitch.sh](https://github.com/mralinp/x28-flasher/blob/main/tools/build/x28-killswitch.sh)، [TESTING ۴۰](../../docs/TESTING.md) | همه‌پروتکل/همه‌مبدأ نیست؛ clean-flash و tunnel-down کامل آزمون نشده |
 | soak و حرارت | [TESTING ۳۳](../../docs/TESTING.md)، [THERMAL](../../docs/THERMAL.md)، [HARDWARE](../../docs/HARDWARE.md) | ۲۶٫۶ ساعت مجموع، نه یک اجرای بی‌وقفه ۴۸ساعته؛ وضعیت فن native روشن نیست |
 | upstream و کار آینده | [mainline feasibility](../../docs/research/x28-mainline-kernel-feasibility.md)، [mainline roadmap](../../docs/research/x28-mainline-roadmap.md)، [GPL request](../../docs/research/gpl-source-request.md)، [TASKS](../../docs/TASKS.md) | تحلیل و پیشنهاد؛ نه Linux 6.x بوت‌شده و نه تعهد زمان‌بندی |
-| flasher جدید و حذف Rust | [x28-flasher-binary](../../docs/research/x28-flasher-binary.md)، [طراحی Rust کنارگذاشته‌شده](../../docs/research/rust-flasher-design.md)، [launcher فعلی](../../tools/x28-flasher/x28_flasher.py) | ابزار فعلی front end بر recovery است؛ frozen binary هنوز مبنای راهنمای نوشتن عمومی قرار نگرفت |
+| flasher جدید و حذف Rust | [x28-flasher-binary](../../docs/research/x28-flasher-binary.md)، [طراحی Rust کنارگذاشته‌شده](../../docs/research/rust-flasher-design.md)، [launcher فعلی](https://github.com/mralinp/x28-flasher/blob/main/tools/x28-flasher/x28_flasher.py) | ابزار فعلی front end بر recovery است؛ frozen binary هنوز مبنای راهنمای نوشتن عمومی قرار نگرفت |
 
 </div>
 
@@ -194,5 +194,63 @@
 <h2 dir="rtl" align="right">نتیجه کنترل نهایی</h2>
 
 کنترل تحریریه شامل پیوستگی چهار قسمت، حجم، تمایز وضعیت تاریخی و فعلی، منابع claims، مسیرهای Markdown و تصویر، دستورهای موجود و افشای اطلاعات بود. جدول پارتیشن با metadata نمونه و مجموع اندازه تطبیق می‌شود. اعداد benchmark با TESTING مقایسه شده‌اند. هیچ تست firmware یا اتصال live برای تأیید دوباره نتایج اجرا نشده است. مجموعه برای **بازبینی انسانی پیش از انتشار** آماده است؛ تأیید برق UART و موارد مشخص‌شده بالا همچنان به نویسنده نیاز دارد.
+
+
+<h2 dir="rtl" align="right">گسترش مجموعه در ۲۰۲۶-۱۱-۱۰؛ از دسترسی اولیه تا نگهداری فریمور</h2>
+
+مبنای بازبینی شش فصل تازه، درخت محلی commit `e1ded5c`، کد و test log موجود و به‌روزرسانی هم‌زمان اسناد وضعیت در ۲۰۲۶-۱۱-۱۰ است. تغییرهای خارج از articles/sisoog که در working tree دیده می‌شوند، کار این بازبینی نیستند و دست نخورده‌اند. به‌جای تکیه بر شماره release قدیمی در README یا STATUS، ادعاهای تازه با MODULES، PACKAGE-FEED، TESTING بخش‌های ۴۲ تا ۵۳، پیاده‌سازی platform.sh و workflowهای Image و Sign image تطبیق داده شدند. در این کار هیچ تست دستگاهی یا اجرای workflow انجام نشد.
+
+تأیید نویسنده در همین گفت‌وگو، ۲۰۲۶-۱۱-۱۰: Tozed، SDK را در اختیار پروژه گذاشته است. تشکر از شرکت در نقشه مجموعه و فصل‌های ۵ و ۱۰ آمده؛ تاریخ تحویل، نسخه کامل SDK، دسترسی عمومی، اجازه توزیع تمام اجزا یا حمایت رسمی از فریمور استنباط نشده است. متن قدیمی درخواست source در docs/research/gpl-source-request.md سابقه است و به‌تنهایی وضعیت فعلی دریافت SDK را توصیف نمی‌کند.
+
+<div dir="rtl" align="center">
+
+| فصل تازه | مسئله و آموزش | منابع اصلی و محدودیت |
+| ---: | ---: | ---: |
+| ۵. SDK و driver | toolchain، ABI، MODVERSIONS، مصرف‌کننده module و خطای NCM | MODULES، BUILD، package/x28-kmods؛ driver مودم و Wi-Fi بازنویسی‌شده یا mainline معرفی نشده‌اند |
+| ۶. feed | سه حالت capability موجود، module ساخته‌شده و dependency پشتیبانی‌نشده؛ امضا و نسخه | PACKAGE-FEED، release_check، feed_release، TESTING ۴۵ تا ۵۰؛ بازکامپایل همه بسته‌ها ادعا نشده |
+| ۷. X28 و PRO | تشخیص PCI، تک‌کارت/دوکارت، زمان شروع DHCP و تست هم‌شرط | MODULES، BUILD، TESTING ۴۲ تا ۴۴ و ۵۱؛ سایر rebrandها و همه benchmarkهای PRO تأیید نشده |
+| ۸. امضای تصویر | hash، board metadata، fwtool/usign/ucert و signer جدا | image_sign.sh، image.yml، sign-image.yml، TESTING ۵۳d؛ CI کامل، انقضا و revocation آزموده‌شده معرفی نشده |
+| ۹. ارتقای A/B | target غیرجاری، RAM root، verify منطقی و misc | platform.sh، sysupgrade-design، TESTING ۵۲ و ۵۳؛ آزمایش تاریخی درجا با سیاست جدید #509 تفکیک شده |
+| ۱۰. انتشار | ورودی عمومی/خصوصی، assembly، clean flash، upgrade و OTA | workflowها، BUILD، PACKAGE-FEED، TESTING؛ وجود فایل CI به‌عنوان اجرای موفق یا OTA آماده گزارش نشده |
+
+</div>
+
+<h3 dir="rtl" align="right">اختلاف منابع که در روایت حل شد</h3>
+
+- در آغاز بازبینی، STATUS با تاریخ ۸ نوامبر و بعضی جدول‌ها sysupgrade را آینده می‌دانستند؛ هنگام نگارش، STATUS و overviewها به ۱۰ نوامبر به‌روز شدند. TESTING در ۹ نوامبر آزمون واقعی ۵۳ و ۵۳d را ثبت کرده است. فصل‌های تازه این شاهدها و وضعیت جدید را بیان می‌کنند، بدون تعمیم به OTA بی‌حضور کاربر.
+- امضای feed، امضای sysupgrade و امضای vendor در LK مستقل توضیح داده شده‌اند. امضای پروژه، امضای Tozed یا secure boot کامل معرفی نشده است.
+- policy فعلی x28_target در platform.sh همیشه slot غیرجاری را انتخاب می‌کند؛ آزمون‌های قدیمی شامل in-place و marker انتخاب B بوده‌اند. پذیرش و چرخه امضاشده ۵۳d شاهد نسخه آزمایش‌شده است، نه تأیید سخت‌افزاری تمام revisionهای بعدی.
+- نوشتن native روی B، stock داخلی را حذف می‌کند؛ عبارت قدیمی «B همیشه stock است» فقط در مرحله اولیه معنا دارد.
+- SDK، ImageBuilder و بازکامپایل module تفکیک شده‌اند. بسته‌های userspace رسمی که آماده مصرف می‌شوند، به‌عنوان ساخته‌شده از source توسط پروژه معرفی نشده‌اند.
+- فرمان‌های source قدیمی در چهار مقاله نخست تاریخی باقی مانده‌اند و banner دارند. لینک ابزارهایی که منتقل شده‌اند به مخزن x28-flasher هدایت شده است؛ دسترسی عمومی آن مخزن پیش از انتشار باید بررسی شود.
+
+
+**لایه update تازه:** package/x28-update، ابزار x28-upgrade، check نسخه، اعلان و پنجره تأیید LuCI و tests/test_update.sh نیز خوانده شدند. حالت بدون آرگومان فقط check با درخواست شبکه و cache است؛ حالت -y دانلود، checksum، sysupgrade -T و سپس -n را اجرا می‌کند. هیچ‌کدام در تهیه مقاله اجرا نشدند. تفکیک پیاده‌سازی host-tested از آزمون دستگاه در فصل‌های ۹ و ۱۰ و نقشه مجموعه اضافه شد. «Nothing upgrades on its own» در STATUS فعلی، مبنای پرهیز از ادعای OTA بدون تأیید است.
+
+<h3 dir="rtl" align="right">عنوان و توضیح پیشنهادی برای جست‌وجو؛ فصل‌های تازه</h3>
+
+- **۵ — ساخت درایور برای ZLT X28 با SDK؛ سازگاری Kernel و ABI:** چرا module برای ARM64 کافی نیست و چطور driver ساخته‌شده روی Kernel واقعی آزموده می‌شود؟
+- **۶ — ساخت feed امضاشده OpenWrt برای X28 و X28 PRO:** dependencyها، kmodهای واقعی و stubها، نسخه‌گذاری و انتشار امن packageها.
+- **۷ — تفاوت X28 و X28 PRO در پورت OpenWrt:** پروفایل Wi-Fi، تشخیص PCI و رفع خطای DHCP بدون دست‌زدن به calibration واحد دیگر.
+- **۸ — امضای فریمور OpenWrt با fwtool و ucert:** فرق hash و امضا، گواهی signer و بررسی تصویر پیش از نوشتن.
+- **۹ — ارتقای A/B در ZLT X28؛ sysupgrade و Recovery:** چرا verify تصویر باید پیش از تغییر misc باشد و کدام آزمون‌ها واقعاً انجام شده‌اند؟
+- **۱۰ — انتشار و نگهداری فریمور سفارشی X28:** از SDK و assembly تا CI، feed، آزمون دستگاه واقعی و مسیر آینده OTA.
+
+<h3 dir="rtl" align="right">بازبینی انتشار این گسترش</h3>
+
+فصل‌های تازه متن آموزشی مستقل دارند و برای پرکردن تعداد کلمه، مراحل یا نتایج تکراری اضافه نشده است. اندازه آن‌ها از هدف تقریبی ۲۰۰۰ تا ۳۵۰۰ واژه درخواست اولیه کوتاه‌تر است؛ برای انتشار می‌توان مباحث امضا و A/B را جدا حفظ کرد یا با نظر نویسنده به متن‌های بلندتر گسترش داد. فرمان‌های فلش خودکار و داده خصوصی اضافه نشده‌اند. نمودار جریان در فصل ۹، متن تألیفی در بلوک LTR است و لاگ واقعی معرفی نشده.
+
+عکس تازه یا screenshot ساختگی اضافه نشده است؛ عکس‌های واقعی چهار قسمت نخست حفظ شده‌اند. برای فصل‌های تازه، screenshot پالایش‌شده Software/LuCI، Carrier و دو رادیوی PRO، نمونه metadata بدون secret، خروجی رد امضای نامعتبر و capture چرخه A/B می‌تواند با شاهد واقعی و اجازه نویسنده اضافه شود. تا آن زمان، جدول‌ها و کدها محتوای آموزشی اصلی‌اند.
+
+پیش از انتشار: نسخه نهایی release و index feed تثبیت شود؛ هویت board_name برای PRO از حدس جدا بماند؛ دامنه آزمون policy جدید A/B و حفظ config بررسی شود؛ اجازه بازنشر تصویرها و اجزای vendor مستقل از تشکر بابت SDK بررسی شود. گزارش انقضا، revoke، قطع برق، fallback tries-6 و OTA سرتاسری بدون شاهد تازه به متن افزوده نشود.
+
+
+<h2 dir="rtl" align="right">بازنگری جریان آموزشی؛ پیش از بازنویسی بعدی</h2>
+
+درخواست تازه نویسنده: مجموعه باید تجربه ساخت یه دستگاه Embedded Linux رو منتقل کنه و هر پیشرفت عمده یه قسمت داشته باشه؛ تعریف روشن Preloader، LK، کنترل امضا، Device Tree و ABI پیش از استفاده لازم است. [طرح دوازده‌قسمتی](revision-plan.md) به‌همراه [دفتر شواهد issueها](revision-evidence.md) برای همین مرحله آماده شد. کیفیت و محتوای مفید قسمت‌های ۱ تا ۵ حفظ می‌شود؛ فصل‌های متراکم NAND/boot و build/network تقسیم می‌شوند و بخش‌های بعدی با مسئله، مشاهده، شکست، اصلاح و معیار موفقیت بازنویسی خواهند شد.
+
+نویسنده تأیید کرد v0.78 در حال ساخت CI است؛ در بررسی فعلی artifact آن هنوز در release list قابل مشاهده نبود. نبود artifact در این زمان، شکست CI معرفی نشده و موفقیت یا تست واحد برای آن فرض نشده است. مرجع محلی جدید 9d0f8a0 است؛ مبنای قدیمی شش فصل قبلی با این تغییر بی‌صدا عوض نشده است.
+
+این گام فقط طراحی و تطبیق شواهد است؛ متن و شماره‌بندی ده مقاله هنوز بازنویسی نشده‌اند. برنامه مستقل tasks/plan.md و وضعیت issueهای GitHub تغییر نکرده‌اند. پس از مرور این flow، بسته‌های بازنویسی و معیارهای پذیرش در خود طرح مشخص‌اند.
 
 </div>
