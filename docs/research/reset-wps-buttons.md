@@ -35,7 +35,10 @@ for UART logging. It does not restore stock firmware.
 
 The unit kept running (no reboot, no log line, watchdog still kicked) through every press.
 
-## Why nothing reacts on the native image
+## Why nothing reacted on the native image
+
+Since #551 `x28-wps` also follows the reset key and a 10 s hold runs the image's own `firstboot` ([RECOVERY.md](../RECOVERY.md)).
+Before that:
 
 - OpenWrt's `/etc/rc.button/reset` is installed (tap reboots, 5 s hold runs `jffs2reset -y`) but button hotplug never fires:
   the kernel's input devices are only `mtk-kpd` and `mtk-pmic-keys`, no gpio-keys device.

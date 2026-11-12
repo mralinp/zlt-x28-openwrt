@@ -512,11 +512,21 @@ exact-scope approval. The test did not boot changed certificates or a custom roo
 
 ## Clearing settings when the overlay is on `user_data` (#183)
 
-The native image keeps its overlay on `user_data`'s `data` volume, so the usual resets don't reach it:
+The native image keeps its overlay on `user_data`'s `data` volume, which OpenWrt's own reset (`jffs2reset`) does not reach. The
+image's `/sbin/firstboot` (`x28-storage`, #551) does: it marks the volume and the next boot removes the overlay, settings and
+installed packages alike (a live `upper` is never deleted). Three ways to the same factory reset:
 
-- The reset button and `firstboot` clear only `rootfs_data`. Reflashing identical image bytes keeps the overlay; an image with a
-  different root UUID starts it fresh.
-- Over SSH, let the next boot wipe it (never delete a live `upper`): `echo reset > /overlay/etc/.extroot-uuid && sync && reboot`.
+- **Reset button:** hold it for 10 s with the unit running; the front LEDs blink and the unit reboots. A tap or a shorter hold
+  does nothing, a button that is already down when the unit starts is ignored, and so is a hold begun in the first 3 minutes
+  after boot (the boot counter is still being reset). Do not hold it while powering on (untested).
+- **LuCI:** System > Backup / Flash Firmware > Perform reset.
+- **SSH:** `firstboot -y -r` (the same as `echo reset > /overlay/etc/.extroot-uuid && sync && reboot`).
+
+After it the unit is as freshly flashed: empty root password, default LAN address, a new Wi-Fi key and host key. On a fall-back
+boot (below) the overlay is `rootfs_data`, so all three clear only that and `user_data` keeps its overlay: use the clean-up
+command below. Otherwise:
+
+- Reflashing identical image bytes keeps the overlay; an image with a different root UUID starts it fresh.
 - No SSH: from slot A's third boot try on, the preinit hook leaves `user_data` alone and `rootfs_data` boots, reachable with the
   image's SSH key. LuCI's password is empty there, Wi-Fi has a new key and the host key differs, until the next normal boot.
 - Clean up from such a boot: `ubiattach /dev/ubi_ctrl -m <user_data mtd> -d 1; mkdir -p /tmp/ud && mount -t ubifs /dev/ubi1_2 /tmp/ud && rm -rf /tmp/ud/upper /tmp/ud/work /tmp/ud/etc/.extroot-uuid /tmp/ud/.fs_state; umount /tmp/ud`.

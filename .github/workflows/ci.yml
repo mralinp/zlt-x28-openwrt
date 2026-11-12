@@ -54,3 +54,4 @@ jobs:
       - run: sh tests/test_sysupgrade.sh
       - run: sh tests/test_update.sh
       - run: sh tests/test_user_data.sh
+      - run: sh tests/test_firstboot.sh

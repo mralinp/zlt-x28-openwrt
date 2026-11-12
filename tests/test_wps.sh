@@ -20,4 +20,16 @@ c_radio_5g_disabled=1
 [ -z "$(net b)" ] || exit 1  # its radio is disabled
 # wps_down <event> <key>: only the WPS key-down (the driver also reports key-up, and the reset button as key 1).
 wps_down 1 2 && ! wps_down 2 2 && ! wps_down 1 1 && ! wps_down 2 1 || exit 1
+# reset_step <event> <key> <ms>: the reset hold (#551). Time is faked: T is "now" in seconds.
+T=1100; now() { echo $T; }
+down_up() { reset_step "$@" || :; }                      # key-down and key-up only move the state
+hold() { T=$(($1 + $3 / 1000)); reset_step 3 "$2" "$3"; }   # a tick read on time, for a hold that began at $1
+down_up 1 1 0; ! hold 1100 1 4000 && ! hold 1100 1 9000 && hold 1100 1 10000 || exit 1  # fires at the 10 s tick
+! hold 1100 1 11000 || exit 1                                                             # once per hold
+T=200; down_up 1 1 0; ! hold 200 1 9000 || exit 1; down_up 2 1 9400; ! hold 200 1 10000 || exit 1  # released before 10 s
+T=300; down_up 1 2 0; ! hold 300 2 10000 || exit 1                                    # the WPS key never resets
+T=100; down_up 1 1 0; ! hold 100 1 10000 || exit 1                                    # too soon after boot (x28-bootok)
+reset_t0=; T=400; ! reset_step 3 1 60000 || exit 1                                       # down since boot: no key-down seen
+T=500; down_up 1 1 0; ! reset_step 3 1 40000 || exit 1; T=520; ! reset_step 3 1 60000 || exit 1  # a stale key-down from the queue
+echo "PASS: the reset button resets only at 10 s of a hold this service watched from its key-down"
 echo "PASS: WPS button opens only enabled WPA2-PSK access-point networks, on its own key-down"

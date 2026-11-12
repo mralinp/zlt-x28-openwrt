@@ -160,9 +160,9 @@ def tar_gz(files, dirs=False):
     return buf.getvalue()
 
 
-def stub(name, depends, description, files=(), arch='all', scripts=(), version=VERSION):
+def stub(name, depends, description, files=(), arch='all', scripts=(), version=VERSION, replaces=''):
     control = ''.join(f'{k}: {v}\n' for k, v in (
-        ('Package', name), ('Version', version), ('Depends', depends), ('Section', 'kernel'), ('Architecture', arch),
+        ('Package', name), ('Version', version), ('Depends', depends), ('Replaces', replaces), ('Section', 'kernel'), ('Architecture', arch),
         ('Installed-Size', str(sum(len(f[1]) for f in files))), ('Description', description)) if v)
     ipk = tar_gz([('./debian-binary', b'2.0\n'), ('./data.tar.gz', tar_gz(list(files), dirs=True)),
                   ('./control.tar.gz', tar_gz([('./control', control.encode())] + [('./' + s[0], s[1], s[2] if len(s) > 2 else 0o755) for s in scripts]))])
@@ -170,7 +170,7 @@ def stub(name, depends, description, files=(), arch='all', scripts=(), version=V
 
 
 def read_packages(spec=PACKAGES, root=None):
-    """The x28-* packages of package/x28-packages.ini as build() entries: (name, depends, description, files, arch, scripts, version).
+    """The x28-* packages of package/x28-packages.ini as build() entries: (name, depends, description, files, arch, scripts, version, replaces).
     Every /etc/init.d script is enabled when the package is installed on a running system and disabled when it is removed."""
     root = pathlib.Path(root) if root else pathlib.Path(spec).parent
     cp = configparser.ConfigParser(interpolation=None)
@@ -194,7 +194,7 @@ def read_packages(spec=PACKAGES, root=None):
         if conf:
             scripts.append(('conffiles', ''.join(c + '\n' for c in conf).encode(), 0o644))
         out.append((name, ', '.join(s.get('depends', '').split()), ' '.join(s['description'].split()), files, 'all', scripts,
-                    f"{s['version']}-{s['release']}"))
+                    f"{s['version']}-{s['release']}", ', '.join(s.get('replaces', '').split())))
     return out
 
 
@@ -241,7 +241,7 @@ def build(names, out, real=(), loader=None, packages=()):
     pkgs += list(packages)
     for name, depends, description, *rest in pkgs:
         version = VERSION if not rest else rest[3] if len(rest) > 3 else f'{VERSION}-r{REV}'
-        control, ipk = stub(name, depends, description, *rest[:3], version=version)
+        control, ipk = stub(name, depends, description, *rest[:3], version=version, replaces=rest[4] if len(rest) > 4 else '')
         filename = f'{name}_{version.split(":")[-1]}_{"all" if not rest else rest[1]}.ipk'
         (out / filename).write_bytes(ipk)
         head = control[:control.index('Description: ')]

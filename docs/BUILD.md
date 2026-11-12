@@ -393,9 +393,14 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
 - **WPS push button (#262):** off unless a network has `wps_pushbutton '1'` (a checkbox on the Wireless Security tab, offered for
   WPA2-PSK and WPA2/WPA3 mixed mode; WPS cannot give out a WPA3-only key). `/sbin/x28-wps` (procd, `S97x28-wps`) reads the Tozed
-  button driver `/dev/tz_gpio_keys` (`[event, key, ms]` words: event 1 is key-down and 2 key-up, key 2 is the WPS button and key 1 reset, `ms` is the hold time on key-up) and on a press
+  button driver `/dev/tz_gpio_keys` (`[event, key, ms]` words: event 1 is key-down and 2 key-up, key 2 is the WPS button and key 1 reset, `ms` is the hold time on key-up; event 3 repeats once a second while a key is held) and on a press
   drives `iwpriv` (`WscConfMode=7`, `WscMode=2`, `WscGetConf=1`) for two minutes on each enabled network, then `WscStop`. The stock
   profiles keep `WscConfMode=0`, so nothing offers WPS between presses. Not verified: pairing with a client (see #262).
+- **Reset button (#551):** the same reader follows key 1: at the first hold tick at or past 10 s it blinks the front LEDs
+  (`x28-leds blink`) and runs `firstboot -y -r`, the factory reset. Only a hold whose key-down it read counts, and only while the
+  driver's hold time matches the time since then, so a button down at boot or stale queued records don't reset; holds begun in the
+  first 180 s of uptime are ignored, so the reboot never lands before `x28-bootok` reset the tries. Not verified on
+  a unit: ticks past 8.5 s, and the reset itself (see the PR).
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate (the rate is read as unsigned: the driver keeps bits per second in a signed 32-bit field, and the X28 PRO's 4-stream 80 MHz rate of about 2.4 Gbit/s wraps negative, which showed as "?" in LuCI), per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
@@ -417,8 +422,9 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   doesn't mount, `rootfs_data` serves as before; so it does from slot A's third boot try on, so a bad overlay can't run the
   tries up to stock B's repair (a persistent fault cycles bad, bad, good). `block` binds the overlay to the image's root UUID, so
   the hook starts the overlay fresh on a new image, as flashing does to `rootfs_data`. The image ships only `ubiattach` and
-  `ubinfo` of `ubi-utils`; `ab_guard` allows `ubiattach` in that one file only. Limits, see `docs/RECOVERY.md`: the reset button
-  and `firstboot` don't clear this overlay, reflashing identical bytes keeps it, and a fall-back boot has `rootfs_data`'s own
+  `ubinfo` of `ubi-utils`; `ab_guard` allows `ubiattach` in that one file only. `/sbin/firstboot` is ours
+  (#551): `jffs2reset` doesn't reach this overlay, so it marks the volume and the hook removes the overlay at the next boot; LuCI's
+  "Perform reset" and the reset button call it. Limits, see `docs/RECOVERY.md`: reflashing identical bytes keeps the overlay, and a fall-back boot has `rootfs_data`'s own
   settings (LuCI password empty, new Wi-Fi key and host key). Keep free space on it: stock B's `/data` is the same volume.
 - **Modem at boot (#131):** `package/x28-modem` (`S19x28-modem`, before network) creates the `/dev/mtd/<name>` and
   `/dev/block/<name>` links from `/proc/mtd` plus active-slot aliases, mounts the vendor yaffs2 partitions, starts the
