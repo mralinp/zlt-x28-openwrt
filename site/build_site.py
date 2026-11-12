@@ -34,7 +34,8 @@ def tests():
             rows.append({'n': c[0], 'name': c[1], 'date': c[2], 'result': c[3]})
     ok = sum(r['result'].startswith('✅') for r in rows)
     bad = sum(r['result'].startswith('❌') for r in rows)
-    return {'total': len(rows), 'passed': ok, 'failed': bad, 'other': len(rows) - ok - bad, 'recent': rows[-8:][::-1]}
+    sup = sum(r['result'].startswith('↪') for r in rows)
+    return {'total': len(rows), 'passed': ok, 'failed': bad, 'superseded': sup, 'other': len(rows) - ok - bad - sup, 'recent': rows[-8:][::-1]}
 
 
 def feed():

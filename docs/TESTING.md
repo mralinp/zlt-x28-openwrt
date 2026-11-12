@@ -5,6 +5,7 @@ Written for whoever picks this up later with no memory of the sessions: start he
 anywhere else in the repo.
 
 Conventions:
+- **Result marks**: ✅ passed, ❌ failed, ↪ the check failed as written and a later test replaced it (the row names it). The record is kept as it was run.
 - **Tool paths**: commands named `tools/recovery/...` and `tools/x28-flasher/...` ran from this repo until 2026-11-06; those tools now live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (#343, #351). The records below are kept as they were run.
 - **Device**: one ZLT X28, kernel 4.19.205. Tests 1–22 ran on the stock firmware (OEM 1.5.13, OpenWrt 19.07-derived, active slot **B**); tests 23–31 ran on the native image on slot **A**.
 - **Host**: Apple Silicon Mac (macOS), Docker Desktop (arm64 Linux, plus x86_64 emulation).
@@ -47,7 +48,7 @@ Conventions:
 | 29 | Live `misc` byte writes with the stock `dd-nand` | 2026-10-29 | ✅ identical-value test, then A tries 5 → 0 in four copies; the full 1 MiB compared byte for byte after every write | this page |
 | 30 | Temperature and idle load on the native image | 2026-10-29 | ✅ SoC 40 °C, CPU 97 % idle (stock: 65 °C idle without fan) | [THERMAL](THERMAL.md) |
 | 31 | Proxy tunnel speed and CPU (xray on a local SOCKS port) | 2026-11-01 | ✅ about 0.45 cores per 100 Mbit/s, so an estimated 300–450 Mbit/s ceiling on 4 cores; Passwall2 itself not enabled | [PASSWALL2](PASSWALL2.md) |
-| 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ❌ 19 of 35 needed symbols differ and 2 aren't exported; built without CRCs they do load (39) | [kernel-module-crc](research/kernel-module-crc.md) |
+| 32 | TPROXY module CRCs against the stock kernel (offline) | 2026-11-01 | ↪ superseded: 19 of 35 needed symbols differ and 2 aren't exported, so the modules are built without CRCs; they load and Passwall2 runs on them (39), as feed packages (47) | [kernel-module-crc](research/kernel-module-crc.md) |
 | 33 | Soak of slot A | 2026-11-01 | ✅ 26.6 h of the planned 48 h, stopped by the owner: no unexplained restart, WAN up throughout; available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)) | this page |
 | 34 | opkg stub feed with the image's real opkg (chroot) | 2026-11-01 | ✅ 19 of 19 checks: available stubs/userspace install; incomplete `ipset`, `kmod-nft-core` and `iptables-mod-tproxy` are refused; not yet on a unit | [BUILD](BUILD.md#opkg-feed-for-the-vendor-kernel-200) |
 | 35 | Explicit vendor-ipset dependency chain (#200), disposable container | 2026-11-01 | ✅ signed update, invalid-signature rejection, install/remove/reinstall; unchanged upstream payloads; full aggregate refused; not on device | [Evidence](research/vendor-ipset-packaging.md) |

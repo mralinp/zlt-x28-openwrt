@@ -157,7 +157,7 @@ fetch("stats.json").then(r=>r.json()).then(s=>{
  set("fw",s.firmware.tag);set("flasher",s.flasher.tag);set("feed",n(s.feed.packages));set("tests",`${t.passed}/${t.total}`);
  $("#fl-tag").textContent=s.flasher.tag;$("#fw-tag").textContent=s.firmware.tag;rows("#fl-assets",s.flasher);rows("#fw-assets",s.firmware);
  $("#feed-info").textContent=`${s.feed.packages} packages (${s.feed.tag}).`;
- $("#t-sum").innerHTML=`${t.passed} of ${t.total} passed${t.failed?`, <span class="bad">${t.failed} failed</span>`:""}${t.other?`, <span class="wn">${t.other} partial or open</span>`:""}`;
+ $("#t-sum").innerHTML=`${t.passed} of ${t.total} passed${t.failed?`, <span class="bad">${t.failed} failed</span>`:""}${t.superseded?`, ${t.superseded} superseded`:""}${t.other?`, <span class="wn">${t.other} partial or open</span>`:""}`;
  $("#t-bar").style.width=(100*t.passed/t.total)+"%";
  $("#t-rows").innerHTML=t.recent.map(r=>`<tr><td>#${esc(r.n)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.result.slice(0,90))}</td></tr>`).join("");
  $("#built").textContent="Data: "+s.built;
