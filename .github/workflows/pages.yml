@@ -1,0 +1,40 @@
+# The project landing page (GitHub Pages): site/ + live stats + a mirror of the newest signed feed-N release at /feed.
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions". Feed URL: https://mralinp.github.io/zlt-x28-openwrt/feed
+name: pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"  # download counts and stars
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml", "docs/TESTING.md"]
+  release:
+    types: [published, edited]  # a new firmware, flasher or feed-N release
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 site/build_site.py _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

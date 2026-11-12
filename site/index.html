@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X28 OpenWrt</title>
+<meta name="description" content="OpenWrt 23.05.5 for the ZLT X28 and X28 PRO 5G routers: flasher, firmware downloads, signed package feed, hardware, plan and test evidence.">
+<link rel="icon" href="favicon.svg">
+<style>
+:root{--bg:#fff;--fg:#14181f;--mut:#5b6573;--card:#f5f7fa;--line:#e2e7ee;--acc:#0b63ce;--accfg:#fff;--ok:#127a3d;--warn:#9a6700;--bad:#c4281c;--code:#eef1f5}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e8ecf1;--mut:#9aa5b3;--card:#171c24;--line:#262d38;--acc:#5aa2ff;--accfg:#0b1220;--ok:#4cc27c;--warn:#e3b341;--bad:#ff7b72;--code:#1d232c}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--acc)}code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em}
+.w{max-width:1040px;margin:0 auto;padding:0 16px}
+nav{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:5}
+nav .w{display:flex;align-items:center;gap:20px;height:52px;overflow-x:auto;white-space:nowrap}
+nav b{display:flex;align-items:center;gap:8px}nav img{width:24px;height:24px}
+nav a{color:var(--mut);text-decoration:none;font-size:.92rem}nav a:hover{color:var(--fg)}nav .gh{margin-left:auto}
+.hero{padding:56px 0 32px;text-align:center}
+.hero img.logo{width:96px;height:96px}
+h1{font-size:clamp(2rem,5vw,3rem);line-height:1.1;margin:.4em 0 .2em}
+.lead{color:var(--mut);max-width:620px;margin:0 auto 24px;font-size:1.1rem}
+.btn{display:inline-block;padding:10px 18px;border-radius:8px;background:var(--acc);color:var(--accfg);text-decoration:none;font-weight:600;margin:4px}
+.btn.alt{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:32px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center}
+.stat b{display:block;font-size:1.8rem;line-height:1.2}.stat span{color:var(--mut);font-size:.85rem}
+section{padding:36px 0;border-top:1px solid var(--line)}
+h2{font-size:1.5rem;margin:0 0 6px}.sub{color:var(--mut);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card h3{margin:0 0 6px;font-size:1.05rem}.card p{margin:0;color:var(--mut)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-weight:500;width:34%}
+.tw{overflow-x:auto}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;margin:8px 0}
+.warn{border-left:4px solid var(--warn);background:var(--card);padding:12px 16px;border-radius:8px;margin:16px 0}
+ol.steps{padding-left:1.2em}ol.steps li{margin:.5em 0}
+.pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.78rem;border:1px solid var(--line);color:var(--mut)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.wn{color:var(--warn)}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--ok)}
+.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:18px}.shots img{width:100%;border-radius:10px;border:1px solid var(--line)}
+footer{padding:28px 0 48px;color:var(--mut);font-size:.88rem;border-top:1px solid var(--line)}
+button.cp{float:right;font:inherit;font-size:.8rem;padding:2px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);cursor:pointer}
+</style>
+</head>
+<body>
+<nav><div class="w">
+<b><img src="favicon.svg" alt="">X28 OpenWrt</b>
+<a href="#start">Start</a><a href="#downloads">Downloads</a><a href="#hardware">Hardware</a><a href="#feed">Feed</a><a href="#plan">Plan</a><a href="#tests">Tests</a>
+<a class="gh" href="https://github.com/mralinp/zlt-x28-openwrt">GitHub</a>
+</div></nav>
+
+<header class="hero w">
+<picture><source media="(prefers-color-scheme:dark)" srcset="logo-dark.svg"><img class="logo" src="logo.svg" alt="X28 OpenWrt logo"></picture>
+<h1>OpenWrt for the ZLT X28</h1>
+<p class="lead">OpenWrt 23.05.5 with LuCI, 5G, WireGuard and Passwall2 on the X28 and X28&nbsp;PRO, installed and recovered with a guided flasher.</p>
+<a class="btn" href="#downloads">Download</a><a class="btn alt" href="#start">Get started</a><a class="btn alt" href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/README.md">Documentation</a>
+<div class="stats" id="stats" aria-live="polite">
+<div class="stat"><b data-k="stars">…</b><span>GitHub stars</span></div>
+<div class="stat"><b data-k="downloads">…</b><span>total downloads</span></div>
+<div class="stat"><b data-k="fw">…</b><span>latest firmware</span></div>
+<div class="stat"><b data-k="flasher">…</b><span>latest flasher</span></div>
+<div class="stat"><b data-k="feed">…</b><span>feed packages</span></div>
+<div class="stat"><b data-k="tests">…</b><span>tests passed</span></div>
+</div>
+</header>
+
+<main class="w">
+<section id="start">
+<h2>Get started</h2>
+<p class="sub">The flasher is the only supported installation path.</p>
+<ol class="steps">
+<li>Download the <a href="#downloads">flasher</a> for Windows, macOS (Apple silicon) or Linux (.deb or Arch).</li>
+<li>Connect the router with a <b>USB-A to USB-C</b> cable. USB-C to USB-C does not work.</li>
+<li>Follow the guided steps: connect, make a <b>verified full backup</b>, enable root access, prepare the image, flash and pick the boot slot. Keep a second copy of the backup offline.</li>
+<li>After boot open <code>https://192.168.70.1/cgi-bin/luci</code>, accept the self-signed certificate and set a root password.</li>
+</ol>
+<div class="warn"><b>Flashing can brick your router.</b> Never write partitions or change the boot order by hand. Read the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md">recovery guide</a> first.</div>
+<div class="shots"><img src="x28-flasher.png" alt="X28 Flasher application" loading="lazy"><img src="x28-passwall2-luci.png" alt="Passwall2 running in LuCI on the X28" loading="lazy"></div>
+</section>
+
+<section id="downloads">
+<h2>Downloads</h2>
+<p class="sub" id="dl-sub">Latest releases from GitHub.</p>
+<div class="grid">
+<div class="card"><h3>X28 Flasher <span class="pill" id="fl-tag"></span></h3><p>Backup, build and flash, with recovery.</p><div class="tw"><table id="fl-assets"></table></div></div>
+<div class="card"><h3>Firmware <span class="pill" id="fw-tag"></span></h3><p>Image bundle and signed <code>sysupgrade</code> files.</p><div class="tw"><table id="fw-assets"></table></div></div>
+</div>
+<p class="sub" style="margin-top:14px">Verify downloads against the release's <code>SHA256SUMS</code>. Counts include every release since the first.</p>
+</section>
+
+<section id="hardware">
+<h2>Hardware</h2>
+<p class="sub">Measured on a test unit running the native image. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/HARDWARE.md">Full details</a>.</p>
+<div class="grid"><div class="card tw"><table>
+<tr><th>SoC</th><td>MediaTek MT6890 (T750), 4× Cortex-A55, aarch64</td></tr>
+<tr><th>CPU speed</th><td>0.5 to 2.0 GHz, one shared frequency (schedutil)</td></tr>
+<tr><th>Modem</th><td>Quectel RG500L, 5G, on the SoC's modem processor</td></tr>
+<tr><th>Wi-Fi</th><td>MT7915, dual band</td></tr>
+<tr><th>RAM</th><td>1 GiB; Linux gets about 628 MiB, the rest is the modem's</td></tr>
+<tr><th>Flash</th><td>1 GiB NAND, 51 partitions; about 288 MiB for installs and settings</td></tr>
+<tr><th>Kernel</th><td>Vendor 4.19.205 (not the official OpenWrt kernel)</td></tr>
+<tr><th>Recovery port</th><td>MediaTek preloader <code>0e8d:2000</code>, USB-A to USB-C only</td></tr>
+</table></div>
+<div class="card"><img src="x28-board-back.jpg" alt="X28 board, back side" style="width:100%;border-radius:8px" loading="lazy"></div></div>
+</section>
+
+<section id="feed">
+<h2>Package feed</h2>
+<p class="sub">A signed <code>opkg</code> feed built for the vendor kernel. Images already carry the line and key.</p>
+<div class="card">
+<button class="cp" data-copy="src/gz x28 https://mralinp.github.io/zlt-x28-openwrt/feed">Copy</button>
+<b>/etc/opkg/customfeeds.conf</b>
+<pre>src/gz x28 https://mralinp.github.io/zlt-x28-openwrt/feed</pre>
+<p style="margin:0;color:var(--mut)">Signing key <code>7fec994ab0d15b97</code>. <span id="feed-info"></span> 208 of the 976 official <code>kmod-*</code> packages install; the rest are refused rather than installed broken.
+<a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PACKAGE-FEED.md">Feed guide</a> · <a href="feed/Packages">Packages</a></p>
+</div>
+</section>
+
+<section id="plan">
+<h2>Project plan</h2>
+<p class="sub">Target: slot A runs stable OpenWrt; stock stays in slot B until the first <code>sysupgrade</code>. Recovery is the flasher. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/ROADMAP.md">Roadmap</a> · <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/STATUS.md">Status</a></p>
+<div class="grid">
+<div class="card"><h3>1 · Soak and test</h3><p>48 h without unexplained reboots, Wi-Fi client and throughput tests, more LED states, idle CPU and RAM baseline.</p></div>
+<div class="card"><h3>2 · A/B <code>sysupgrade</code></h3><p>Signed images work. Left: keeping settings (#477), LuCI flash page (#478), interrupted-write hardware pass (#458).</p></div>
+<div class="card"><h3>3 · Stable release</h3><p>A tagged stable release, the device page for the OpenWrt wiki, and build docs for other owners.</p></div>
+<div class="card"><h3>4 · Later</h3><p>Fan control in LuCI (#47), SMS and voice on the native image, a 4.19 kernel plus kmod feed (#130).</p></div>
+</div>
+</section>
+
+<section id="tests">
+<h2>Tests</h2>
+<p class="sub">Every test is logged with the command, the result and what it did not prove. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md">Full test log</a></p>
+<div class="card">
+<b id="t-sum"></b><div class="bar"><i id="t-bar" style="width:0"></i></div>
+<div class="tw"><table id="t-rows"></table></div>
+</div>
+</section>
+</main>
+
+<footer><div class="w">Community firmware on the vendor kernel; not an official OpenWrt device image. Not affiliated with ZLT, Tozed, MediaTek or Quectel. Code is GPL-3.0-or-later. SMS and voice are not supported yet.
+<br>Stats refresh daily and on every release. <span id="built"></span></div></footer>
+
+<script>
+const $=s=>document.querySelector(s),n=x=>x.toLocaleString("en"),mb=b=>b>1e6?(b/1e6).toFixed(1)+" MB":Math.max(1,Math.round(b/1e3))+" kB";
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const rows=(el,r)=>{$(el).innerHTML=r.assets.filter(a=>!/^(SHA256SUMS.*|.*\.sig)$/.test(a.name)).map(a=>`<tr><td><a href="${esc(a.url)}">${esc(a.name)}</a></td><td>${mb(a.size)}</td><td>${n(a.downloads)}↓</td></tr>`).join("")};
+document.querySelectorAll("button.cp").forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.copy).then(()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy",1500)}));
+fetch("stats.json").then(r=>r.json()).then(s=>{
+ const set=(k,v)=>$(`[data-k=${k}]`).textContent=v,t=s.tests;
+ set("stars",n(Object.values(s.stars).reduce((a,b)=>a+b,0)));
+ set("downloads",n(Object.values(s.downloads).reduce((a,b)=>a+b,0)));
+ set("fw",s.firmware.tag);set("flasher",s.flasher.tag);set("feed",n(s.feed.packages));set("tests",`${t.passed}/${t.total}`);
+ $("#fl-tag").textContent=s.flasher.tag;$("#fw-tag").textContent=s.firmware.tag;rows("#fl-assets",s.flasher);rows("#fw-assets",s.firmware);
+ $("#feed-info").textContent=`${s.feed.packages} packages (${s.feed.tag}).`;
+ $("#t-sum").innerHTML=`${t.passed} of ${t.total} passed${t.failed?`, <span class="bad">${t.failed} failed</span>`:""}${t.other?`, <span class="wn">${t.other} partial or open</span>`:""}`;
+ $("#t-bar").style.width=(100*t.passed/t.total)+"%";
+ $("#t-rows").innerHTML=t.recent.map(r=>`<tr><td>#${esc(r.n)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.result.slice(0,90))}</td></tr>`).join("");
+ $("#built").textContent="Data: "+s.built;
+}).catch(()=>{$("#dl-sub").innerHTML='Live data unavailable; see <a href="https://github.com/mralinp/zlt-x28-openwrt/releases">GitHub releases</a>.'});
+</script>
+</body>
+</html>
