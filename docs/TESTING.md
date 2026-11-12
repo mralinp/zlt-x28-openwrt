@@ -67,6 +67,7 @@ Conventions:
 | 49 | The packaged image from the signed feed with 222 packages, on two reflashed units | 2026-11-08 | ✅ both units flashed and boot fast without errors (owner's report); `opkg update` passes every signature; `x28-base` refuses removal of `x28-modem`; 248 container checks, 0 failures: [section 49](#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) |
 | 50 | Rolling back and forward an x28 package on a unit | 2026-11-08 | ✅ `x28-base` 0.1.0-2 to 0.1.0-1 with `--force-downgrade` and back with `opkg upgrade`; installing from a URL does not work: [section 50](#50-rolling-back-and-forward-an-x28-package-on-a-unit-2026-11-08) |
 | 51 | Two units flashed with the v0.68.1 image | 2026-11-09 | ✅ both units boot, run `x28-base` 0.1.0-2 with the band tool and the switch package, 5G/4G data works on both; carrier aggregation differs by SIM: [section 51](#51-two-units-flashed-with-the-v0681-image-2026-11-09) |
+| 55 | Passwall2 live throughput on a real connection (owner-reported) | 2026-11-12 | ✅ 340 Mbit/s with about 5% CPU load recorded; method not captured, so not comparable with 41: [section 55](#55-passwall2-live-throughput-owner-reported-2026-11-12) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -769,3 +770,10 @@ a boot-critical package that is not `x28-kmods`; the full package list on the fl
 - **Host checks**: `sh tests/test_leds.sh` first fails against the old poll (disabled radios, stale ra0: LED on), then passes with the fix. Six cases cover no active interface, one or either band active, a down/no-carrier interface, and a missing interface. Existing LED selftest, Wi-Fi tests and package-builder/release-check tests pass.
 - **Unit, read-only**: the new detector, loaded into an stdin shell without the script's dispatch, recognizes the live ra0/rai0 interfaces. Real `jsonfilter` tests exclude down/disabled radios and interfaces absent from netifd's active set, including a mixed-band helper fixture. No credentials recorded; no LED device writes or network changes.
 - **Not verified**: physical LED transitions with Wi-Fi off/on, reboot persistence, and driver failures that leave both netifd and carrier reporting up. The existing 10-second poll interval remains.
+
+## 55. Passwall2 live throughput, owner-reported (2026-11-12)
+
+- **Question**: what does Passwall2 reach on a real connection with the shipped image?
+- **Result, as reported by the owner**: **340 Mbit/s** through Passwall2 on the live router, with **about 5% CPU load** recorded.
+- **How it compares**: 340 Mbit/s is inside the estimated ceiling of 300 to 450 Mbit/s ([PASSWALL2](PASSWALL2.md)) and above the 206 Mbit/s measured in [41](#41-passwall2-throughput-from-a-lan-client-2026-11-02), which was limited by the link. The CPU figure is far below the earlier cost of about 0.45 cores per 100 Mbit/s (which predicts about 38% of 4 cores at 340 Mbit/s); the reason is not known.
+- **Not verified / not recorded**: direction, test tool and server, the node and protocol, duration, which CPU figure the 5% is (router total, one core or xray), and the image version. Repeat with `top` or `/proc/stat` sampled on the router during the run before quoting the CPU number elsewhere.
