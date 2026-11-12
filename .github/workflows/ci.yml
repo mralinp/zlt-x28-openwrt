@@ -54,3 +54,4 @@ jobs:
       - run: sh tests/test_sysupgrade.sh
       - run: sh tests/test_update.sh
       - run: sh tests/test_user_data.sh
+      - run: sudo apt-get install -y -q lua5.1 && sh tests/test_telephony.sh

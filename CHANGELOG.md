@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Add `x28-telephony`: text messages in LuCI (Services > Telephony), a phone book, and an HTTP API with API keys for machines on the LAN (#309, #15).
 - Add `x28-upgrade --refresh` to bypass the update-check cache without installing firmware (#530).
 - Compare release versions correctly with the image's BusyBox sort (#531).
 
