@@ -107,7 +107,7 @@ cores, so the router had headroom left; the link ran out first ([TESTING 41](TES
 
 **Ceiling, estimated:** at 100% CPU, **300–450 Mbit/s, most likely around 400**; for everyday use plan on about
 300 Mbit/s (75% load). This assumes LAN forwarding costs about what the router's own `curl` did, and it has not been
-reached in a measurement: the links tried so far ran out first. A live run later reported **340 Mbit/s at about 5% CPU** ([TESTING 55](TESTING.md#55-passwall2-live-throughput-owner-reported-2026-11-12)): inside this range, but its CPU figure is far lower than the cost above and its method was not recorded.
+reached in a measurement: the links tried so far ran out first. A live run later reported **240 Mbit/s at 46% CPU** ([TESTING 55](TESTING.md#55-passwall2-live-throughput-owner-reported-2026-11-12)), in line with the cost above; its method was not recorded.
 
 ### Pushing it further
 

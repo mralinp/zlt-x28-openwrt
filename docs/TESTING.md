@@ -67,7 +67,7 @@ Conventions:
 | 49 | The packaged image from the signed feed with 222 packages, on two reflashed units | 2026-11-08 | ✅ both units flashed and boot fast without errors (owner's report); `opkg update` passes every signature; `x28-base` refuses removal of `x28-modem`; 248 container checks, 0 failures: [section 49](#49-the-packaged-image-and-the-feed-with-the-x28--packages-2026-11-08) |
 | 50 | Rolling back and forward an x28 package on a unit | 2026-11-08 | ✅ `x28-base` 0.1.0-2 to 0.1.0-1 with `--force-downgrade` and back with `opkg upgrade`; installing from a URL does not work: [section 50](#50-rolling-back-and-forward-an-x28-package-on-a-unit-2026-11-08) |
 | 51 | Two units flashed with the v0.68.1 image | 2026-11-09 | ✅ both units boot, run `x28-base` 0.1.0-2 with the band tool and the switch package, 5G/4G data works on both; carrier aggregation differs by SIM: [section 51](#51-two-units-flashed-with-the-v0681-image-2026-11-09) |
-| 55 | Passwall2 live throughput on a real connection (owner-reported) | 2026-11-12 | ✅ 340 Mbit/s with about 5% CPU load recorded; method not captured, so not comparable with 41: [section 55](#55-passwall2-live-throughput-owner-reported-2026-11-12) |
+| 55 | Passwall2 live throughput on a real connection (owner-reported) | 2026-11-12 | ✅ 240 Mbit/s with 46% CPU load recorded; method not captured: [section 55](#55-passwall2-live-throughput-owner-reported-2026-11-12) |
 
 Inactive `rootfs_sig_a` passed an exact changed-page-and-restore test (22), and the native image then booted from slot A (24). What is not proven: Wi-Fi clients and throughput, a long soak, and any off-device rewrite of `misc` (28).
 
@@ -774,6 +774,6 @@ a boot-critical package that is not `x28-kmods`; the full package list on the fl
 ## 55. Passwall2 live throughput, owner-reported (2026-11-12)
 
 - **Question**: what does Passwall2 reach on a real connection with the shipped image?
-- **Result, as reported by the owner**: **340 Mbit/s** through Passwall2 on the live router, with **about 5% CPU load** recorded.
-- **How it compares**: 340 Mbit/s is inside the estimated ceiling of 300 to 450 Mbit/s ([PASSWALL2](PASSWALL2.md)) and above the 206 Mbit/s measured in [41](#41-passwall2-throughput-from-a-lan-client-2026-11-02), which was limited by the link. The CPU figure is far below the earlier cost of about 0.45 cores per 100 Mbit/s (which predicts about 38% of 4 cores at 340 Mbit/s); the reason is not known.
-- **Not verified / not recorded**: direction, test tool and server, the node and protocol, duration, which CPU figure the 5% is (router total, one core or xray), and the image version. Repeat with `top` or `/proc/stat` sampled on the router during the run before quoting the CPU number elsewhere.
+- **Result, as reported by the owner**: **240 Mbit/s** through Passwall2 on the live router, with **46% CPU load** recorded. An earlier report of 340 Mbit/s at 5% was a mistake and was corrected after the owner re-ran the speed test.
+- **How it compares**: above the 206 Mbit/s at 56% CPU measured in [41](#41-passwall2-throughput-from-a-lan-client-2026-11-02), and consistent with the cost of about 0.45 cores per 100 Mbit/s ([PASSWALL2](PASSWALL2.md)), which predicts about 27% of 4 cores at 240 Mbit/s (46% is somewhat higher, e.g. 1.8 cores).
+- **Not verified / not recorded**: direction, test tool and server, the node and protocol, duration, which CPU figure the 46% is (router total, one core or xray), and the image version. Repeat with `top` or `/proc/stat` sampled on the router during the run so the CPU number can be quoted with its source.
