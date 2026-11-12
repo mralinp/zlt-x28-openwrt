@@ -121,12 +121,14 @@ button.cp{float:right;font:inherit;font-size:.8rem;padding:2px 10px;border:1px s
 
 <section id="plan">
 <h2>Project plan</h2>
-<p class="sub">Target: slot A runs stable OpenWrt; stock stays in slot B until the first <code>sysupgrade</code>. Recovery is the flasher. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/ROADMAP.md">Roadmap</a> · <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/STATUS.md">Status</a></p>
+<p class="sub">Slot A runs OpenWrt; stock stays in slot B until the first <code>sysupgrade</code>. Recovery is the flasher. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/ROADMAP.md">Roadmap</a> · <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/STATUS.md">Status</a></p>
 <div class="grid">
-<div class="card"><h3>1 · Soak and test</h3><p>48 h without unexplained reboots, Wi-Fi client and throughput tests, more LED states, idle CPU and RAM baseline.</p></div>
-<div class="card"><h3>2 · A/B <code>sysupgrade</code></h3><p>Signed images work. Left: keeping settings (#477), LuCI flash page (#478), interrupted-write hardware pass (#458).</p></div>
-<div class="card"><h3>3 · Stable release</h3><p>A tagged stable release, the device page for the OpenWrt wiki, and build docs for other owners.</p></div>
-<div class="card"><h3>4 · Later</h3><p>Fan control in LuCI (#47), SMS and voice on the native image, a 4.19 kernel plus kmod feed (#130).</p></div>
+<div class="card"><h3><span class="ok">✓</span> Soak test</h3><p>Done: the slot-A image ran the soak and the stability tests.</p></div>
+<div class="card"><h3><span class="ok">✓</span> A/B <code>sysupgrade</code></h3><p>Done: signed upgrades write the inactive slot and work.</p></div>
+<div class="card"><h3><span class="ok">✓</span> Stable release</h3><p>Done: v1.0.0 is out, with the flasher for install, backup and recovery.</p></div>
+<div class="card"><h3>Next · <code>x28-telephony</code></h3><p>A package for SMS and VoIP calls on the native image.</p></div>
+<div class="card"><h3>Next · Factory reset</h3><p>Reset the router to the image defaults from LuCI and the front panel.</p></div>
+<div class="card"><h3>Next · OpenWrt 25.12.6</h3><p>Move from 23.05.5 to OpenWrt 25.12.6 with kernel 6.12.6.</p></div>
 </div>
 </section>
 
