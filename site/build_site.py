@@ -30,7 +30,7 @@ def tests():
     rows = []
     for line in (ROOT / 'docs/TESTING.md').read_text(encoding='utf-8').split('## Summary')[1].splitlines():
         c = [x.strip() for x in line.strip().strip('|').split('|')]
-        if len(c) >= 5 and c[0].isdigit():
+        if len(c) >= 4 and c[0].isdigit():
             rows.append({'n': c[0], 'name': c[1], 'date': c[2], 'result': c[3]})
     ok = sum(r['result'].startswith('✅') for r in rows)
     bad = sum(r['result'].startswith('❌') for r in rows)
