@@ -100,7 +100,9 @@ jobs:
           # newest feed release, which is updated in place; they are taken from there by the hashes in package/x28-kmods/ipk.sha256,
           # so this job never waits for signing, and a changed file fails here instead of shipping.
           python3 tools/build/release_check.py x28 --out "$B/ipk"
-          gh release download --dir "$B/ipk" $(awk '{print "-p " $2}' package/x28-kmods/ipk.sha256)
+          # Named, not left to "latest": since v1.0.0 the Latest release is a firmware release, which has none of these (#561).
+          FEED=$(gh release list --limit 100 --json tagName --jq '[.[].tagName|select(test("^feed-[0-9]+$"))]|sort_by(.[5:]|tonumber)|last')
+          gh release download "$FEED" --dir "$B/ipk" $(awk '{print "-p " $2}' package/x28-kmods/ipk.sha256)
           python3 tools/build/release_check.py fetch "$B/ipk" || { echo "package/x28-kmods/ipk.sha256 is out of date: run release_check.py pin"; exit 1; }
           # first_boot.py reads the eight image modules as .ko files until it reads ipks (#420).
           python3 tools/build/release_check.py kmods "$B/ipk" --out "$B/kmods"
