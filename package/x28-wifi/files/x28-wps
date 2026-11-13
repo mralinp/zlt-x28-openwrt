@@ -5,12 +5,16 @@
 # 12-byte reads of three 32-bit words, [event, key, ms]: event 1 is key-down, 2 is key-up (ms = hold time, 0 on key-down).
 # mt_wifi starts WPS only through its private ioctls, so this drives iwpriv. The stock profiles have WscConfMode=0, so no
 # network offers WPS between presses.
+# The reset button has no reader of its own (two readers would take each other's records), so its 10 s hold is handled
+# here too (#551): event 3 is "still held", once a second, with ms = the hold time so far.
 
 INCLUDE_ONLY=1 . "${MTWIFI_SH:-/lib/netifd/wireless/mtwifi.sh}"
 [ -n "$X28_WPS_TEST" ] || . /lib/functions.sh
 
 WPS_SECONDS=${WPS_SECONDS:-120}
 WPS_LOCK=${WPS_LOCK:-/var/run/x28-wps.lock}
+RESET_MS=${RESET_MS:-10000}
+RESET_AFTER=${RESET_AFTER:-180}  # seconds of uptime: x28-bootok (S96) has reset the boot tries and finished its misc write by then
 
 # wps_net <wifi-iface section>: prints the interface (ra0/rai0) when this network allows WPS.
 wps_net() {
@@ -53,12 +57,43 @@ wps_open() {
 	logger -t x28-wps "WPS push button closed"
 }
 
+now() { cut -d. -f1 /proc/uptime; }
+
+# reset_step <event> <key> <ms>: follows the reset button; true once, at the first hold tick at or past RESET_MS.
+# A hold counts only from a key-down this service read, and only while the driver's hold time agrees with the time since
+# then (2 s slack): a button already down at boot, or records queued before the service started, never reset the unit.
+# A hold that starts before RESET_AFTER is ignored: a reboot then would add a boot try before the last one was reset.
+reset_step() {
+	[ "$2" = 1 ] || return 1
+	case "$1" in
+		1) reset_t0=$(now); [ "$reset_t0" -ge "$RESET_AFTER" ] || reset_t0= ;;
+		2) reset_t0= ;;
+		3)	[ -n "$reset_t0" ] || return 1
+			[ $(($3 / 1000)) -le $(($(now) - reset_t0 + 2)) ] || { reset_t0=; return 1; }
+			[ "$3" -ge "$RESET_MS" ] && { reset_t0=; return 0; } ;;
+	esac
+	return 1
+}
+
+factory_reset() {
+	# The packages upgrade one by one from the feed: base-files' firstboot would not reach the overlay, and an x28-leds
+	# without blink would take the word for its daemon mode and never return.
+	grep -q extroot-uuid /sbin/firstboot 2>/dev/null || { logger -t x28-wps "reset button: firstboot is not x28-storage's, nothing done"; return; }
+	logger -t x28-wps "reset button held $RESET_MS ms: factory reset"
+	grep -q 'blink)' /sbin/x28-leds 2>/dev/null && /sbin/x28-leds blink
+	/sbin/firstboot -y -r || /sbin/x28-leds once  # failed: the LEDs go back to the unit's state
+}
+
 [ -z "$X28_WPS_TEST" ] || return 0
 rm -f "$WPS_LOCK"
 while :; do
 	rec="$(dd if=/dev/tz_gpio_keys bs=24 count=1 2>/dev/null | hexdump -v -e '6/4 "%u " "\n"')"
 	[ -n "$rec" ] || { sleep 1; continue; }
 	set -- $rec
-	# ponytail: any press of the WPS key counts, whatever its length; presses during an open window are ignored.
-	wps_down "$1" "$2" && [ ! -e "$WPS_LOCK" ] && { wps_open & }
+	while [ $# -ge 3 ]; do  # a read can carry two records
+		# ponytail: any press of the WPS key counts, whatever its length; presses during an open window are ignored.
+		wps_down "$1" "$2" && [ ! -e "$WPS_LOCK" ] && { wps_open & }
+		reset_step "$1" "$2" "$3" && factory_reset
+		shift 3
+	done
 done
