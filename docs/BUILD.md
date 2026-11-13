@@ -399,8 +399,8 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
 - **Reset button (#551):** the same reader follows key 1: at the first hold tick at or past 10 s it blinks the front LEDs
   (`x28-leds blink`) and runs `firstboot -y -r`, the factory reset. Only a hold whose key-down it read counts, and only while the
   driver's hold time matches the time since then, so a button down at boot or stale queued records don't reset; holds begun in the
-  first 180 s of uptime are ignored, so the reboot never lands before `x28-bootok` reset the tries. Not verified on
-  a unit: ticks past 8.5 s, and the reset itself (see the PR).
+  first 180 s of uptime are ignored, so the reboot never lands before `x28-bootok` reset the tries. Seen on
+  a unit (2026-11-13): the driver's ticks come about 1.1 s apart, so the reset fires about 11 s after the press; ticks ran past 21 s.
 - **Wi-Fi info for LuCI (#165):** `mt_wifi` has no nl80211, so the feed's `libiwinfo` sees no radios. `tools/build/sdk_packages.sh`
   builds iwinfo 2023-07-01 with the SDK and `package/iwinfo-mtwifi/100-mtwifi-backend.patch` (release 2, preferred by
   ImageBuilder): wireless extensions for ESSID/BSSID/channel/mode/bit rate (the rate is read as unsigned: the driver keeps bits per second in a signed 32-bit field, and the X28 PRO's 4-stream 80 MHz rate of about 2.4 Gbit/s wraps negative, which showed as "?" in LuCI), per-band mode lists, channels from the country's region (no DFS flags), and associated stations from the driver's station table
