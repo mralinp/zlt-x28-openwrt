@@ -1,0 +1,81 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# A bounded IPv4 routing experiment, not a persistent bridge-mode implementation.
+# shortcut: manual address handoff; add DHCP/netifd integration before exposing a persistent mode.
+run_dir=/var/run/x28-passthrough
+
+pt_ipv4() {
+ printf '%s\n' "$1" | awk -F. 'NR != 1 || NF != 4 {exit 1} {
+  for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || length($i)>3 || $i+0>255 || (length($i)>1 && substr($i,1,1)=="0")) exit 1
+  if ($1==0 || $1==127 || $1>=224) exit 1
+ }'
+}
+
+pt_has_address() {
+ ip -4 addr show dev "$device" | grep -F "inet $public/" >/dev/null
+}
+
+pt_cleanup() {
+ result=$?
+ trap - EXIT HUP INT TERM
+ # netifd may already have replaced the bearer; never resurrect the old local address.
+ if [ "$local_removed" = 1 ] && pt_has_address; then
+  ip -4 route replace local "$public/32" dev "$device" proto kernel scope host src "$public" table local || result=1
+ fi
+ [ "$route_added" != 1 ] || ip -4 route del "$public/32" via "$peer" dev br-lan proto 186 || result=1
+ [ "$nat_added" != 1 ] || iptables -t nat -D POSTROUTING -s "$public/32" -o "$device" -m comment --comment "$comment" -j ACCEPT || result=1
+ [ "$guard_added" != 1 ] || iptables -D FORWARD -i br-lan -s "$public/32" -m mac ! --mac-source "$mac" -m comment --comment "$comment" -j DROP || result=1
+ rmdir "$run_dir" || result=1
+ echo 'Passthrough experiment stopped; check WAN connectivity.'
+ exit "$result"
+}
+
+pt_run() {
+ peer=${1:-}; duration=${2:-300}
+ if [ "$#" -gt 2 ] || ! pt_ipv4 "$peer"; then
+  echo 'Usage: x28-passthrough LAN_PEER_IPV4 [SECONDS: 10..600]' >&2; return 1
+ fi
+ case "$duration" in ''|*[!0-9]*|0*) return 1 ;; esac
+ [ "${#duration}" -le 3 ] && [ "$duration" -ge 10 ] && [ "$duration" -le 600 ] || return 1
+ [ "$(id -u)" = 0 ] || { echo 'Requires root.' >&2; return 1; }
+ status=$(ifstatus wan) || return 1
+ [ "$(printf '%s' "$status" | jsonfilter -e '@.up')" = true ] &&
+ [ "$(printf '%s' "$status" | jsonfilter -e '@.proto')" = x28_mipc ] || return 1
+ device=$(printf '%s' "$status" | jsonfilter -e '@.l3_device')
+ public=$(printf '%s' "$status" | jsonfilter -e '@["ipv4-address"][0].address')
+ case "$device" in ccmni[0-9]*) ;; *) return 1 ;; esac
+ case "$device" in *[!a-z0-9]*) return 1 ;; esac
+ pt_ipv4 "$public" && [ "$public" != "$peer" ] && pt_has_address || return 1
+ case "$(ip -4 route get "$peer")" in "$peer dev br-lan "*) ;; *) echo 'Peer must be directly on br-lan.' >&2; return 1 ;; esac
+ mac=$(ip -4 neigh show to "$peer" dev br-lan | awk '!/FAILED|INCOMPLETE/ {for(i=1;i<NF;i++) if($i=="lladdr") {print $(i+1); exit}}')
+ printf '%s\n' "$mac" | grep -Eq '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$' || { echo 'Ping the LAN peer first to resolve its MAC.' >&2; return 1; }
+ [ -z "$(ip -4 route show exact "$public/32")" ] || return 1
+ ip -4 route show table local exact "$public/32" | grep -F "local $public dev $device " >/dev/null || return 1
+ mkdir -m 700 "$run_dir" || { echo 'Another experiment or stale lock exists.' >&2; return 1; }
+ route_added=0; nat_added=0; guard_added=0; local_removed=0
+ comment=x28-passthrough-$$
+ trap pt_cleanup EXIT
+ trap 'exit 1' HUP INT TERM
+ # Arm cleanup before each mutation, including a failed/partially applied setup.
+ guard_added=1
+ iptables -I FORWARD 1 -i br-lan -s "$public/32" -m mac ! --mac-source "$mac" -m comment --comment "$comment" -j DROP || return 1
+ nat_added=1
+ iptables -t nat -I POSTROUTING 1 -s "$public/32" -o "$device" -m comment --comment "$comment" -j ACCEPT || return 1
+ route_added=1
+ ip -4 route add "$public/32" via "$peer" dev br-lan proto 186 || return 1
+ local_removed=1
+ ip -4 route del local "$public/32" dev "$device" table local || return 1
+ echo "Temporary IPv4 passthrough: $public -> $peer ($mac), expires in $duration seconds."
+ echo 'Configure the downstream /32 alias and source route as documented; Ctrl-C restores NAT.'
+ elapsed=0
+ while [ "$elapsed" -lt "$duration" ]; do
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if ! pt_has_address || ! ip -4 route get "$public" | grep -F "via $peer dev br-lan " >/dev/null ||
+   ! iptables -t nat -C POSTROUTING -s "$public/32" -o "$device" -m comment --comment "$comment" -j ACCEPT; then
+   echo 'WAN address, routing or firewall changed; stopping.' >&2; return 1
+  fi
+ done
+}
+
+[ "${INCLUDE_ONLY:-0}" = 1 ] || { pt_run "$@"; exit "$?"; }

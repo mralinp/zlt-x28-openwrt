@@ -28,10 +28,11 @@ Tested on **X28 and X28 PRO**. A native OpenWrt userspace replaces the stock int
 | Cellular | 5G data, APN settings, operator selection, band/cell locking and signal status in LuCI |
 | Networking | Dual-band Wi-Fi, LAN, DHCP/DNS, firewall, NAT and IPv6 on LAN |
 | VPN and proxy | WireGuard, OpenVPN and Passwall2 preinstalled |
+| Text messages (SMS) | The `x28-telephony` package: send and receive in LuCI (Services > Telephony), a phone book, and an HTTP API with API keys for machines on the LAN |
 | Updates | Working signed firmware upgrades and a signed, kernel-compatible `opkg` package feed |
 | Hardware | Front-panel LEDs and boot-counter management; about 40 °C idle SoC temperature on the test unit |
 
-This is community firmware using the vendor 4.19.205 kernel, not an official OpenWrt device image. Most feature testing was on the X28; not every feature has been verified on both models. SMS and voice are not supported yet. See [status and limitations](docs/STATUS.md) and [test evidence](docs/TESTING.md).
+This is community firmware using the vendor 4.19.205 kernel, not an official OpenWrt device image. Most feature testing was on the X28; not every feature has been verified on both models. Text messages work through `x28-telephony` ([details](docs/TELEPHONY.md)); voice calls are not supported yet. See [status and limitations](docs/STATUS.md) and [test evidence](docs/TESTING.md).
 
 ## LuCI and Passwall2
 

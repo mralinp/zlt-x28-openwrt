@@ -12,7 +12,8 @@ Read in this order if you are new (or returning after a long break):
 8. [**NATIVE-CELLULAR.md**](NATIVE-CELLULAR.md): the `x28_mipc` cellular protocol.
 9. [**THERMAL.md**](THERMAL.md): heat baseline, the 12 V fan and current readings.
 10. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
-11. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
+11. [**TELEPHONY.md**](TELEPHONY.md): text messages, the phone book and the HTTP API with API keys; what is known about calls.
+12. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
 
 What changed and when: [../CHANGELOG.md](../CHANGELOG.md).
 
@@ -32,6 +33,7 @@ docs/
 ├── RECOVERY.md               NAND backup, USB preloader/DA access, flash sessions, UART
 ├── BOOT-FLOW.md              A/B slots, boot counter, selection records and the rootfs signature check
 ├── NATIVE-CELLULAR.md        the x28_mipc netifd protocol and its hardware validation
+├── TELEPHONY.md              x28-telephony: text messages, phone book, HTTP API; findings for calls
 ├── THERMAL.md                baseline, fan result and the native image reading, how it was measured
 ├── PACKAGE-FEED.md           the supported X28 opkg feed: URL, key, coverage, limits, how a release is made
 ├── research/kernel-module-crc.md  TPROXY module CRCs vs the stock kernel, and how they load anyway
@@ -101,7 +103,7 @@ Older analysis and plans, kept for the evidence behind decisions in the document
 
 | Path | What |
 |---|---|
-| `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter), `x28-sysupgrade` (`/lib/upgrade/platform.sh`), `x28-update` (`x28-upgrade` and the LuCI update notice), `x28-kmods`, `x28-switch`, `x28-nrband`, `x28-storage`, `x28-dhcp`, `x28-feed`; `x28-packages.ini` lists what becomes an ipk |
+| `package/` | OpenWrt packages we wrote: `x28-mipc` (cellular netifd protocol), `luci-proto-x28-mipc` (its LuCI page), `x28-modem` (starts the vendor modem stack), `x28-wifi` (netifd handler for `mt_wifi`), `x28-leds`, `x28-bootok` (A/B boot counter), `x28-sysupgrade` (`/lib/upgrade/platform.sh`), `x28-update` (`x28-upgrade` and the LuCI update notice), `x28-telephony` (text messages, phone book, HTTP API), `x28-kmods`, `x28-switch`, `x28-nrband`, `x28-storage`, `x28-dhcp`, `x28-feed`; `x28-packages.ini` lists what becomes an ipk |
 | `tools/build/` | `userspace.sh` (ImageBuilder), `feed_release.py`, `usign/` (signing image), `image_sign.sh` (signs sysupgrade images), `opkg_real_test.sh`, `kmod_gap.py`, `link_check.py`, `qemu_boot_test.py`, `device_ram_test.sh`, `management_auth_test.py` (image assembly, `stage_native.py`, `first_boot.py`, `ab_guard.py`, `package_ubi.py`, moved to x28-flasher) |
 | (moved) | the backup, USB and guarded flash tools live in [mralinp/x28-flasher](https://github.com/mralinp/x28-flasher) (`tools/recovery/`, `tools/x28-flasher/`) |
 | `tools/firmware/` | `inventory.py` (kernel config, modules, packages, ELF deps, services), `abi_check.py` |
