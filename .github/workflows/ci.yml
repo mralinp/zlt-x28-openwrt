@@ -50,6 +50,7 @@ jobs:
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py
       - run: node tests/test_luci.cjs
+      - run: node tests/test_telephony_luci.cjs
       - run: sh tests/test_bootok.sh
       - run: sh tests/test_sysupgrade.sh
       - run: sh tests/test_update.sh
