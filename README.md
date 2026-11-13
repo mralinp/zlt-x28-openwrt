@@ -10,6 +10,7 @@
 **OpenWrt 23.05.5 for the ZLT X28 and X28 PRO 5G routers.**
 
 [![Release](https://img.shields.io/github/v/release/mralinp/zlt-x28-openwrt?include_prereleases&label=release)](https://github.com/mralinp/zlt-x28-openwrt/releases)
+[![Downloads](https://img.shields.io/github/downloads/mralinp/zlt-x28-openwrt/total)](https://github.com/mralinp/zlt-x28-openwrt/releases)
 [![CI](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
@@ -19,9 +20,26 @@
 
 ## What works
 
-Tested on **X28 and X28 PRO**. The firmware provides standard OpenWrt with LuCI, 5G data, dual-band Wi-Fi, LAN, DHCP/DNS, firewall and NAT. WireGuard, OpenVPN and Passwall2 are included. **Signed firmware upgrades and package updates work**, with a kernel-compatible `opkg` feed.
+Tested on **X28 and X28 PRO**. A native OpenWrt userspace replaces the stock interface while keeping the vendor kernel and modem backend.
+
+| Feature | Included |
+|---|---|
+| Web interface | Standard LuCI over HTTPS, UCI configuration and SSH |
+| Cellular | 5G data, APN settings, operator selection, band/cell locking and signal status in LuCI |
+| Networking | Dual-band Wi-Fi, LAN, DHCP/DNS, firewall, NAT and IPv6 on LAN |
+| VPN and proxy | WireGuard, OpenVPN and Passwall2 preinstalled |
+| Updates | Working signed firmware upgrades and a signed, kernel-compatible `opkg` package feed |
+| Hardware | Front-panel LEDs and boot-counter management; about 40 °C idle SoC temperature on the test unit |
 
 This is community firmware using the vendor 4.19.205 kernel, not an official OpenWrt device image. Most feature testing was on the X28; not every feature has been verified on both models. SMS and voice are not supported yet. See [status and limitations](docs/STATUS.md) and [test evidence](docs/TESTING.md).
+
+## LuCI and Passwall2
+
+Configure networking through standard LuCI pages and manage Passwall2 from its web interface. The screenshot below shows Passwall2 running on the X28, with connectivity checks through the configured node.
+
+![Passwall2 running in LuCI on the X28, with successful connectivity checks](docs/images/x28-passwall2-luci.png)
+
+See the [VPN setup notes and measured performance](docs/PASSWALL2.md).
 
 ## Get started
 
@@ -32,11 +50,20 @@ Use **[x28-flasher](https://github.com/mralinp/x28-flasher)** for installation, 
 3. Follow the flasher's guided steps: connect, make a verified full backup, enable root access, prepare the image, flash OpenWrt and select the boot slot. Keep a second copy of your backup offline.
 4. After boot, open **https://192.168.70.1/cgi-bin/luci**, accept the self-signed certificate and set a root password. SSH is available on port 22 from the LAN.
 
+![X28 Flasher application for guided backup and installation](docs/images/x28-flasher.png)
+
 > [!WARNING]
 > Flashing can brick your router. Use the flasher's safety checks; never write partitions or change the boot order by hand. Read the [recovery guide](docs/RECOVERY.md) first. Firmware upgrades write the inactive slot, so the first upgrade can replace the stock firmware fallback. Back up your settings before upgrading.
 
 > [!NOTE]
 > **Carrier unlocking:** we will provide step-by-step instructions later.
+
+## Updates and packages
+
+- **Firmware:** signed A/B upgrades write and verify the inactive slot before switching to it. Download the signed `x28-sysupgrade-<version>.tar` from [releases](https://github.com/mralinp/zlt-x28-openwrt/releases). The CLI and LuCI update controls are available in recent images; nothing installs automatically. Back up your configuration first—settings preservation is not fully verified.
+- **Packages:** use LuCI's **System → Software** or `opkg`. The image includes our signed feed for packages compatible with the vendor kernel; incompatible kernel modules are refused rather than installed.
+
+See [firmware upgrade details](docs/research/sysupgrade-design.md) and the [package-feed guide](docs/PACKAGE-FEED.md) for compatibility, safety and known limits.
 
 ## Contributing
 
