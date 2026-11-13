@@ -18,6 +18,6 @@ Roughly in order ([PROJECT-PLAN](PROJECT-PLAN.md) has the detail):
    ([#477](https://github.com/mralinp/zlt-x28-openwrt/issues/477)), LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)) and the
    hardware pass with interrupted writes and the tries-6 fall-back ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
 3. A tagged stable release, the device page for the OpenWrt wiki, and build documentation for other owners.
-4. Later: fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), local SMS and voice
-   on the native image, and a 4.19 kernel plus kmod feed built from a sibling-device SDK
+4. Later: fan control from LuCI ([#47](https://github.com/mralinp/zlt-x28-openwrt/issues/47)), voice calls
+   on the native image (text messages are there: `x28-telephony`, [TELEPHONY](TELEPHONY.md)), and a 4.19 kernel plus kmod feed built from a sibling-device SDK
    ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).
