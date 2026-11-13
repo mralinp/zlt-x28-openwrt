@@ -25,6 +25,7 @@ on:
       - "package/x28-sysupgrade/**"
       - "package/x28-wifi/**"
       - "package/x28-update/**"
+      - "package/x28-telephony/**"
       - "package/x28-kmod-stubs/**"
       - "package/luci-proto-x28-mipc/**"
       - ".github/workflows/release.yml"

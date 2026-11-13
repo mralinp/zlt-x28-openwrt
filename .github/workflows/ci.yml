@@ -50,8 +50,10 @@ jobs:
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py
       - run: node tests/test_luci.cjs
+      - run: node tests/test_telephony_luci.cjs
       - run: sh tests/test_bootok.sh
       - run: sh tests/test_sysupgrade.sh
       - run: sh tests/test_update.sh
       - run: sh tests/test_user_data.sh
       - run: sh tests/test_firstboot.sh
+      - run: sudo apt-get install -y -q lua5.1 && sh tests/test_telephony.sh

@@ -1,0 +1,23 @@
+{
+	"admin/services/telephony": {
+		"title": "Telephony",
+		"order": 60,
+		"action": { "type": "alias", "path": "admin/services/telephony/messages" },
+		"depends": { "acl": [ "x28-telephony" ] }
+	},
+	"admin/services/telephony/messages": {
+		"title": "Messages",
+		"order": 1,
+		"action": { "type": "view", "path": "x28-telephony/messages" }
+	},
+	"admin/services/telephony/contacts": {
+		"title": "Phone book",
+		"order": 2,
+		"action": { "type": "view", "path": "x28-telephony/contacts" }
+	},
+	"admin/services/telephony/api": {
+		"title": "API",
+		"order": 3,
+		"action": { "type": "view", "path": "x28-telephony/api" }
+	}
+}

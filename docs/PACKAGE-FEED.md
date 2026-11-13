@@ -63,7 +63,7 @@ Three groups:
 
 | Group | Packages | On the image | If the user removes it |
 |---|---|---|---|
-| **Required** | `x28-base` and what it depends on: `x28-kmods` (module loader), `x28-storage` (overlay), `x28-bootok` (A/B boot counter), `x28-dhcp`, `x28-leds`, `x28-modem`, `x28-mipc` with `luci-proto-x28-mipc` (5G WAN), `x28-nrband` (5G band tool), `x28-switch` (LAN switch), `x28-wifi` | yes | `opkg` refuses while `x28-base` is installed (`--force-depends` overrides it, on the user); reinstall from the feed |
+| **Required** | `x28-base` and what it depends on: `x28-kmods` (module loader), `x28-storage` (overlay), `x28-bootok` (A/B boot counter), `x28-dhcp`, `x28-leds`, `x28-modem`, `x28-mipc` with `luci-proto-x28-mipc` (5G WAN), `x28-nrband` (5G band tool), `x28-switch` (LAN switch), `x28-telephony` (text messages), `x28-wifi` | yes | `opkg` refuses while `x28-base` is installed (`--force-depends` overrides it, on the user); reinstall from the feed |
 | **Preinstalled, optional** | `kmod-wireguard`, `kmod-ipt-tproxy`, `kmod-ipt-socket` (what Passwall2 and WireGuard need), `ipset` with its libraries | yes | `opkg install` brings it back |
 | **On demand** | the other built module packages and the stubs | no | `opkg install` when something needs them |
 

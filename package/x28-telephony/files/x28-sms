@@ -1,0 +1,497 @@
+#!/usr/bin/lua
+-- SPDX-License-Identifier: GPL-2.0-only
+-- x28-sms: text messages through the modem's AT channel in PDU mode (#309, #15). Received messages are copied from the SIM
+-- (50 slots) to DIR/messages and only then deleted from the SIM. Also the phone book, the API keys and the HTTP API (cgi).
+-- Usage: x28-sms list | poll | send <number> <text> | delete <id>... | contacts | contact-set <number> <name> |
+--        contact-del <number> | keys | key-add <label> | key-del <id> | webhook [url] | cgi | selftest
+-- Output is JSON; an error is {"error":...} with exit code 1. Tests point X28_SMS_DIR and X28_SMS_AT elsewhere.
+
+local DIR = os.getenv("X28_SMS_DIR") or "/etc/x28-telephony"
+local AT = os.getenv("X28_SMS_AT") or "mipc_wan_cli --at_cmd"
+local LIMIT = 30      -- messages sent per hour, API and LuCI together
+local MAXPARTS = 10   -- longest message we send: 1530 GSM characters or 670 others
+
+local function sq(s) return "'" .. (tostring(s):gsub("'", "'\\''")) .. "'" end
+
+-- One instance at a time: the store is rewritten in place and the AT channel is not ours alone.
+if not os.getenv("X28_SMS_LOCKED") and arg[1] ~= "selftest" then
+	local a = {}
+	for i = 0, #arg do a[#a + 1] = sq(arg[i]) end
+	os.exit(os.execute("X28_SMS_LOCKED=1 exec flock /tmp/x28-sms.lock lua " .. table.concat(a, " ")) == 0 and 0 or 1)
+end
+
+local function sh(cmd)
+	local p = io.popen(cmd .. " 2>/dev/null")
+	local o = p:read("*a")
+	p:close()
+	return (o:gsub("\r", ""))
+end
+local function at(cmd) return sh(AT .. " " .. sq(cmd)) end
+
+---------------------------------------------------------------- text coding (3GPP TS 23.038 / 23.040)
+
+local UTF8 = "[%z\1-\127\194-\244][\128-\191]*"
+local G = { "@", "£", "$", "¥", "è", "é", "ù", "ì", "ò", "Ç", "\n", "Ø", "ø", "\r", "Å", "å",
+	"Δ", "_", "Φ", "Γ", "Λ", "Ω", "Π", "Ψ", "Σ", "Θ", "Ξ", "\27", "Æ", "æ", "ß", "É",
+	" ", "!", '"', "#", "¤", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/",
+	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "¡" }
+for c = 65, 90 do G[#G + 1] = string.char(c) end
+for _, c in ipairs { "Ä", "Ö", "Ñ", "Ü", "§", "¿" } do G[#G + 1] = c end
+for c = 97, 122 do G[#G + 1] = string.char(c) end
+for _, c in ipairs { "ä", "ö", "ñ", "ü", "à" } do G[#G + 1] = c end
+local E = { [10] = "\f", [20] = "^", [40] = "{", [41] = "}", [47] = "\\", [60] = "[", [61] = "~", [62] = "]", [64] = "|", [101] = "€" }
+local GR, ER = {}, {}
+for i, c in ipairs(G) do if i ~= 28 then GR[c] = i - 1 end end
+for i, c in pairs(E) do ER[c] = i end
+
+local function unhex(h) return (h:gsub("%x%x", function(x) return string.char(tonumber(x, 16)) end)) end
+local function hex(s) return (s:gsub(".", function(c) return string.format("%02X", c:byte()) end)) end
+local function swap(h) return (h:gsub("(.)(.)", "%2%1")) end
+
+local function u8(c)
+	if c < 0x80 then return string.char(c)
+	elseif c < 0x800 then return string.char(192 + math.floor(c / 64), 128 + c % 64)
+	elseif c < 0x10000 then return string.char(224 + math.floor(c / 4096), 128 + math.floor(c / 64) % 64, 128 + c % 64)
+	end
+	return string.char(240 + math.floor(c / 262144), 128 + math.floor(c / 4096) % 64, 128 + math.floor(c / 64) % 64, 128 + c % 64)
+end
+local function cp(ch)
+	local b = ch:byte()
+	if b < 128 then return b end
+	local n = b >= 240 and 3 or b >= 224 and 2 or 1
+	local c = b % 2 ^ (6 - n)
+	for i = 2, n + 1 do c = c * 64 + (ch:byte(i) or 128) % 64 end
+	return c
+end
+
+-- Septets are a little-endian bit stream over the octets.
+local function unpack7(s)
+	local out, acc, bits = {}, 0, 0
+	for i = 1, #s do
+		acc = acc + s:byte(i) * 2 ^ bits
+		bits = bits + 8
+		while bits >= 7 do out[#out + 1] = acc % 128; acc = math.floor(acc / 128); bits = bits - 7 end
+	end
+	return out
+end
+local function pack7(sep)
+	local t, acc, bits = {}, 0, 0
+	for _, v in ipairs(sep) do
+		acc = acc + v * 2 ^ bits
+		bits = bits + 7
+		while bits >= 8 do t[#t + 1] = string.char(acc % 256); acc = math.floor(acc / 256); bits = bits - 8 end
+	end
+	if bits > 0 then t[#t + 1] = string.char(acc) end
+	return table.concat(t)
+end
+local function gsm_text(sep, from, to)
+	local t, esc = {}, false
+	for i = from, to do
+		local c = sep[i]
+		if not c then break end
+		if esc then t[#t + 1] = E[c] or " "; esc = false
+		elseif c == 27 then esc = true
+		else t[#t + 1] = G[c + 1] end
+	end
+	return table.concat(t)
+end
+local function ucs2(s)
+	local t, i = {}, 1
+	while i + 1 <= #s do
+		local c = s:byte(i) * 256 + s:byte(i + 1)
+		i = i + 2
+		if c >= 0xD800 and c < 0xDC00 and i + 1 <= #s then
+			local l = s:byte(i) * 256 + s:byte(i + 1)
+			if l >= 0xDC00 and l < 0xE000 then c = 0x10000 + (c - 0xD800) * 1024 + (l - 0xDC00); i = i + 2 end
+		end
+		if c >= 0xD800 and c < 0xE000 then c = 0xFFFD end   -- half a pair is not valid UTF-8
+		t[#t + 1] = u8(c)
+	end
+	return table.concat(t)
+end
+
+local function epoch(y, m, d, h, mi, s)   -- UTC fields to Unix time (Lua 5.1 has no timegm)
+	if m <= 2 then y = y - 1; m = m + 12 end
+	local days = 365 * y + math.floor(y / 4) - math.floor(y / 100) + math.floor(y / 400) + math.floor((153 * (m - 3) + 2) / 5) + d - 719469
+	return days * 86400 + h * 3600 + mi * 60 + s
+end
+
+-- SMS-DELIVER PDU (hex, with the service centre address in front) -> message, or nil for anything else.
+local function decode(pduhex)
+	local p = unhex(pduhex)
+	local i = p:byte(1) + 2
+	local fo = p:byte(i)
+	if not fo or fo % 4 ~= 0 then return nil end
+	local n, toa = p:byte(i + 1), p:byte(i + 2)
+	local alen = math.floor((n + 1) / 2)
+	local addr, from = p:sub(i + 3, i + 2 + alen)
+	if math.floor(toa / 16) % 8 == 5 then from = gsm_text(unpack7(addr), 1, math.floor(n * 4 / 7))   -- a name, e.g. the operator
+	else from = (math.floor(toa / 16) % 8 == 1 and "+" or "") .. swap(hex(addr)):gsub("F", "") end
+	i = i + 3 + alen
+	local dcs, ts, udl, ud = p:byte(i + 1), swap(hex(p:sub(i + 2, i + 8))), p:byte(i + 9), p:sub(i + 10)
+	local time = os.time()
+	local y, mo, d, h, mi, s = ts:match("^(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)")
+	if y then
+		local z = tonumber(ts:sub(13, 13), 16)
+		local q = (z % 8) * 10 + tonumber(ts:sub(14, 14), 16)   -- quarter hours east of UTC, bit 3 is the sign
+		if z >= 8 then q = -q end
+		time = epoch(2000 + tonumber(y), tonumber(mo), tonumber(d), tonumber(h), tonumber(mi), tonumber(s)) - q * 900
+	end
+	local alpha = 0   -- 0 GSM 7-bit, 1 8-bit data, 2 UCS2
+	if dcs >= 0xF0 then alpha = math.floor(dcs / 4) % 2
+	elseif dcs >= 0xE0 then alpha = 2
+	elseif dcs < 0x80 then alpha = math.floor(dcs / 4) % 4 end
+	local off, ref, total, seq = 0, "", "", ""
+	if fo % 128 >= 64 then   -- user data header: only the concatenation elements matter
+		off = ud:byte(1) + 1
+		local j = 2
+		while j + 1 <= off do
+			local id, l = ud:byte(j), ud:byte(j + 1)
+			if id == 0 and l == 3 then ref, total, seq = ud:byte(j + 2), ud:byte(j + 3), ud:byte(j + 4)
+			elseif id == 8 and l == 4 then ref, total, seq = ud:byte(j + 2) * 256 + ud:byte(j + 3), ud:byte(j + 4), ud:byte(j + 5) end
+			j = j + 2 + l
+		end
+	end
+	local text
+	if alpha == 2 then text = ucs2(ud:sub(off + 1, udl))
+	elseif alpha == 0 then text = gsm_text(unpack7(ud), math.ceil(off * 8 / 7) + 1, udl)
+	else text = ud:sub(off + 1, udl):gsub("[^\32-\126\n]", "?") end
+	return { dir = "in", number = from, time = time, status = "", ref = ref, total = total, seq = seq, text = text }
+end
+
+-- Text -> list of { TPDU length, PDU hex } SMS-SUBMITs (several when it does not fit one), or nil, error.
+local function encode(to, text)
+	local u, gsm = {}, true
+	for ch in text:gmatch(UTF8) do if not (GR[ch] or ER[ch]) then gsm = false; break end end
+	for ch in text:gmatch(UTF8) do
+		if gsm then
+			if ER[ch] then u[#u + 1] = 27; u[#u + 1] = ER[ch] else u[#u + 1] = GR[ch] end
+		else
+			local c = cp(ch)
+			if c < 0x10000 then u[#u + 1] = c
+			else c = c - 0x10000; u[#u + 1] = 0xD800 + math.floor(c / 1024); u[#u + 1] = 0xDC00 + c % 1024 end
+		end
+	end
+	if #u == 0 then return nil, "empty message" end
+	local chunks = { u }
+	if #u > (gsm and 160 or 70) then
+		chunks = {}
+		local i, max = 1, gsm and 153 or 67
+		while i <= #u do
+			local j = math.min(i + max - 1, #u)
+			-- never cut between an escape and its character, or inside a surrogate pair
+			if j < #u and (gsm and u[j] == 27 or not gsm and u[j] >= 0xD800 and u[j] < 0xDC00) then j = j - 1 end
+			local c = {}
+			for k = i, j do c[#c + 1] = u[k] end
+			chunks[#chunks + 1] = c
+			i = j + 1
+		end
+	end
+	if #chunks > MAXPARTS then return nil, "message too long" end
+	local digits = to:gsub("^%+", "")
+	local da = string.format("%02X%s", #digits, to:sub(1, 1) == "+" and "91" or "81") .. swap(digits .. (#digits % 2 == 1 and "F" or ""))
+	local ref, out = math.random(0, 255), {}
+	for n, c in ipairs(chunks) do
+		local udh = #chunks > 1 and string.char(5, 0, 3, ref, #chunks, n) or ""
+		local ud, udl
+		if gsm then
+			local sep = {}
+			if udh ~= "" then for _ = 1, 7 do sep[#sep + 1] = 0 end end   -- the 6 header octets take 7 septets
+			for _, v in ipairs(c) do sep[#sep + 1] = v end
+			ud, udl = pack7(sep), #sep
+			if udh ~= "" then ud = udh .. ud:sub(7) end
+		else
+			local t = {}
+			for _, v in ipairs(c) do t[#t + 1] = string.char(math.floor(v / 256), v % 256) end
+			ud = udh .. table.concat(t)
+			udl = #ud
+		end
+		local tpdu = (udh ~= "" and "41" or "01") .. "00" .. da .. string.format("00%02X%02X", gsm and 0 or 8, udl) .. hex(ud)
+		out[#out + 1] = { #tpdu / 2, "00" .. tpdu }   -- leading 00: use the SIM's service centre
+	end
+	return out
+end
+
+---------------------------------------------------------------- store (tab-separated, one record per line)
+
+local ESC = { ["\\"] = "\\\\", ["\t"] = "\\t", ["\n"] = "\\n", ["\r"] = "\\r" }
+local UNESC = { t = "\t", n = "\n", r = "\r", ["\\"] = "\\" }
+local function esc(s) return (tostring(s):gsub("[\\\t\n\r]", ESC)) end
+local function unesc(s) return (s:gsub("\\(.)", UNESC)) end
+
+local function rows(name)
+	local t, f = {}, io.open(DIR .. "/" .. name)
+	if f then
+		for l in f:lines() do
+			local r = {}
+			for field in (l .. "\t"):gmatch("([^\t]*)\t") do r[#r + 1] = unesc(field) end
+			t[#t + 1] = r
+		end
+		f:close()
+	end
+	return t
+end
+local function line(r)
+	local t = {}
+	for i, v in ipairs(r) do t[i] = esc(v) end
+	return table.concat(t, "\t") .. "\n"
+end
+local function append(name, r)
+	os.execute("mkdir -p -m 700 " .. sq(DIR))
+	local f = io.open(DIR .. "/" .. name, "a")
+	return f and f:write(line(r)) and f:close() and true or false
+end
+local function save(name, t)
+	local f = io.open(DIR .. "/" .. name .. ".new", "w")
+	if not f then return false end
+	for _, r in ipairs(t) do f:write(line(r)) end
+	return f:close() and os.rename(DIR .. "/" .. name .. ".new", DIR .. "/" .. name) and true or false
+end
+
+local function newid()
+	local f = io.open("/dev/urandom", "rb")
+	local id = hex(f:read(6)):lower()
+	f:close()
+	return id
+end
+local function put(m)
+	m.id = newid()
+	return append("messages", { m.id, m.dir, m.number, m.time, m.status, m.ref, m.total, m.seq, m.text })
+end
+
+-- Messages with the parts of a long one joined. A part that never arrived shows as "[…]".
+local function messages()
+	local out, groups = {}, {}
+	for _, r in ipairs(rows("messages")) do
+		local seq = tonumber(r[8]) or 1
+		local k = r[6] ~= "" and table.concat({ r[2], r[3], r[6], r[7] }, "/")
+		local g = k and groups[k]
+		if g and not g.parts[seq] then
+			g.parts[seq] = r[9]; g.ids[#g.ids + 1] = r[1]
+		else
+			g = { ids = { r[1] }, dir = r[2], number = r[3], time = tonumber(r[4]) or 0, status = r[5], total = tonumber(r[7]) or 1, parts = { [seq] = r[9] } }
+			if k then groups[k] = g end
+			out[#out + 1] = g
+		end
+	end
+	for _, g in ipairs(out) do
+		local t = {}
+		g.complete = true
+		for i = 1, g.total do t[i] = g.parts[i] or "[…]"; g.complete = g.complete and g.parts[i] ~= nil end
+		g.text, g.parts, g.total = table.concat(t), nil, nil
+	end
+	return out
+end
+
+---------------------------------------------------------------- output
+
+local function js(v)
+	local t = type(v)
+	if t == "table" then
+		local o = {}
+		if #v > 0 or next(v) == nil then
+			for _, x in ipairs(v) do o[#o + 1] = js(x) end
+			return "[" .. table.concat(o, ",") .. "]"
+		end
+		for k, x in pairs(v) do o[#o + 1] = js(tostring(k)) .. ":" .. js(x) end
+		table.sort(o)
+		return "{" .. table.concat(o, ",") .. "}"
+	elseif t == "string" then
+		return '"' .. v:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end) .. '"'
+	end
+	return tostring(v)
+end
+
+---------------------------------------------------------------- actions
+
+local function webhook(new)
+	local url = (rows("webhook")[1] or {})[1]
+	if not url or next(new) == nil then return end
+	for _, g in ipairs(messages()) do
+		local mine = false
+		for _, id in ipairs(g.ids) do mine = mine or new[id] end
+		if mine and g.complete then   -- a long message is posted once, when its last part is in
+			local p = io.popen("curl -s -m 10 -o /dev/null -H 'Content-Type: application/json' --data-binary @- " .. sq(url) .. " 2>/dev/null", "w")
+			p:write(js(g)); p:close()
+		end
+	end
+end
+
+-- `mipc_wan_cli --at_cmd AT+CMGL=4` crashes on a long answer (seen with 27 messages), so the slots are read one by one,
+-- and only when the SIM's count changed: what we leave there (drafts, reports, unreadable ones) is not read again each time.
+local LEFT = os.getenv("X28_SMS_DIR") and DIR .. "/.left" or "/tmp/x28-sms.left"
+local function poll()
+	local used, size = at("AT+CPMS?"):match('%+CPMS:%s*"%u+",%s*(%d+),%s*(%d+)')
+	used, size = tonumber(used), tonumber(size)
+	local f = io.open(LEFT)
+	local left = f and tonumber(f:read("*l"))
+	if f then f:close() end
+	if not used or used == 0 or used == left then return 0 end
+	at("AT+CMGF=0")
+	local new, count, seen = {}, 0, 0
+	for i = 1, size do
+		if seen >= used then break end
+		local stat, pdu = at("AT+CMGR=" .. i):match("%+CMGR:%s*(%d+)[^\n]*\n(%x+)")
+		if stat then
+			seen = seen + 1
+			local ok, m = pcall(decode, pdu)
+			-- received ones only, and deleted from the SIM only once safely in the store; what we cannot read stays there
+			if tonumber(stat) <= 1 and ok and m and put(m) then at("AT+CMGD=" .. i); new[m.id] = true; count = count + 1 end
+		end
+	end
+	f = io.open(LEFT, "w")
+	if f then f:write(used - count, "\n"); f:close() end
+	webhook(new)
+	return count
+end
+
+local function send(to, text)
+	if type(to) ~= "string" or not to:match("^%+?%d%d%d+$") or #to > 21 then return nil, "bad number", 400 end
+	if type(text) ~= "string" or text:gsub(UTF8, "") ~= "" then return nil, "bad text", 400 end
+	local parts, err = encode(to, text)
+	if not parts then return nil, err, 400 end
+	local recent, now = 0, os.time()
+	for _, r in ipairs(rows("messages")) do if r[2] == "out" and (tonumber(r[4]) or 0) > now - 3600 then recent = recent + 1 end end
+	if recent >= LIMIT then return nil, "rate limit: " .. LIMIT .. " messages per hour", 429 end
+	local ok = true
+	for _, p in ipairs(parts) do
+		-- MediaTek's one-line form (no "> " prompt, which mipc_wan_cli cannot answer); the modem answers +CMGS: to it.
+		ok = at(string.format('AT+CMGS=%d,"%s"', p[1], p[2])):match("%+CMGS:") ~= nil
+		if not ok then break end
+	end
+	put { dir = "out", number = to, time = now, status = ok and "sent" or "failed", ref = "", total = "", seq = "", text = text }
+	if not ok then return nil, "the modem did not accept the message", 502 end
+	return true
+end
+
+local function remove(name, col, keys)
+	local keep, drop = {}, {}
+	for _, k in ipairs(keys) do drop[k] = true end
+	for _, r in ipairs(rows(name)) do if not drop[r[col]] then keep[#keep + 1] = r end end
+	return save(name, keep)
+end
+
+local function sha256(s)
+	local p = io.popen("sha256sum > " .. sq(DIR .. "/.hash"), "w")
+	p:write(s); p:close()
+	local h = (rows(".hash")[1] or { "" })[1]:match("^%x+")
+	os.remove(DIR .. "/.hash")
+	return h
+end
+local function auth(key)
+	local h = sha256(key)
+	for _, r in ipairs(rows("keys")) do if h and r[1] == h then return true end end
+	return false
+end
+
+local function cgi()
+	local function reply(status, body) io.write("Status: ", status, "\r\nContent-Type: application/json\r\n\r\n", js(body), "\n") end
+	local key = (os.getenv("HTTP_AUTHORIZATION") or ""):match("^Bearer%s+(%x+)$")
+	if not key or not auth(key) then return reply("401 Unauthorized", { error = "missing or wrong API key" }) end
+	local method = os.getenv("REQUEST_METHOD")
+	if os.getenv("PATH_INFO") ~= "/messages" then return reply("404 Not Found", { error = "not found" }) end
+	if method == "GET" then return reply("200 OK", messages()) end
+	if method ~= "POST" then return reply("405 Method Not Allowed", { error = "GET or POST" }) end
+	local body = io.read(math.min(tonumber(os.getenv("CONTENT_LENGTH")) or 0, 16384)) or ""
+	local to, text
+	if (os.getenv("CONTENT_TYPE") or ""):match("json") then
+		local ok, jsonc = pcall(require, "luci.jsonc")
+		local d = ok and jsonc.parse(body)
+		if type(d) == "table" then to, text = d.to, d.text end
+	else
+		local f = {}
+		for k, v in body:gmatch("([^&=]+)=([^&]*)") do
+			f[k] = v:gsub("%+", " "):gsub("%%(%x%x)", function(x) return string.char(tonumber(x, 16)) end)
+		end
+		to, text = f.to, f.text
+	end
+	local ok, err, code = send(to, text)
+	if ok then return reply("200 OK", { ok = true }) end
+	reply(code == 429 and "429 Too Many Requests" or code == 502 and "502 Bad Gateway" or "400 Bad Request", { error = err })
+end
+
+---------------------------------------------------------------- self-test (no modem, no files)
+
+local function selftest()
+	local m = decode("07911326040000F0040B911346610089F60000208062917314080CC8F71D14969741F977FD07")
+	assert(m.number == "+31641600986" and m.text == "How are you?", "deliver")
+	assert(m.time == epoch(2002, 8, 26, 19, 37, 41), "time zone")
+	assert(encode("+46708251358", "hellohello")[1][2] == "0001000B916407281553F800000AE8329BFD4697D9EC37", "submit")
+	-- what we send, read back as if received
+	local function back(to, text)
+		local t = {}
+		for _, p in ipairs(assert(encode(to, text))) do
+			local s = p[2]:sub(3)
+			assert(p[1] == #s / 2, "length")
+			local dalen = 4 + 2 * math.floor((#to:gsub("^%+", "") + 1) / 2)
+			local d = assert(decode("00" .. (s:sub(1, 2) == "41" and "44" or "04") .. s:sub(5, 4 + dalen) .. s:sub(5 + dalen, 8 + dalen) .. "42112100000000" .. s:sub(9 + dalen)))
+			assert(d.number == to, "number " .. d.number)
+			t[#t + 1] = d.text
+		end
+		return table.concat(t), #t
+	end
+	for _, c in ipairs { { "+989120000000", "سلام، حال شما؟ 👋", 1 }, { "09120000000", "price {10€} [ok]~", 1 }, { "+1555", string.rep("a", 160), 1 },
+		{ "+1555", string.rep("a", 161), 2 }, { "+1555", string.rep("a", 152) .. "€€€€€", 2 }, { "+1555", string.rep("س", 66) .. "👋👋👋", 2 } } do
+		local text, n = back(c[1], c[2])
+		assert(text == c[2] and n == c[3], "round trip: " .. c[2])
+	end
+	assert(not encode("+1555", string.rep("a", 1531)) and not encode("+1555", ""), "limits")
+	assert(js({ a = 'x"\n', b = { 1, 2 } }) == '{"a":"x\\u0022\\u000a","b":[1,2]}', "json")
+	assert(unesc(esc("a\tb\\n\nc")) == "a\tb\\n\nc", "store escaping")
+	print("x28-sms selftest: ok")
+end
+
+---------------------------------------------------------------- command line
+
+math.randomseed(os.time())
+local cmd = arg[1]
+local function fail(err) print(js { error = err }); os.exit(1) end
+local function done(ok) if ok then print(js { ok = true }) else fail("could not write " .. DIR) end end
+
+if cmd == "list" then print(js(messages()))
+elseif cmd == "poll" then print(js { new = poll() })
+elseif cmd == "send" then
+	local ok, err = send(arg[2], arg[3])
+	if not ok then fail(err) end
+	done(true)
+elseif cmd == "delete" then done(remove("messages", 1, { select(2, unpack(arg)) }))
+elseif cmd == "contacts" then
+	local t = {}
+	for _, r in ipairs(rows("contacts")) do t[#t + 1] = { number = r[1], name = r[2] } end
+	print(js(t))
+elseif cmd == "contact-set" then
+	local number, name = arg[2] or "", arg[3] or ""
+	if not number:match("^%+?%d%d%d+$") or #number > 21 or name == "" or #name > 80 then fail("bad number or name") end
+	done(remove("contacts", 1, { number }) and append("contacts", { number, name }))
+elseif cmd == "contact-del" then done(remove("contacts", 1, { arg[2] }))
+elseif cmd == "keys" then
+	local t = {}
+	for _, r in ipairs(rows("keys")) do t[#t + 1] = { id = r[1]:sub(1, 12), label = r[2], created = tonumber(r[3]) or 0 } end
+	print(js(t))
+elseif cmd == "key-add" then
+	local label = arg[2] or ""
+	if label == "" or #label > 40 then fail("give the key a name (up to 40 characters)") end
+	os.execute("mkdir -p -m 700 " .. sq(DIR))
+	local f = io.open("/dev/urandom", "rb")
+	local key = hex(f:read(24)):lower()
+	f:close()
+	local h = sha256(key)   -- only the hash is kept: the key is shown once
+	if not h or not append("keys", { h, label, os.time() }) then fail("could not write " .. DIR) end
+	print(js { key = key })
+elseif cmd == "key-del" then
+	local keep = {}
+	for _, r in ipairs(rows("keys")) do if r[1]:sub(1, 12) ~= arg[2] then keep[#keep + 1] = r end end
+	done(save("keys", keep))
+elseif cmd == "webhook" then
+	if arg[2] == nil then print(js { url = (rows("webhook")[1] or { "" })[1] })
+	elseif arg[2] == "" then os.remove(DIR .. "/webhook"); done(true)
+	elseif arg[2]:match("^https?://[%w%.%-%[%]:]+[%w%-%._~:/%?#@!%$&'%(%)%*%+,;=%%]*$") then
+		os.execute("mkdir -p -m 700 " .. sq(DIR))
+		done(save("webhook", { { arg[2] } }))
+	else fail("the address must start with http:// or https://") end
+elseif cmd == "cgi" then cgi()
+elseif cmd == "selftest" then selftest()
+else
+	io.stderr:write("usage: x28-sms list|poll|send N TEXT|delete ID...|contacts|contact-set N NAME|contact-del N|keys|key-add LABEL|key-del ID|webhook [URL]|cgi|selftest\n")
+	os.exit(1)
+end

@@ -7,7 +7,7 @@ on:
   schedule:
     - cron: "17 4 * * *"  # download counts and stars
   push:
-    branches: [main]
+    branches: [develop]
     paths: ["site/**", ".github/workflows/pages.yml", "docs/TESTING.md"]
   release:
     types: [published, edited]  # a new firmware, flasher or feed-N release
