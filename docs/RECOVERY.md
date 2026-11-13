@@ -522,6 +522,10 @@ installed packages alike (a live `upper` is never deleted). Three ways to the sa
 - **LuCI:** System > Backup / Flash Firmware > Perform reset.
 - **SSH:** `firstboot -y -r` (the same as `echo reset > /overlay/etc/.extroot-uuid && sync && reboot`).
 
+A settings backup (LuCI "Generate archive", `sysupgrade -b`, and what an upgrade keeps) holds all of `/etc/config` and
+`/etc/dropbear` through `/lib/upgrade/keep.d/x28`: the image has no keep list of its own, so before #551 it held only the changed
+config files of installed packages, without `network`, `wireless` or the SSH `authorized_keys`.
+
 After it the unit is as freshly flashed: empty root password, default LAN address, a new Wi-Fi key and host key. On a fall-back
 boot (below) the overlay is `rootfs_data`, so all three clear only that and `user_data` keeps its overlay: use the clean-up
 command below. Otherwise:
