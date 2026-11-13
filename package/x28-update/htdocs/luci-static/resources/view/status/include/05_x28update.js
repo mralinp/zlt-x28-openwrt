@@ -6,6 +6,7 @@
 // Status > Overview: a notice when a newer signed X28 image is released (#511), and "Upgrade now" (#515), which runs x28-upgrade in
 // the background. The overview polls its includes; one check per page load is enough, and the script caches its answer in /tmp.
 var check;
+var reconnecting = false;
 var LOG = '/tmp/x28-upgrade.log';
 
 function follow() {
@@ -23,18 +24,23 @@ function follow() {
 		}
 		else if (/flashing/.test(text)) {
 			ui.showModal(_('Flashing…'), [ E('p', { 'class': 'spinning' }, last) ]);
-			ui.awaitReconnect();
+			if (!reconnecting) {
+				reconnecting = true;
+				ui.awaitReconnect();
+			}
 		}
 		else {
 			ui.showModal(_('Upgrading…'), [ E('p', { 'class': 'spinning' }, last || _('Starting…')) ]);
-			return new Promise(function(r) { window.setTimeout(r, 2000); }).then(follow);
 		}
+		if (!/FAILED|up to date/.test(text))
+			return new Promise(function(r) { window.setTimeout(r, 2000); }).then(follow);
 	});
 }
 
 function upgrade(u) {
+	reconnecting = false;
 	ui.showModal(_('Upgrade to %s?').format(u.latest), [
-		E('p', {}, _('The signed image %s is downloaded, checked and written to the other A/B slot, which then boots. The unit reboots and is offline for a few minutes; the running slot stays as the fall-back. Settings are not kept.').format(u.latest)),
+		E('p', {}, _('The signed image %s is downloaded, checked and written to the other A/B slot, which then boots. The unit reboots and is offline for a few minutes; the running slot stays as the fall-back. Changed settings and the installed-package list are kept.').format(u.latest)),
 		E('div', { 'class': 'right' }, [
 			E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Cancel')), ' ',
 			E('button', { 'class': 'btn cbi-button-action important', 'click': function() {

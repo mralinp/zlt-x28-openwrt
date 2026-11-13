@@ -6,6 +6,8 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Fix the first phonebook save on an empty telephony store and keep LuCI watching for upgrade failures after flashing is announced.
+
 - Messages in LuCI are shown as conversations, with paging and a phone book picker for the recipient (#554).
 - Add `x28-telephony`: text messages in LuCI (Services > Telephony), a phone book, and an HTTP API with API keys for machines on the LAN (#309, #15).
 - Add `x28-upgrade --refresh` to bypass the update-check cache without installing firmware (#530).
