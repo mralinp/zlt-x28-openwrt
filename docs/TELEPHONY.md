@@ -4,11 +4,13 @@
 machines on the LAN can use the SIM (issues #309 and #15). Calls are not in it yet; [what is known](#calls-not-built-yet) is at the end.
 
 **State (2026-11-12):** installed by hand on the X28 test unit. Receiving, the store and the HTTP API work there; a sent test message arrived;
-**the LuCI pages in a browser are not yet checked**. See [Not verified](#not-verified).
+and the owner has
+looked at the LuCI pages, the conversation view of Messages (#554) included. See [Not verified](#not-verified).
 
 ## What you get
 
-- **LuCI, Services > Telephony**, three tabs: **Messages** (received and sent, newest first, reply, delete, send), **Phone book**
+- **LuCI, Services > Telephony**, three tabs: **Messages** (conversations by number as in a messaging app: a paged list on the left, the thread with a reply
+  box on the right; a new message takes its recipient from the phone book or a typed number; delete a message or a conversation), **Phone book**
   (names for numbers; kept on the router, not on the SIM), **API** (keys, the address for received messages, examples).
 - **`/usr/sbin/x28-sms`**, the one backend (Lua 5.1). `x28-sms` without arguments lists its commands; output is JSON.
 - **A service** (`/etc/init.d/x28-telephony`) that looks at the SIM every 15 seconds.
@@ -66,12 +68,14 @@ Through `mipc_wan_cli --at_cmd`, in PDU mode: `AT+CPMS?` for the count, `AT+CMGR
 ```sh
 lua package/x28-telephony/files/x28-sms selftest   # coding and decoding, no modem
 sh tests/test_telephony.sh                         # the whole tool against a fake modem (needs lua 5.1 and flock)
+node tests/test_telephony_luci.cjs                 # the Messages view against a stub of LuCI
 ```
 
 ## Not verified
 
 - Sending **Persian text** or a message of **several parts** (only a short GSM-alphabet message was sent).
-- The **LuCI pages in a browser** (the three views are served and the menu entry is in place; nobody has clicked through them).
+- Each button of the LuCI pages one by one. The owner looked at the three pages and at the conversation view of Messages (#554)
+  on the unit (2026-11-13) and said they were right; the view's logic is covered by `tests/test_telephony_luci.cjs`.
 - Installing as an **ipk** from the feed (the files were copied by hand), and the image.
 - The push of received messages to an address, a message arriving while the service runs, and `sysupgrade` keeping the store.
 - The X28 PRO.
