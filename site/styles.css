@@ -558,8 +558,8 @@ button {
 }
 
 .floating-2 {
-  bottom: 45px;
-  right: -30px;
+  bottom: -25px;
+  right: 20px;
   animation: floatAnim 5.2s ease-in-out infinite 0.7s;
 }
 
@@ -1883,3 +1883,18 @@ button {
 .footer-sisoog { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; font-size: 0.85rem; color: var(--text-muted); }
 .footer-sisoog img { height: 30px; width: auto; }
 @media (max-width: 768px) { .articles-card { grid-template-columns: minmax(0, 1fr); padding: 24px; gap: 24px; } }
+
+/* hero: front and back of the modem */
+.device-card { max-width: 560px; }
+.device-pair { display: grid; grid-template-columns: 1fr 0.546fr; gap: 14px; align-items: end; }
+.device-pair figure { margin: 0; min-width: 0; }
+.device-pair figcaption { margin-top: 6px; text-align: center; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.guide-step.no-shots { grid-template-columns: minmax(0, 1fr); }
+
+.hero-visual { padding-bottom: 30px; }
+@media (max-width: 480px) { .hud-card { padding: 8px 12px; } .floating-1 { left: -8px; } }
+@media (max-width: 768px) {
+  .hero-visual { padding-bottom: 0; }
+  .hud-card { position: static; width: 100%; margin-top: 12px; animation: none; }
+  .hud-card:first-of-type { margin-top: 0; }
+}
