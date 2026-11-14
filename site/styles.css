@@ -1880,7 +1880,6 @@ button {
 [data-theme="dark"] .logo-for-light { display: none; }
 [data-theme="dark"] .logo-for-dark { display: block; }
 .articles-text p { margin: 10px 0 14px; color: var(--text-muted); line-height: 1.6; }
-.articles-text .articles-title { color: var(--text-main); font-weight: 600; }
 .footer-sisoog { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; font-size: 0.85rem; color: var(--text-muted); }
 .footer-sisoog img { height: 30px; width: auto; }
 @media (max-width: 768px) { .articles-card { grid-template-columns: minmax(0, 1fr); padding: 24px; gap: 24px; } }
