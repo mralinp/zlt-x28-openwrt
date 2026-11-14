@@ -89,7 +89,7 @@ See the [contribution workflow](docs/WORKFLOW.md) for labels, milestones and rev
 
 ## Documentation
 
-The **[documentation index](docs/README.md)** covers installation, recovery, firmware upgrades, packages, hardware and development. See the [changelog](CHANGELOG.md) for release history.
+The **[wiki](site/wiki/Home.md)** is the short version: install, packages, cellular, upgrades, recovery, build and test results. The **[documentation index](docs/README.md)** covers installation, recovery, firmware upgrades, packages, hardware and development. See the [changelog](CHANGELOG.md) for release history.
 
 ## Credits and license
 
