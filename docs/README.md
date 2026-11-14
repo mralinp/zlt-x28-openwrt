@@ -52,6 +52,7 @@ docs/
 ├── DEVELOPMENT.md            repository layout and local checks
 ├── WORKFLOW.md               develop/main flow, labels, Conventional Commits, release and changelog rules
 ├── COMMUNITY-BRIEF.md        the project's public-facing brief
+├── ../site/wiki/             the wiki: short pages on using, understanding and working on the project, shown on the website at /wiki/
 ├── research/                 boot-flow, signature, slot-selection and flash-session research and plans
 ├── firmware/                 the stock kernel's embedded config (identical in both slots) and the device tree
 ├── assets/                   logo kit (SVG, icons, social preview) and BRAND.md usage guide
