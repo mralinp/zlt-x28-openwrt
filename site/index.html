@@ -1,165 +1,878 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>X28 OpenWrt</title>
-<meta name="description" content="OpenWrt 23.05.5 for the ZLT X28 and X28 PRO 5G routers: flasher, firmware downloads, signed package feed, hardware, plan and test evidence.">
-<link rel="icon" href="favicon.svg">
-<style>
-:root{--bg:#fff;--fg:#14181f;--mut:#5b6573;--card:#f5f7fa;--line:#e2e7ee;--acc:#0b63ce;--accfg:#fff;--ok:#127a3d;--warn:#9a6700;--bad:#c4281c;--code:#eef1f5}
-@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e8ecf1;--mut:#9aa5b3;--card:#171c24;--line:#262d38;--acc:#5aa2ff;--accfg:#0b1220;--ok:#4cc27c;--warn:#e3b341;--bad:#ff7b72;--code:#1d232c}}
-*{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-a{color:var(--acc)}code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em}
-.w{max-width:1040px;margin:0 auto;padding:0 16px}
-nav{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:5}
-nav .w{display:flex;align-items:center;gap:20px;height:52px;overflow-x:auto;white-space:nowrap}
-nav b{display:flex;align-items:center;gap:8px}nav img{width:24px;height:24px}
-nav a{color:var(--mut);text-decoration:none;font-size:.92rem}nav a:hover{color:var(--fg)}nav .gh{margin-left:auto}
-.hero{padding:56px 0 32px;text-align:center}
-.hero img.logo{width:96px;height:96px}
-h1{font-size:clamp(2rem,5vw,3rem);line-height:1.1;margin:.4em 0 .2em}
-.lead{color:var(--mut);max-width:620px;margin:0 auto 24px;font-size:1.1rem}
-.btn{display:inline-block;padding:10px 18px;border-radius:8px;background:var(--acc);color:var(--accfg);text-decoration:none;font-weight:600;margin:4px}
-.btn.alt{background:transparent;color:var(--fg);border:1px solid var(--line)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:32px 0}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center}
-.stat b{display:block;font-size:1.8rem;line-height:1.2}.stat span{color:var(--mut);font-size:.85rem}
-section{padding:36px 0;border-top:1px solid var(--line)}
-h2{font-size:1.5rem;margin:0 0 6px}.sub{color:var(--mut);margin:0 0 20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
-.card h3{margin:0 0 6px;font-size:1.05rem}.card p{margin:0;color:var(--mut)}
-table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--mut);font-weight:500;width:34%}
-.tw{overflow-x:auto}
-pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;margin:8px 0}
-.warn{border-left:4px solid var(--warn);background:var(--card);padding:12px 16px;border-radius:8px;margin:16px 0}
-ol.steps{padding-left:1.2em}ol.steps li{margin:.5em 0}
-.pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.78rem;border:1px solid var(--line);color:var(--mut)}
-.ok{color:var(--ok)}.bad{color:var(--bad)}.wn{color:var(--warn)}
-.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--ok)}
-.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:18px}.shots img{width:100%;border-radius:10px;border:1px solid var(--line)}
-footer{padding:28px 0 48px;color:var(--mut);font-size:.88rem;border-top:1px solid var(--line)}
-button.cp{float:right;font:inherit;font-size:.8rem;padding:2px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);cursor:pointer}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X28 OpenWrt — Real OpenWrt for ZLT X28 & X28 PRO 5G</title>
+  <meta name="description" content="OpenWrt 23.05.5 userspace for the ZLT X28 and X28 PRO 5G routers (MediaTek MT6890): LuCI, 5G band and cell locking, text messages with a local HTTP API, WireGuard, OpenVPN and Passwall2.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<nav><div class="w">
-<b><img src="favicon.svg" alt="">X28 OpenWrt</b>
-<a href="#start">Start</a><a href="#downloads">Downloads</a><a href="#hardware">Hardware</a><a href="#feed">Feed</a><a href="#plan">Plan</a><a href="#tests">Tests</a>
-<a class="gh" href="https://github.com/mralinp/zlt-x28-openwrt">GitHub</a>
-</div></nav>
 
-<header class="hero w">
-<picture><source media="(prefers-color-scheme:dark)" srcset="logo-dark.svg"><img class="logo" src="logo.svg" alt="X28 OpenWrt logo"></picture>
-<h1>OpenWrt for the ZLT X28</h1>
-<p class="lead">OpenWrt 23.05.5 with LuCI, 5G, WireGuard and Passwall2 on the X28 and X28&nbsp;PRO, installed and recovered with a guided flasher.</p>
-<a class="btn" href="#downloads">Download</a><a class="btn alt" href="#start">Get started</a><a class="btn alt" href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/README.md">Documentation</a>
-<div class="stats" id="stats" aria-live="polite">
-<div class="stat"><b data-k="stars">…</b><span>GitHub stars</span></div>
-<div class="stat"><b data-k="downloads">…</b><span>total downloads</span></div>
-<div class="stat"><b data-k="fw">…</b><span>latest firmware</span></div>
-<div class="stat"><b data-k="flasher">…</b><span>latest flasher</span></div>
-<div class="stat"><b data-k="feed">…</b><span>feed packages</span></div>
-<div class="stat"><b data-k="tests">…</b><span>tests passed</span></div>
-</div>
-</header>
+  <!-- Navigation Bar -->
+  <header class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-brand" aria-label="X28 OpenWrt Home">
+        <img src="logo-dark-horizontal.svg" alt="X28 OpenWrt" class="brand-logo" id="brandLogo">
+      </a>
 
-<main class="w">
-<section id="start">
-<h2>Get started</h2>
-<p class="sub">The flasher is the only supported installation path.</p>
-<ol class="steps">
-<li>Download the <a href="#downloads">flasher</a> for Windows, macOS (Apple silicon) or Linux (.deb or Arch).</li>
-<li>Connect the router with a <b>USB-A to USB-C</b> cable. USB-C to USB-C does not work.</li>
-<li>Follow the guided steps: connect, make a <b>verified full backup</b>, enable root access, prepare the image, flash and pick the boot slot. Keep a second copy of the backup offline.</li>
-<li>After boot open <code>https://192.168.70.1/cgi-bin/luci</code>, accept the self-signed certificate and set a root password.</li>
-</ol>
-<div class="warn"><b>Flashing can brick your router.</b> Never write partitions or change the boot order by hand. Read the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md">recovery guide</a> first.</div>
-<div class="shots"><img src="x28-flasher.png" alt="X28 Flasher application" loading="lazy"><img src="x28-passwall2-luci.png" alt="Passwall2 running in LuCI on the X28" loading="lazy"></div>
-</section>
+      <nav class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#telephony">SMS & API</a>
+        <a href="#cellular">5G Control</a>
+        <a href="#vpn">VPN & Proxy</a>
+        <a href="#flasher">Install</a>
+        <a href="#downloads">Downloads</a>
+        <a href="#hardware">Hardware</a>
+        <a href="https://github.com/mralinp/zlt-x28-openwrt" target="_blank" rel="noopener" class="nav-link-gh">
+          <svg class="icon-gh" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </nav>
 
-<section id="downloads">
-<h2>Downloads</h2>
-<p class="sub" id="dl-sub">Latest releases from GitHub.</p>
-<div class="grid">
-<div class="card"><h3>X28 Flasher <span class="pill" id="fl-tag"></span></h3><p>Backup, build and flash, with recovery.</p><div class="tw"><table id="fl-assets"></table></div></div>
-<div class="card"><h3>Firmware <span class="pill" id="fw-tag"></span></h3><p>Image bundle and signed <code>sysupgrade</code> files.</p><div class="tw"><table id="fw-assets"></table></div></div>
-</div>
-<p class="sub" style="margin-top:14px">Verify downloads against the release's <code>SHA256SUMS</code>. Counts include every release since the first.</p>
-</section>
+      <div class="nav-actions">
+        <button id="themeToggle" class="btn-icon" aria-label="Toggle Dark/Light Mode">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <a href="#flasher" class="btn btn-primary btn-sm">Get Started</a>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle Navigation">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
 
-<section id="hardware">
-<h2>Hardware</h2>
-<p class="sub">Measured on a test unit running the native image. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/HARDWARE.md">Full details</a>.</p>
-<div class="grid"><div class="card tw"><table>
-<tr><th>SoC</th><td>MediaTek MT6890 (T750), 4× Cortex-A55, aarch64</td></tr>
-<tr><th>CPU speed</th><td>0.5 to 2.0 GHz, one shared frequency (schedutil)</td></tr>
-<tr><th>Modem</th><td>Quectel RG500L, 5G, on the SoC's modem processor</td></tr>
-<tr><th>Wi-Fi</th><td>MT7915, dual band</td></tr>
-<tr><th>RAM</th><td>1 GiB; Linux gets about 628 MiB, the rest is the modem's</td></tr>
-<tr><th>Flash</th><td>1 GiB NAND, 51 partitions; about 288 MiB for installs and settings</td></tr>
-<tr><th>Kernel</th><td>Vendor 4.19.205 (not the official OpenWrt kernel)</td></tr>
-<tr><th>Recovery port</th><td>MediaTek preloader <code>0e8d:2000</code>, USB-A to USB-C only</td></tr>
-</table></div>
-<div class="card"><img src="x28-board-back.jpg" alt="X28 board, back side" style="width:100%;border-radius:8px" loading="lazy"></div></div>
-</section>
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    
+    <div class="container hero-container">
+      <div class="hero-content">
+        <div class="release-pill">
+          <span class="pill-dot"></span>
+          <span class="pill-tag">Stable v1.1.1</span>
+          <span class="pill-divider">|</span>
+          <span class="pill-text">Native OpenWrt 23.05.5 for ZLT X28 & X28 PRO</span>
+          <svg class="icon-arrow" viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+          </svg>
+        </div>
 
-<section id="feed">
-<h2>Package feed</h2>
-<p class="sub">A signed <code>opkg</code> feed built for the vendor kernel. Images already carry the line and key.</p>
-<div class="card">
-<button class="cp" data-copy="src/gz x28 https://mralinp.github.io/zlt-x28-openwrt/feed">Copy</button>
-<b>/etc/opkg/customfeeds.conf</b>
-<pre>src/gz x28 https://mralinp.github.io/zlt-x28-openwrt/feed</pre>
-<p style="margin:0;color:var(--mut)">Signing key <code>7fec994ab0d15b97</code>. <span id="feed-info"></span> 208 of the 976 official <code>kmod-*</code> packages install; the rest are refused rather than installed broken.
-<a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PACKAGE-FEED.md">Feed guide</a> · <a href="feed/Packages">Packages</a></p>
-</div>
-</section>
+        <h1 class="hero-title">
+          Open Core.<br>
+          <span class="text-gradient">Real OpenWrt</span> for your 5G CPE.
+        </h1>
 
-<section id="plan">
-<h2>Project plan</h2>
-<p class="sub">Target: slot A runs stable OpenWrt; stock stays in slot B until the first <code>sysupgrade</code>. Recovery is the flasher. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/ROADMAP.md">Roadmap</a> · <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/STATUS.md">Status</a></p>
-<div class="grid">
-<div class="card"><h3>1 · Soak and test</h3><p>48 h without unexplained reboots, Wi-Fi client and throughput tests, more LED states, idle CPU and RAM baseline.</p></div>
-<div class="card"><h3>2 · A/B <code>sysupgrade</code></h3><p>Signed images work. Left: keeping settings (#477), LuCI flash page (#478), interrupted-write hardware pass (#458).</p></div>
-<div class="card"><h3>3 · Stable release</h3><p>A tagged stable release, the device page for the OpenWrt wiki, and build docs for other owners.</p></div>
-<div class="card"><h3>4 · Later</h3><p>Fan control in LuCI (#47), SMS and voice on the native image, a 4.19 kernel plus kmod feed (#130).</p></div>
-</div>
-</section>
+        <p class="hero-subtitle">
+          Replace the stock interface of your ZLT X28 or X28 PRO with real OpenWrt.
+          OpenWrt 23.05.5 userspace on the MediaTek MT6890, 5G band & cell locking,
+          <strong>SMS conversations & a local HTTP API</strong>, LuCI over HTTPS, and WireGuard, OpenVPN and Passwall2 preinstalled.
+        </p>
 
-<section id="tests">
-<h2>Tests</h2>
-<p class="sub">Every test is logged with the command, the result and what it did not prove. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md">Full test log</a></p>
-<div class="card">
-<b id="t-sum"></b><div class="bar"><i id="t-bar" style="width:0"></i></div>
-<div class="tw"><table id="t-rows"></table></div>
-</div>
-</section>
-</main>
+        <div class="hero-buttons">
+          <a href="#flasher" class="btn btn-primary btn-lg">
+            <span>Install via x28-flasher</span>
+            <svg class="btn-arrow" viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </a>
+          <a href="https://forum.openwrt.org/t/zlt-x28-5g-cpe-mt6890-custom-openwrt-23-05-running-as-my-daily-router-heading-for-a-stable-release-need-advice-on-publishing-and-the-wiki-page/254974/5" target="_blank" rel="noopener" class="btn btn-forum btn-lg">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.08L2 22l5.05-1.34C8.5 21.49 10.2 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+            </svg>
+            <span>OpenWrt Forum Thread</span>
+          </a>
+          <a href="https://github.com/mralinp/zlt-x28-openwrt/releases/tag/v1.1.1" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">
+            v1.1.1 Notes
+          </a>
+        </div>
 
-<footer><div class="w">Community firmware on the vendor kernel; not an official OpenWrt device image. Not affiliated with ZLT, Tozed, MediaTek or Quectel. Code is GPL-3.0-or-later. SMS and voice are not supported yet.
-<br>Stats refresh daily and on every release. <span id="built"></span></div></footer>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-number">23.05.5</div>
+            <div class="stat-label">Real OpenWrt, standard LuCI & UCI</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">5G + LTE</div>
+            <div class="stat-label">Band & Cell Locking in LuCI</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">SMS & API</div>
+            <div class="stat-label">Conversations + HTTP API</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">A/B Safe</div>
+            <div class="stat-label">Signed A/B Firmware Upgrades</div>
+          </div>
+        </div>
+      </div>
 
-<script>
-const $=s=>document.querySelector(s),n=x=>x.toLocaleString("en"),mb=b=>b>1e6?(b/1e6).toFixed(1)+" MB":Math.max(1,Math.round(b/1e3))+" kB";
-const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const rows=(el,r)=>{$(el).innerHTML=r.assets.filter(a=>!/^(SHA256SUMS.*|.*\.sig)$/.test(a.name)).map(a=>`<tr><td><a href="${esc(a.url)}">${esc(a.name)}</a></td><td>${mb(a.size)}</td><td>${n(a.downloads)}↓</td></tr>`).join("")};
-document.querySelectorAll("button.cp").forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.copy).then(()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy",1500)}));
-fetch("stats.json").then(r=>r.json()).then(s=>{
- const set=(k,v)=>$(`[data-k=${k}]`).textContent=v,t=s.tests;
- set("stars",n(Object.values(s.stars).reduce((a,b)=>a+b,0)));
- set("downloads",n(Object.values(s.downloads).reduce((a,b)=>a+b,0)));
- set("fw",s.firmware.tag);set("flasher",s.flasher.tag);set("feed",n(s.feed.packages));set("tests",`${t.passed}/${t.total}`);
- $("#fl-tag").textContent=s.flasher.tag;$("#fw-tag").textContent=s.firmware.tag;rows("#fl-assets",s.flasher);rows("#fw-assets",s.firmware);
- $("#feed-info").textContent=`${s.feed.packages} packages (${s.feed.tag}).`;
- $("#t-sum").innerHTML=`${t.passed} of ${t.total} passed${t.failed?`, <span class="bad">${t.failed} failed</span>`:""}${t.other?`, <span class="wn">${t.other} partial or open</span>`:""}`;
- $("#t-bar").style.width=(100*t.passed/t.total)+"%";
- $("#t-rows").innerHTML=t.recent.map(r=>`<tr><td>#${esc(r.n)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.result.slice(0,90))}</td></tr>`).join("");
- $("#built").textContent="Data: "+s.built;
-}).catch(()=>{$("#dl-sub").innerHTML='Live data unavailable; see <a href="https://github.com/mralinp/zlt-x28-openwrt/releases">GitHub releases</a>.'});
-</script>
+      <div class="hero-visual">
+        <div class="device-card">
+          <div class="device-glow"></div>
+          <div class="device-pair">
+            <figure><img src="zlt-x28.jpg" alt="ZLT X28 5G CPE, front" class="device-image"><figcaption>Front</figcaption></figure>
+            <figure><img src="modem-back.jpeg" alt="ZLT X28 5G CPE, back: power, four LAN ports, SIM slot and the USB-C debug port, with a penguin pointing at the debug port" class="device-image"><figcaption>Back</figcaption></figure>
+          </div>
+          
+          <!-- Floating Status Cards -->
+          <div class="hud-card hud-temp floating-1">
+            <div class="hud-icon-box sms-active">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="hud-details">
+              <div class="hud-label">Firmware</div>
+              <div class="hud-value">Signed A/B upgrades</div>
+            </div>
+          </div>
+
+          <div class="hud-card hud-cellular floating-2">
+            <div class="hud-icon-box signal-strong">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 20h2M7 20v-4m0 4h2M12 20v-8m0 8h2M17 20V8m0 12h2M22 20V4"/>
+              </svg>
+            </div>
+            <div class="hud-details">
+              <div class="hud-label">Cellular Link (5G)</div>
+              <div class="hud-value">Band & cell lock • <strong class="text-teal">LuCI</strong></div>
+            </div>
+          </div>
+
+          <div class="hud-card hud-proxy floating-3">
+            <div class="hud-icon-box sms-active">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="hud-details">
+              <div class="hud-label">Telephony & SMS API</div>
+              <div class="hud-value"><span class="status-online">LuCI</span> • HTTP API</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section features-section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">What you get</span>
+        <h2 class="section-title">Built for Control, Stability and Freedom</h2>
+        <p class="section-desc">
+          The stock interface is replaced by OpenWrt userspace. The vendor kernel and the 5G modem backend stay, so the modem keeps working.
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <div class="feature-card">
+          <div class="card-icon icon-purple"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3>SMS & Local HTTP API <span class="tag-new">v1.1</span></h3>
+          <p>Text messages in LuCI (<strong>Services → Telephony</strong>) as conversations, with a phone book and a local HTTP API with API keys for machines on your LAN. Received messages move to the router, so the SIM does not fill up.</p>
+          <div class="card-badge">HTTP API + Push to Your Address</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon icon-teal"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg></div>
+          <h3>5G Cellular Control</h3>
+          <p>APN, operator selection with a network scan, 4G and 5G band locks, cell lock and signal status on a standard LuCI interface page.</p>
+          <div class="card-badge">x28_mipc netifd Protocol</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon icon-amber"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+          <h3>VoIP <span class="tag-wip">In development</span></h3>
+          <p>The stock firmware makes voice calls. We are building VoIP for OpenWrt, with a VoIP server on the router and more. It is not ready yet: voice calls are not supported in the current release.</p>
+          <div class="card-badge">Work in progress</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon icon-blue"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h20v14H2zM8 21h8M12 17v4"/></svg></div>
+          <h3>Standard LuCI over HTTPS</h3>
+          <p>The standard OpenWrt LuCI web interface with UCI configuration, SSH, netifd, dnsmasq and firewall3. Vendor daemons run only as the modem backend.</p>
+          <div class="card-badge">OpenWrt 23.05.5 Userspace</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon icon-green"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>VPN & Proxy</h3>
+          <p>Passwall2, WireGuard, OpenVPN, L2TP, PPTP and SSH tunnels, managed from LuCI.</p>
+          <div class="card-badge">Preinstalled</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon icon-amber"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+          <h3>Signed A/B Firmware Upgrades</h3>
+          <p>Signed upgrades write and verify the slot that is not running, then switch to it; <code>x28-bootok</code> manages the boot counter. Use <code>x28-upgrade</code> or the LuCI update notice. Nothing installs by itself; back up your settings first.</p>
+          <div class="card-badge">Signed Images + Signed opkg Feed</div>
+        </div>
+      </div>
+
+      <figure class="luci-shot">
+        <div class="browser-bar">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <div class="browser-address"><span>https://192.168.70.1/cgi-bin/luci/admin/status/overview</span></div>
+        </div>
+        <img src="img/8-done.png" alt="LuCI status page of the X28 running OpenWrt 23.05.5" loading="lazy">
+        <figcaption>LuCI on a real X28: OpenWrt 23.05.5 on the vendor 4.19.205 kernel.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- SMS and API -->
+  <section class="section telephony-section" id="telephony">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">New in v1.1</span>
+        <h2 class="section-title">SMS Conversations & Local HTTP API</h2>
+        <p class="section-desc">
+          The <code>x28-telephony</code> package adds <strong>Services → Telephony</strong> to LuCI and an HTTP API for machines on your LAN. Voice calls are not supported yet. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TELEPHONY.md" target="_blank" rel="noopener">Documentation</a>
+        </p>
+      </div>
+
+      <div class="telephony-pillars-grid">
+        <div class="pillar-card">
+          <div class="pillar-icon icon-purple"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h4>Messages</h4>
+          <p>Conversations by number as in a messaging app: a paged list on the left, the thread with a reply box on the right. A new message takes its recipient from the phone book or a typed number. Delete a message or a whole conversation.</p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon icon-teal"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <h4>Phone book</h4>
+          <p>Names for numbers, kept on the router and not on the SIM. Received and sent messages are stored on the router too, root-only, and kept across firmware upgrades.</p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon icon-blue"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></div>
+          <h4>The SIM does not fill up</h4>
+          <p>The SIM has 50 slots. The service looks at it every 15 seconds, copies each received message to the router and only then deletes it from the SIM. Long messages (up to 10 parts) arrive in parts and are shown joined.</p>
+        </div>
+      </div>
+
+      <div class="luci-shots">
+        <figure class="luci-shot ">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › Messages</span></div></div>
+          <img src="img/luci-messages.png" alt="LuCI Services, Telephony, Messages tab: a New message button, a recipient chosen from the phone book or typed, and a message box" loading="lazy">
+        </figure>
+        <figure class="luci-shot ">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › Phone book</span></div></div>
+          <img src="img/luci-phonebook.png" alt="LuCI Telephony Phone book tab: names for numbers, kept on the router, with Message and Delete buttons and an Add row" loading="lazy">
+        </figure>
+        <figure class="luci-shot wide">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › API</span></div></div>
+          <img src="img/luci-api.png" alt="LuCI Telephony API tab: API keys, the address that received messages are sent to, and curl usage examples" loading="lazy">
+        </figure>
+      </div>
+
+      <div class="api-layout">
+        <div class="api-info-col">
+          <h4>Local HTTP API</h4>
+          <p>Any machine on your LAN (Home Assistant, n8n, Node-RED, a curl script) can send and list messages, and received messages can be pushed to an address you set. No cloud service is involved.</p>
+          <div class="api-feature-pills">
+            <div class="ap-pill"><span class="ap-icon">🔑</span><div><strong>API keys</strong><span>Created in LuCI and shown once; only the SHA-256 is stored.</span></div></div>
+            <div class="ap-pill"><span class="ap-icon">📬</span><div><strong>Push of received messages</strong><span>Each complete received message is POSTed as JSON to the address you set.</span></div></div>
+            <div class="ap-pill"><span class="ap-icon">⏱️</span><div><strong>Rate limit</strong><span>At most 30 messages sent per hour, API and LuCI together.</span></div></div>
+          </div>
+        </div>
+
+        <div class="api-code-col">
+          <div class="api-code-header"><span>curl</span><button class="btn-copy-code" id="copyApiCode">Copy send command</button></div>
+<pre class="api-code-pre"><code><span class="c-str"># list messages, oldest first</span>
+<span class="c-cmd">curl</span> -k -H <span class="c-str">"Authorization: Bearer $KEY"</span> \
+  https://192.168.70.1/cgi-bin/x28-telephony/messages
+
+<span class="c-str"># send a message</span>
+<span class="c-cmd">curl</span> -k -H <span class="c-str">"Authorization: Bearer $KEY"</span> \
+  -H <span class="c-str">"Content-Type: application/json"</span> \
+  -d <span class="c-str">'{"to":"+989121234567","text":"Hello"}'</span> \
+  https://192.168.70.1/cgi-bin/x28-telephony/messages</code></pre>
+          <table class="answers-table">
+            <tr><td><code>200</code></td><td>done</td></tr>
+            <tr><td><code>400</code></td><td>bad number, or empty or too long text</td></tr>
+            <tr><td><code>401</code></td><td>no key, or a wrong one</td></tr>
+            <tr><td><code>429</code></td><td>more than 30 messages sent in the last hour</td></tr>
+            <tr><td><code>502</code></td><td>the modem refused the message; it is kept as failed</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5G control -->
+  <section class="section cellular-section" id="cellular">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">5G & LTE</span>
+        <h2 class="section-title">5G Band & Cell Locking</h2>
+        <p class="section-desc">
+          The modem is a normal netifd interface (<code>proto x28_mipc</code>) with its own LuCI page. Everything below is set on the interface page, under the Carrier tab. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/NATIVE-CELLULAR.md" target="_blank" rel="noopener">Documentation</a>
+        </p>
+      </div>
+
+      <div class="carrier-layout">
+        <div class="pillar-grid-2">
+        <div class="pillar-card">
+          <h4>Network mode</h4>
+          <p>Automatic, 4G only or 5G only. Set before the data call, and read back from the modem.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Band locks</h4>
+          <p>Allow or deny lists of LTE bands, and a 5G band mask set with <code>x28-nrband</code>. A mask outside the bands the modem supports is refused.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Cell lock</h4>
+          <p>Lock to one cell by its EARFCN and PCI, or turn the lock off again.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Operator selection</h4>
+          <p>Automatic or manual, with a network scan. A scan can take a few minutes and drops the data connection, which comes back by itself.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>APN & IP type</h4>
+          <p>IPv4, IPv6 or both. Leave the APN empty and it is taken from the SIM's operator. Roaming is off by default.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Modem status</h4>
+          <p>Operator, registration, serving cell and neighbours with RSRP and RSRQ, carrier aggregation and the 5G (EN-DC) state.</p>
+        </div>
+      </div>
+
+        <figure class="luci-shot carrier-shot">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Network › Interfaces › wan › Carrier</span></div></div>
+          <img src="img/luci-carrier.png" alt="LuCI interface page, Carrier tab: modem status with operator, registration, 5G signal and serving cell, then roaming, network selection, network mode, 4G band lock, 5G band lock and cell lock" loading="lazy">
+          <figcaption>The Carrier tab on a real X28, with 4G and 5G attached.</figcaption>
+        </figure>
+      </div>
+
+      <div class="band-card">
+        <h4>Bands the modem supports and the lock accepts</h4>
+        <div class="band-row"><b>LTE</b><div class="band-list"><span>B1</span><span>B3</span><span>B5</span><span>B7</span><span>B8</span><span>B20</span><span>B28</span><span>B32</span><span>B38</span><span>B40</span><span>B41</span><span>B42</span><span>B43</span></div></div>
+        <div class="band-row"><b>5G NR</b><div class="band-list nr"><span>n1</span><span>n3</span><span>n5</span><span>n7</span><span>n8</span><span>n20</span><span>n28</span><span>n38</span><span>n40</span><span>n41</span><span>n77</span><span>n78</span></div></div>
+        <p>Which of these your operator uses depends on your location. See the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md" target="_blank" rel="noopener">test log</a> for what has been checked on real SIMs.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- VPN and proxy -->
+  <section class="section passwall-section" id="vpn">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">VPN & Proxy</span>
+        <h2 class="section-title">Tunnels and Proxies, Managed from LuCI</h2>
+        <p class="section-desc">
+          The router has what it takes to put your whole LAN through a tunnel or a proxy. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PASSWALL2.md" target="_blank" rel="noopener">Passwall2 setup notes and measured performance</a>
+        </p>
+      </div>
+
+      <div class="passwall-features-grid">
+        <div class="pf-item"><div class="pf-icon">🧭</div><div><h4>Passwall2</h4><p>Transparent proxy with xray: the whole LAN goes through the node you pick, switched from LuCI.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔐</div><div><h4>WireGuard</h4><p>A module built for the vendor kernel, with LuCI support and the wireguard-tools.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔑</div><div><h4>OpenVPN</h4><p>OpenVPN with OpenSSL and its LuCI page; the tunnels you enable start at boot.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔗</div><div><h4>L2TP</h4><p>L2TP client, configured as a LuCI interface.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔌</div><div><h4>PPTP</h4><p>PPTP client, configured as a LuCI interface.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🚇</div><div><h4>SSH tunnels</h4><p>Forward ports and tunnel traffic over SSH.</p></div></div>
+      </div>
+      <p class="vpn-note">And more: other packages from OpenWrt's feeds and the signed X28 feed install with <code>opkg</code> or <strong>System → Software</strong>. Kernel modules from the official feeds do not load on the vendor kernel, so incompatible ones are refused instead of installed broken.</p>
+    </div>
+  </section>
+
+  <!-- Install guide: the steps follow the OpenWrt Forum tutorial -->
+  <section class="section flasher-section" id="flasher">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Install</span>
+        <h2 class="section-title">Install with x28-flasher</h2>
+        <p class="section-desc">
+          The flasher is the only supported way to install, back up and recover. These are the steps of the tutorial on the OpenWrt Forum; the screenshots are from flasher v0.4.0, later versions may look slightly different.
+        </p>
+      </div>
+
+      <div class="forum-banner-card">
+        <div class="forum-card-content">
+          <div class="forum-icon-badge">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.08L2 22l5.05-1.34C8.5 21.49 10.2 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+          </div>
+          <div class="forum-text">
+            <div class="forum-badge-pill">Discussion & Questions</div>
+            <h3 class="forum-headline">The tutorial lives on the OpenWrt Forum</h3>
+            <p class="forum-desc">Questions, troubleshooting and progress notes are in the thread <em>"ZLT X28 5G CPE (MT6890) custom OpenWrt 23.05 running as my daily router"</em>. This is community firmware, not an official OpenWrt image.</p>
+          </div>
+          <a href="https://forum.openwrt.org/t/zlt-x28-5g-cpe-mt6890-custom-openwrt-23-05-running-as-my-daily-router-heading-for-a-stable-release-need-advice-on-publishing-and-the-wiki-page/254974/5" target="_blank" rel="noopener" class="btn btn-forum-cta">
+            <span>Read on OpenWrt Forum</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="warning-callout">
+        <div class="callout-icon">⚠️</div>
+        <div class="callout-body">
+          <strong>Flashing can brick your router.</strong> Never write partitions or change the boot order by hand. Read the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md" target="_blank" rel="noopener">recovery guide</a> first. A firmware upgrade writes the inactive slot, so the first one can replace the stock fallback.
+        </div>
+      </div>
+
+      <div class="guide">
+        <div class="guide-step no-shots">
+          <div class="guide-text">
+            <div class="step-num">1</div>
+            <div>
+              <h4>Download and launch the flasher</h4>
+              <p>Download the latest X28 Flasher for your operating system, install it and launch it.</p>
+              <div class="os-pick" id="osPick"><p>Get it from <a href="https://github.com/mralinp/x28-flasher/releases" target="_blank" rel="noopener">the flasher releases</a>.</p></div>
+            </div>
+          </div>
+                  </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">2</div>
+            <div>
+              <h4>Connect to your device</h4>
+              <p>Use a <strong>USB-A to USB-C</strong> cable; USB-C to USB-C does not work. Follow these steps in the exact order:</p>
+              <ol>
+                <li>Connect the USB cable between your computer and the ZLT X28.</li>
+                <li>In the flasher, click <strong>Connect Device</strong>.</li>
+                <li>Click <strong>Start</strong>.</li>
+                <li>Wait about 10 seconds.</li>
+                <li>Connect the router's power adapter.</li>
+                <li>Wait until the device reading completes.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not connect the power adapter before the 10-second wait. The order matters for the flasher to reach the device.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/2-connect-a.jpeg" alt="Flasher: Connect device page" loading="lazy"><img src="img/2-connect-b.png" alt="Flasher: connection started, waiting for the device" loading="lazy"><img src="img/2-connect-c.png" alt="Flasher: device connecting" loading="lazy"><img src="img/2-connect-d.png" alt="Flasher: device information read" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">3</div>
+            <div>
+              <h4>Back up your original firmware</h4>
+              <p>Before flashing anything, back up the original firmware.</p>
+              <ol>
+                <li>Open the backup section in the flasher.</li>
+                <li>Follow the instructions to create a backup.</li>
+                <li>Save the backup somewhere safe, and keep a second copy offline.</li>
+                <li>Make sure the backup completes successfully.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not skip this step. The backup is how you restore the original vendor firmware if anything goes wrong. It takes about 20 to 50 minutes; if it fails, retry and it resumes.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/3-backup.jpeg" alt="Flasher: backup page" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">4</div>
+            <div>
+              <h4>Download the signed OpenWrt image</h4>
+              <ol>
+                <li>Go to <strong>Get an image</strong>.</li>
+                <li>Select <strong>Download the signed image</strong>.</li>
+                <li>Click <strong>Download</strong> and wait for it to finish.</li>
+              </ol>
+              <p>You do not need Docker or files from your vendor firmware to get a flashable image.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/4-download.png" alt="Flasher: Get an image, download the signed image" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">5</div>
+            <div>
+              <h4>Identify your current boot slot</h4>
+              <p>In the <strong>Device read</strong> section, find the device information: MAC address, IMEI, serial number and the <strong>current boot slot</strong> (A or B). Note the slot; you select the same one when flashing.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/5-slot.png" alt="Flasher: device information with the current boot slot" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">6</div>
+            <div>
+              <h4>Configure the flash</h4>
+              <ol>
+                <li>Go to <strong>Flash OpenWrt</strong> and select <strong>Built/Downloaded Images</strong>.</li>
+                <li>Under <strong>Image to Flash</strong>, select the image at the top of the list: the latest one, downloaded or assembled locally.</li>
+                <li>Select the path to your backup. It is required on purpose, so you cannot skip the backup.</li>
+                <li>Select the slot your device is booting from, as found in step 5.</li>
+              </ol>
+              <p class="note warn"><strong>Warning:</strong> The selected slot must match the current boot slot. Flashing the wrong slot can cause boot problems.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/6-configure.jpeg" alt="Flasher: Flash OpenWrt configuration" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">7</div>
+            <div>
+              <h4>Start flashing</h4>
+              <ol>
+                <li>Click <strong>Start</strong>. Untick <strong>Rehearsal</strong> for the real write; a rehearsal writes your backup to that slot again to check that writing works.</li>
+                <li>Read and accept the risk warning.</li>
+                <li>Type the confirmation phrase the flasher asks for, and submit it.</li>
+                <li>Wait until the flasher reports <strong>Finished</strong>.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not disconnect the USB cable or interrupt power while flashing.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/7-flash-a.png" alt="Flasher: start the flash" loading="lazy"><img src="img/7-flash-b.png" alt="Flasher: risk warning" loading="lazy"><img src="img/7-flash-c.png" alt="Flasher: confirmation phrase" loading="lazy"><img src="img/7-flash-d.png" alt="Flasher: flash finished" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">8</div>
+            <div>
+              <h4>Disconnect and reboot</h4>
+              <ol>
+                <li>Click <strong>Disconnect</strong> in the flasher.</li>
+                <li>Disconnect the USB cable.</li>
+                <li>Unplug the router's power adapter, then plug it in again.</li>
+                <li>Wait for the router to boot.</li>
+              </ol>
+              <p>The X28 now boots into OpenWrt. Open <a href="https://192.168.70.1/cgi-bin/luci" target="_blank" rel="noopener">https://192.168.70.1/cgi-bin/luci</a>, accept the self-signed certificate and set a root password. SSH is on port 22 from the LAN.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/8-done.png" alt="LuCI status page after the first boot" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="recovery-card">
+        <h3>Recovery: restore the original vendor firmware</h3>
+        <p>If the router does not boot correctly, you can restore the original firmware from your verified backup.</p>
+        <ol>
+          <li>Reconnect the device to the flasher as in step 2.</li>
+          <li>Go to <strong>Flash OpenWrt</strong> and select <strong>Rootfs from a verified backup</strong>.</li>
+          <li>Select your backup.</li>
+          <li>Choose the rootfs partition of the slot you flashed: <code>rootfs_a</code> for slot A, <code>rootfs_b</code> for slot B.</li>
+          <li>Start the restore and wait until it finishes.</li>
+          <li>Disconnect the device and power-cycle the router.</li>
+        </ol>
+        <p>This restores the selected rootfs from your backup. Whether the vendor firmware then runs fully depends on the backup and on the state of the other partitions. Developers can still assemble images locally from a vendor backup (needs Docker). Problems? <a href="https://github.com/mralinp/x28-flasher/issues" target="_blank" rel="noopener">Open an issue</a> with the flasher and firmware versions, your device and the logs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Downloads: filled from stats.json (site/build_site.py) -->
+  <section class="section" id="downloads">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Downloads</span>
+        <h2 class="section-title">Latest Releases</h2>
+        <p class="section-desc" id="dlSub">Straight from GitHub releases. Verify downloads against the release's <code>SHA256SUMS</code>.</p>
+      </div>
+
+      <div class="live-stats" id="liveStats" aria-live="polite">
+        <div><b data-k="stars">…</b><span>GitHub stars</span></div>
+        <div><b data-k="downloads">…</b><span>total downloads</span></div>
+        <div><b data-k="feed">…</b><span>feed packages</span></div>
+        <div><b data-k="tests">…</b><span>tests passed</span></div>
+      </div>
+
+      <div class="dl-grid" id="dlGrid">
+        <div class="table-card dl-card">
+          <h3>X28 Flasher <span class="tag-new" id="flTag"></span></h3>
+          <p>Backup, install and recovery.</p>
+          <table id="flAssets"></table>
+        </div>
+        <div class="table-card dl-card">
+          <h3>Firmware <span class="tag-new" id="fwTag"></span></h3>
+          <p>Image bundle and signed <code>sysupgrade</code> files.</p>
+          <table id="fwAssets"></table>
+        </div>
+      </div>
+
+      <p class="dl-foot">
+        <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PACKAGE-FEED.md" target="_blank" rel="noopener">Signed package feed</a> ·
+        <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md" target="_blank" rel="noopener">Test log</a>
+        <span id="built"></span>
+      </p>
+    </div>
+  </section>
+
+  <!-- Interactive Terminal Playground -->
+  <section class="section terminal-section" id="terminal">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Shell preview</span>
+        <h2 class="section-title">A Normal OpenWrt Shell</h2>
+        <p class="section-desc">
+          SSH in and use <code>uci</code>, <code>opkg</code> and the project's own tools. Click a command to run it in the simulated console; the output is what the tools print.
+        </p>
+      </div>
+
+      <div class="terminal-wrapper">
+        <div class="term-toolbar">
+          <span class="toolbar-label">Quick Commands:</span>
+          <button class="cmd-pill" data-cmd="x28-upgrade --help">x28-upgrade --help</button>
+          <button class="cmd-pill" data-cmd="x28-update-check --help">x28-update-check --help</button>
+          <button class="cmd-pill" data-cmd="x28-sms --help">x28-sms --help</button>
+          <button class="cmd-pill" data-cmd="x28-sms poll">x28-sms poll</button>
+          <button class="cmd-pill" data-cmd="opkg update">opkg update</button>
+        </div>
+
+        <div class="terminal-window">
+          <div class="term-title-bar">
+            <div class="term-lights"><span></span><span></span><span></span></div>
+            <span class="term-title">ssh root@192.168.70.1</span>
+            <span class="term-badge">OpenWrt 23.05.5</span>
+          </div>
+          <div class="term-body" id="termBody">
+            <div class="term-line banner-line">
+  _______                     ________        __
+ |       |.-----.-----.-----.|  |  |  |.----.|  |_
+ |   -   ||  _  |  -__|     ||  |  |  ||   _||   _|
+ |_______||   __|_____|__|__||________||__|  |____|
+          |__| W I R E L E S S   F R E E D O M
+ -----------------------------------------------------
+ OpenWrt 23.05.5, r24106-10cc5fcd00
+ -----------------------------------------------------
+            </div>
+            <div class="term-line info-line">Click a command above.</div>
+            <div class="term-line prompt-line">
+              <span class="term-prompt">root@X28:~#</span> <span class="term-input" id="termInput"></span><span class="term-cursor"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card tools-card">
+        <table class="tools-table">
+          <thead><tr><th>Tool</th><th>What it does</th><th>Synopsis, from the source</th></tr></thead>
+          <tbody>
+            <tr><td><code>x28-upgrade</code><span>x28-update</span></td><td>Upgrade to the newest signed image. Without <code>-y</code> it only checks; with it, it writes the other slot and keeps your changed settings.</td><td><code>x28-upgrade [--refresh | -y [-b]]</code></td></tr>
+            <tr><td><code>x28-update-check</code><span>x28-update</span></td><td>Read-only check for a newer signed release; prints JSON for LuCI.</td><td><code>x28-update-check [--refresh]</code></td></tr>
+            <tr><td><code>x28-sms</code><span>x28-telephony</span></td><td>Text messages, phone book, API keys and the HTTP API. Output is JSON.</td><td><code>x28-sms list | poll | send N TEXT | delete ID… | contacts | contact-set N NAME | contact-del N | keys | key-add LABEL | key-del ID | webhook [URL]</code></td></tr>
+            <tr><td><code>x28-apn</code><span>x28-mipc</span></td><td>The APNs of the SIM's operator, from the database the stock firmware ships.</td><td><code>x28-apn [imsi]</code></td></tr>
+            <tr><td><code>x28-modem-status</code><span>x28-mipc</span></td><td>Read-only modem state for LuCI's Carrier tab: operator, registration, serving cell and signal.</td><td><code>x28-modem-status</code></td></tr>
+            <tr><td><code>x28-plmn-scan</code><span>x28-mipc</span></td><td>Scan for networks; the modem leaves its network meanwhile.</td><td><code>x28-plmn-scan --start | --state | --last</code></td></tr>
+            <tr><td><code>x28-nrband</code><span>x28-nrband</span></td><td>The 5G band mask and the 5G signal, over the modem's MIPC channel.</td><td><code>x28-nrband get | set W0 W1 W2 | signal</code></td></tr>
+          </tbody>
+        </table>
+        <p class="tools-foot">Full <code>--help</code> output and man pages for every tool are planned: <a href="https://github.com/mralinp/zlt-x28-openwrt/issues/570" target="_blank" rel="noopener">#570</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hardware -->
+  <section class="section hardware-section" id="hardware">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Hardware</span>
+        <h2 class="section-title">ZLT X28 & X28 PRO Specifications</h2>
+        <p class="section-desc">
+          Built around the MediaTek MT6890 platform. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/HARDWARE.md" target="_blank" rel="noopener">Full hardware notes</a>
+        </p>
+      </div>
+
+      <div class="hardware-grid">
+        <div class="soc-card">
+          <svg class="mtk-logo" viewBox="0 0 24 24" role="img" aria-label="MediaTek"><path fill="currentColor" d="M3.863 8.996c-.296 0-.664.21-.815.467L.064 14.537c-.15.257-.029.467.267.467h19.805c.297 0 .665-.21.816-.467l2.983-5.074c.15-.257.03-.467-.268-.467zm3.41 1.975h1.09l-.232.402h-.776c-.238 0-.312.093-.312.338v.807h1.37l-.233.402H6.502v-1.197c0-.589.307-.752.771-.752zm1.444 0h.937c.703 0 1.002.27 1.002.959 0 .73-.301.99-.976.99h-.963zm7.832 0h1.09l-.233.402h-.775c-.239 0-.313.093-.313.338-.004.264-.002.539-.002.807h1.372l-.233.402h-1.678v-1.197c0-.589.308-.752.772-.752zm-11.567.004v.986l.569-.984.65-.002v1.941h-.547v-1.191l-.672 1.191h-.546v-1.191l-.688 1.19h-.535l1.121-1.938zm5.98 0h.546v1.941h-.545zm1.798 0h.781v1.941h-.553v-1.383l-.797 1.383h-.552zm1.256 0h1.714l-.232.404h-.504v1.537h-.533v-1.537h-.68zm3.873 0h.547v1.941h-.547zm1.345 0h.545l-.558.968-.002.004h.002l.558.969h-.545l-.56-.97zm-9.994.398v1.145h.297c.432 0 .567-.104.567-.586 0-.483-.135-.559-.567-.559zm-1.847.416h.87l-.185.318h-.86zm9.255 0h.872l-.186.318h-.86Z"/></svg>
+          <svg class="chip-art" viewBox="0 0 240 240" role="img" aria-label="MT6890 chip">
+            <defs><linearGradient id="chipg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2a44"/><stop offset="1" stop-color="#0b1424"/></linearGradient></defs>
+            <g class="chip-pins" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+              <path d="M70 24v22M90 24v22M110 24v22M130 24v22M150 24v22M170 24v22M70 194v22M90 194v22M110 194v22M130 194v22M150 194v22M170 194v22M24 70h22M24 90h22M24 110h22M24 130h22M24 150h22M24 170h22M194 70h22M194 90h22M194 110h22M194 130h22M194 150h22M194 170h22"/>
+            </g>
+            <rect x="46" y="46" width="148" height="148" rx="14" fill="url(#chipg)" stroke="currentColor" stroke-width="2"/>
+            <rect class="chip-core" x="64" y="64" width="112" height="112" rx="8" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+            <path class="chip-trace" d="M64 80h24l10-10h24M176 160h-24l-10 10h-24M80 64v20l8 8M160 176v-20l-8-8" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="120" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="18" font-weight="700" fill="currentColor">MT6890</text>
+            <text x="120" y="136" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="currentColor" fill-opacity=".7">4× Cortex-A55</text>
+          </svg>
+          <div class="spec-tiles">
+            <div class="spec-tile"><b>4</b><span>Cortex-A55 cores</span></div>
+            <div class="spec-tile"><b>2.0 GHz</b><span>max CPU speed</span></div>
+            <div class="spec-tile"><b>5G NR + LTE</b><span>Quectel RG500L-EU</span></div>
+            <div class="spec-tile"><b>Wi-Fi</b><span>MT7915 dual band</span></div>
+            <div class="spec-tile"><b>1 GiB</b><span>RAM</span></div>
+            <div class="spec-tile"><b>1 GiB</b><span>NAND, A/B slots</span></div>
+          </div>
+        </div>
+
+        <div class="specs-table-container">
+          <h3 class="specs-title">Technical Specifications</h3>
+          <table class="specs-table">
+            <tbody>
+              <tr><td>Processor</td><td><strong>MediaTek MT6890 (T750)</strong>, 4x Cortex-A55, 0.5 to 2.0 GHz</td></tr>
+              <tr><td>Architecture</td><td><strong>aarch64</strong> (64-bit ARM, musl libc)</td></tr>
+              <tr><td>Kernel</td><td><strong>4.19.205</strong> vendor kernel with OpenWrt 23.05.5 userspace</td></tr>
+              <tr><td>Cellular Modem</td><td><strong>Quectel RG500L-EU</strong>, 5G NR + LTE, on the SoC's modem processor; 4 antennas, one nano-SIM</td></tr>
+              <tr><td>SMS & Telephony</td><td><strong>x28-telephony</strong>: text messages in LuCI + local HTTP API</td></tr>
+              <tr><td>Voice / VoIP</td><td><span class="tag-wip">In development</span></td></tr>
+              <tr><td>Wi-Fi Subsystem</td><td><strong>MediaTek MT7915</strong>, dual band (X28: one MT7915D chip; X28 PRO: two MT7915 chips)</td></tr>
+              <tr><td>Ethernet</td><td>4 LAN sockets: one 2.5 G, three 1 G</td></tr>
+              <tr><td>Memory</td><td>1 GiB RAM; Linux gets about 628 MiB, the rest is the modem's</td></tr>
+              <tr><td>Flash</td><td>1 GiB NAND, 51 partitions, A/B slots; about 288 MiB for installs and settings</td></tr>
+              <tr><td>Reset Button</td><td>Hold for 10 s to reset to defaults</td></tr>
+              <tr><td>Recovery Port</td><td>USB-C, MediaTek preloader; USB-A to USB-C cable only</td></tr>
+              <tr><td>Serial Console</td><td>UART, 921600 8N1, 1.8 V logic, unpopulated 3-hole footprint</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Side-by-Side Comparison Table -->
+  <section class="section comparison-section" id="comparison">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Side-by-Side Evaluation</span>
+        <h2 class="section-title">Stock Firmware vs. X28 OpenWrt</h2>
+        <p class="section-desc">
+          What changes when you move from the stock firmware to this image.
+        </p>
+      </div>
+
+      <div class="table-card">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature Category</th>
+              <th class="col-stock">Stock Vendor Firmware</th>
+              <th class="col-openwrt">X28 OpenWrt v1.1.1</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Operating System</strong></td>
+              <td>Vendor firmware and web UI</td>
+              <td><span class="tag-yes">OpenWrt 23.05.5 userspace on the vendor 4.19 kernel</span></td>
+            </tr>
+            <tr>
+              <td><strong>SMS & Telephony</strong></td>
+              <td>Vendor web page; messages stay on the SIM (50 slots)</td>
+              <td><span class="tag-yes">Conversations in LuCI + local HTTP API; messages kept on the router</span></td>
+            </tr>
+            <tr>
+              <td><strong>VoIP & Voice Calls</strong></td>
+              <td>Voice calls through the vendor firmware</td>
+              <td><span class="tag-wip">In development</span> VoIP with a VoIP server on the router; not ready yet</td>
+            </tr>
+            <tr>
+              <td><strong>5G Band & Cell Locking</strong></td>
+              <td>Vendor UI</td>
+              <td><span class="tag-yes">Band & cell locking in LuCI</span></td>
+            </tr>
+            <tr>
+              <td><strong>Web Management Interface</strong></td>
+              <td>Vendor web UI</td>
+              <td><span class="tag-yes">Standard LuCI over HTTPS + UCI</span></td>
+            </tr>
+            <tr>
+              <td><strong>VPN & Proxy</strong></td>
+              <td>Not part of the vendor UI</td>
+              <td><span class="tag-yes">Passwall2, WireGuard, OpenVPN, L2TP, PPTP, SSH tunnels</span></td>
+            </tr>
+            <tr>
+              <td><strong>Package Management</strong></td>
+              <td>No package manager</td>
+              <td><span class="tag-yes">Signed kernel-compatible opkg feed</span></td>
+            </tr>
+            <tr>
+              <td><strong>Firmware Upgrade Safety</strong></td>
+              <td>Vendor updates</td>
+              <td><span class="tag-yes">Signed A/B sysupgrade to the inactive slot</span></td>
+            </tr>
+            <tr>
+              <td><strong>Update Controls</strong></td>
+              <td>Vendor UI</td>
+              <td><span class="tag-yes">x28-upgrade command & LuCI update notice; nothing installs by itself</span></td>
+            </tr>
+            <tr>
+              <td><strong>SSH & Root Access</strong></td>
+              <td>Not offered</td>
+              <td><span class="tag-yes">SSH on port 22 from the LAN</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Article series on Sisoog -->
+  <section class="section articles-section" id="articles">
+    <div class="container">
+      <div class="articles-card">
+        <a class="articles-logo" href="https://sisoog.com/" target="_blank" rel="noopener" aria-label="Sisoog">
+          <img class="logo-for-light" src="sisoog-logo.svg" alt="Sisoog" width="254" height="65" loading="lazy">
+          <img class="logo-for-dark" src="sisoog-logo-dark.svg" alt="Sisoog" width="254" height="65" loading="lazy">
+        </a>
+        <div class="articles-text">
+          <span class="section-tag">Article series</span>
+          <h2 class="section-title">The engineering story, on Sisoog</h2>
+          <p>An article series by Ali Naderi Parizi, in Persian, follows this project from the first look at the hardware to signed A/B upgrades. Part 1 is online: the hardware, the UART console and access to the 5G modem.</p>
+          <a class="btn btn-primary" href="https://sisoog.com/zlt-x28-modem/" target="_blank" rel="noopener">Read part 1 on Sisoog</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Community & Footer -->
+  <footer class="footer">
+    <div class="container footer-container">
+      <div class="footer-top">
+        <div class="footer-brand-col">
+          <img src="logo-dark-horizontal.svg" alt="X28 OpenWrt" class="footer-logo">
+          <p class="footer-tagline">
+            Community OpenWrt firmware for the ZLT X28 & X28 PRO 5G routers. It runs on the vendor kernel and is not an official OpenWrt device image.
+          </p>
+          <a class="footer-sisoog" href="https://sisoog.com/" target="_blank" rel="noopener">Tutorials on <img src="sisoog-logo-dark.svg" alt="Sisoog" height="30" loading="lazy"></a>
+          <div class="footer-license">
+            Released under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GNU General Public License v3.0</a>.
+          </div>
+        </div>
+
+        <div class="footer-links-col">
+          <h4>Documentation</h4>
+          <ul>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/README.md" target="_blank" rel="noopener">Docs Index</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TELEPHONY.md" target="_blank" rel="noopener">Telephony & SMS API</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PASSWALL2.md" target="_blank" rel="noopener">Passwall2 Guide</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md" target="_blank" rel="noopener">Recovery & Flash</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/STATUS.md" target="_blank" rel="noopener">Status & Limits</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <h4>Community & Tutorials</h4>
+          <ul>
+            <li><a href="https://forum.openwrt.org/t/zlt-x28-5g-cpe-mt6890-custom-openwrt-23-05-running-as-my-daily-router-heading-for-a-stable-release-need-advice-on-publishing-and-the-wiki-page/254974/5" target="_blank" rel="noopener">OpenWrt Forum Thread</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/releases/tag/v1.1.1" target="_blank" rel="noopener">Release v1.1.1</a></li>
+            <li><a href="https://github.com/mralinp/x28-flasher" target="_blank" rel="noopener">x28-flasher Tool</a></li>
+            <li><a href="https://sisoog.com/zlt-x28-modem/" target="_blank" rel="noopener">Articles on Sisoog (Persian)</a></li>
+            <li><a href="https://github.com/mralinp/zlt-x28-openwrt/issues" target="_blank" rel="noopener">GitHub Issues</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <h4>Credits & Upstream</h4>
+          <ul>
+            <li><a href="https://openwrt.org/" target="_blank" rel="noopener">OpenWrt Project</a></li>
+            <li><a href="https://github.com/EngineerMazeed/ZLT-X28" target="_blank" rel="noopener">EngineerMazeed</a></li>
+            <li><a href="https://github.com/bkerler/mtkclient" target="_blank" rel="noopener">mtkclient</a></li>
+            <li><a href="https://alinaderiparizi.com" target="_blank" rel="noopener">Ali Naderi Parizi</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 Ali Naderi Parizi & Community Contributors. Not affiliated with ZLT, Tozed, MediaTek, or Quectel.</p>
+        <p class="build-ver">X28 OpenWrt v1.1.1 (MT6890 / aarch64)</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
