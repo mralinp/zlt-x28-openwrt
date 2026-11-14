@@ -64,6 +64,13 @@ mtwifi_auth() {
 	esac
 }
 
+# Prints WHNAT=0|1 for the radio's whnat option, nothing when unset (the stock profile's 1 stays). WHNAT is the vendor's Wi-Fi
+# offload engine (WED): 1 makes mtk_warp allocate about 50 MiB of packet buffers for this radio (TX 16384 x 1900 B, RX 12288 x 1700 B),
+# measured on the unit as about 70 MiB per radio with the rings; 0 frees them and sends the traffic through the CPU.
+mtwifi_whnat() {
+	case "$1" in 0|1) echo "WHNAT=$1" ;; esac
+}
+
 # Prints "PMFMFPC PMFMFPR" for ieee80211w (0 off, 1 optional, 2 required); unset keeps the stock profile's 1 0.
 mtwifi_pmf() {
 	case "$1" in
@@ -117,7 +124,7 @@ mtwifi_channel() {
 
 drv_mtwifi_init_device_config() {
 	config_add_string country
-	config_add_int txpower_pct beacon_int
+	config_add_int txpower_pct beacon_int whnat
 }
 
 drv_mtwifi_init_iface_config() {
@@ -147,11 +154,11 @@ mtwifi_setup_vif() {
 }
 
 drv_mtwifi_setup() {
-	local channel htmode country band txpower_pct beacon_int ifname dat rai0_up cc
+	local channel htmode country band txpower_pct beacon_int whnat ifname dat rai0_up cc
 	local vif_name= vif_auth="OPEN NONE" vif_ssid= vif_key= vif_hidden=0 vif_isolate=0 vif_wmm=1 vif_dtim=1
 	local vif_pmf="1 0" vif_policy=0 vif_acl=
 	json_select config
-	json_get_vars channel htmode country band txpower_pct beacon_int
+	json_get_vars channel htmode country band txpower_pct beacon_int whnat
 	json_select ..
 	set -- $(mtwifi_band "$band" "$interface")
 	[ "$#" = 2 ] || { wireless_setup_failed INVALID_BAND; return 1; }
@@ -178,7 +185,7 @@ drv_mtwifi_setup() {
 		"NoForwarding=$vif_isolate" "Channel=$channel" "CountryCode=$7" "CountryRegion=$8" "CountryRegionABand=$9" \
 		"HT_BW=$3" "VHT_BW=$4" "PMFMFPC=$5" "PMFMFPR=$6" "WmmCapable=$vif_wmm" "DtimPeriod=$vif_dtim" \
 		"AccessPolicy0=$vif_policy" "AccessControlList0=$vif_acl" "TxPower=${txpower_pct:-100}" \
-		"BeaconPeriod=${beacon_int:-100}" $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
+		"BeaconPeriod=${beacon_int:-100}" $(mtwifi_whnat "$whnat") $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
 	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
 	# sets up both radios at once; with 2g disabled ra0 then carries the hidden, locked network above.
 	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
