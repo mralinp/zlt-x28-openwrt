@@ -1912,3 +1912,9 @@ button {
 [data-theme="light"] .tag-new { color: #6b21a8; background: rgba(168, 85, 247, 0.12); border-color: rgba(126, 34, 206, 0.4); }
 [data-theme="light"] .status-online { color: #15803d; }
 .step-num, .os-tabs button.active { background: #0f766e; border-color: #0f766e; }
+
+/* hero: the two lower status cards sit side by side under the images, never on top of each other */
+.device-card { display: flex; flex-wrap: wrap; gap: 12px; }
+.device-card .device-pair { flex: 0 0 100%; }
+.hud-card.hud-cellular, .hud-card.hud-proxy { position: static; flex: 1 1 200px; min-width: 0; animation: none; }
+.hero-visual { padding-bottom: 0; }
