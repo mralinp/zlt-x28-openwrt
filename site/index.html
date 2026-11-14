@@ -259,6 +259,21 @@
         </div>
       </div>
 
+      <div class="luci-shots">
+        <figure class="luci-shot ">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › Messages</span></div></div>
+          <img src="img/luci-messages.png" alt="LuCI Services, Telephony, Messages tab: a New message button, a recipient chosen from the phone book or typed, and a message box" loading="lazy">
+        </figure>
+        <figure class="luci-shot ">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › Phone book</span></div></div>
+          <img src="img/luci-phonebook.png" alt="LuCI Telephony Phone book tab: names for numbers, kept on the router, with Message and Delete buttons and an Add row" loading="lazy">
+        </figure>
+        <figure class="luci-shot wide">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Services › Telephony › API</span></div></div>
+          <img src="img/luci-api.png" alt="LuCI Telephony API tab: API keys, the address that received messages are sent to, and curl usage examples" loading="lazy">
+        </figure>
+      </div>
+
       <div class="api-layout">
         <div class="api-info-col">
           <h4>Local HTTP API</h4>
@@ -304,7 +319,8 @@
         </p>
       </div>
 
-      <div class="telephony-pillars-grid">
+      <div class="carrier-layout">
+        <div class="pillar-grid-2">
         <div class="pillar-card">
           <h4>Network mode</h4>
           <p>Automatic, 4G only or 5G only. Set before the data call, and read back from the modem.</p>
@@ -329,6 +345,13 @@
           <h4>Modem status</h4>
           <p>Operator, registration, serving cell and neighbours with RSRP and RSRQ, carrier aggregation and the 5G (EN-DC) state.</p>
         </div>
+      </div>
+
+        <figure class="luci-shot carrier-shot">
+          <div class="browser-bar"><div class="browser-dots"><span></span><span></span><span></span></div><div class="browser-address"><span>LuCI › Network › Interfaces › wan › Carrier</span></div></div>
+          <img src="img/luci-carrier.png" alt="LuCI interface page, Carrier tab: modem status with operator, registration, 5G signal and serving cell, then roaming, network selection, network mode, 4G band lock, 5G band lock and cell lock" loading="lazy">
+          <figcaption>The Carrier tab on a real X28, with 4G and 5G attached.</figcaption>
+        </figure>
       </div>
 
       <div class="band-card">
