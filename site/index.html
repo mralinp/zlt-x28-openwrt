@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>X28 OpenWrt — Real OpenWrt for ZLT X28 & X28 PRO 5G</title>
-  <meta name="description" content="OpenWrt 23.05.5 userspace running natively on the MediaTek MT6890 5G platform. Cold thermals, unlocked cellular bands, native SMS & Telephony API, LuCI web UI, and Passwall2.">
+  <meta name="description" content="OpenWrt 23.05.5 userspace for the ZLT X28 and X28 PRO 5G routers (MediaTek MT6890): LuCI, 5G band and cell locking, text messages with a local HTTP API, WireGuard, OpenVPN and Passwall2.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,9 +22,9 @@
 
       <nav class="nav-links" id="navLinks">
         <a href="#features">Features</a>
-        <a href="#telephony">SMS & API <span class="nav-badge">New</span></a>
+        <a href="#telephony">SMS & API</a>
         <a href="#cellular">5G Control</a>
-        <a href="#passwall">Passwall2</a>
+        <a href="#vpn">VPN & Proxy</a>
         <a href="#flasher">Install</a>
         <a href="#downloads">Downloads</a>
         <a href="#hardware">Hardware</a>
@@ -78,8 +78,8 @@
 
         <p class="hero-subtitle">
           Replace the stock interface of your ZLT X28 or X28 PRO with real OpenWrt.
-          OpenWrt 23.05.5 userspace on the MediaTek MT6890, about <strong>40 °C</strong> at idle on the test unit,
-          5G band & cell locking, <strong>SMS conversations & a local HTTP API</strong>, LuCI over HTTPS, and Passwall2 preinstalled.
+          OpenWrt 23.05.5 userspace on the MediaTek MT6890, 5G band & cell locking,
+          <strong>SMS conversations & a local HTTP API</strong>, LuCI over HTTPS, and WireGuard, OpenVPN and Passwall2 preinstalled.
         </p>
 
         <div class="hero-buttons">
@@ -102,8 +102,8 @@
 
         <div class="hero-stats">
           <div class="stat-item">
-            <div class="stat-number">~40 °C</div>
-            <div class="stat-label">Idle SoC Temp <span class="badge-good">65 °C on stock</span></div>
+            <div class="stat-number">23.05.5</div>
+            <div class="stat-label">Real OpenWrt, standard LuCI & UCI</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">5G + LTE</div>
@@ -127,14 +127,12 @@
           
           <!-- Floating Status Cards -->
           <div class="hud-card hud-temp floating-1">
-            <div class="hud-icon-box temp-cool">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
-              </svg>
+            <div class="hud-icon-box sms-active">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </div>
             <div class="hud-details">
-              <div class="hud-label">MT6890 SoC Temp</div>
-              <div class="hud-value">~40 °C <span class="tag-cool">at idle</span></div>
+              <div class="hud-label">Firmware</div>
+              <div class="hud-value">Signed A/B upgrades</div>
             </div>
           </div>
 
@@ -166,773 +164,376 @@
     </div>
   </section>
 
-  <!-- Key Advantages Grid -->
+  <!-- Features -->
   <section class="section features-section" id="features">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">Architecture & Capabilities</span>
-        <h2 class="section-title">Built for Performance, Stability, and Freedom</h2>
+        <span class="section-tag">What you get</span>
+        <h2 class="section-title">Built for Control, Stability and Freedom</h2>
         <p class="section-desc">
-          Replacing the vendor's locked firmware with OpenWrt userspace while keeping the proprietary MT6890 5G cellular modem service gives you the best of both worlds.
+          The stock interface is replaced by OpenWrt userspace. The vendor kernel and the 5G modem backend stay, so the modem keeps working.
         </p>
       </div>
 
       <div class="grid-3">
-        <div class="feature-card highlight-card">
-          <div class="card-icon icon-purple">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
+        <div class="feature-card">
+          <div class="card-icon icon-purple"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
           <h3>SMS & Local HTTP API <span class="tag-new">v1.1</span></h3>
-          <p>
-            Text messages in LuCI (<strong>Services → Telephony</strong>) as conversations, with a phone book and a local HTTP API with API keys for machines on your LAN. Received messages move to the router, so the SIM does not fill up. Voice calls are not supported yet.
-          </p>
+          <p>Text messages in LuCI (<strong>Services → Telephony</strong>) as conversations, with a phone book and a local HTTP API with API keys for machines on your LAN. Received messages move to the router, so the SIM does not fill up.</p>
           <div class="card-badge">HTTP API + Push to Your Address</div>
         </div>
 
         <div class="feature-card">
-          <div class="card-icon icon-teal">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="2"></circle>
-              <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
-            </svg>
-          </div>
+          <div class="card-icon icon-teal"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg></div>
           <h3>5G Cellular Control</h3>
-          <p>
-            APN, operator selection, 4G and 5G band locks (n1, n3, n7, n28, n77, n78 and more), cell lock and signal status, all on a standard LuCI interface page.
-          </p>
+          <p>APN, operator selection with a network scan, 4G and 5G band locks, cell lock and signal status on a standard LuCI interface page.</p>
           <div class="card-badge">x28_mipc netifd Protocol</div>
         </div>
 
         <div class="feature-card">
-          <div class="card-icon icon-green">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-            </svg>
-          </div>
-          <h3>Cooler at Idle</h3>
-          <p>
-            The test unit idled at about 65 °C on stock firmware without a fan. On this image it reads about 40 °C at idle; fewer vendor services running is the likely reason.
-          </p>
-          <div class="card-badge">Measured on the Test Unit</div>
+          <div class="card-icon icon-amber"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+          <h3>VoIP <span class="tag-wip">In development</span></h3>
+          <p>The stock firmware makes voice calls. We are building VoIP for OpenWrt, with a VoIP server on the router and more. It is not ready yet: voice calls are not supported in the current release.</p>
+          <div class="card-badge">Work in progress</div>
         </div>
 
         <div class="feature-card">
-          <div class="card-icon icon-blue">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-          </div>
+          <div class="card-icon icon-blue"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h20v14H2zM8 21h8M12 17v4"/></svg></div>
           <h3>Standard LuCI over HTTPS</h3>
-          <p>
-            The standard OpenWrt LuCI web interface with UCI configuration, SSH, netifd, dnsmasq and firewall3. Vendor daemons run only as the modem backend.
-          </p>
+          <p>The standard OpenWrt LuCI web interface with UCI configuration, SSH, netifd, dnsmasq and firewall3. Vendor daemons run only as the modem backend.</p>
           <div class="card-badge">OpenWrt 23.05.5 Userspace</div>
         </div>
 
         <div class="feature-card">
-          <div class="card-icon icon-purple">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          <h3>Passwall2 & VPN Suites</h3>
-          <p>
-            WireGuard, OpenVPN and Passwall2 (with xray) are preinstalled and managed from LuCI.
-          </p>
+          <div class="card-icon icon-green"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>VPN & Proxy</h3>
+          <p>Passwall2, WireGuard, OpenVPN, L2TP, PPTP and SSH tunnels, managed from LuCI.</p>
           <div class="card-badge">Preinstalled</div>
         </div>
 
         <div class="feature-card">
-          <div class="card-icon icon-amber">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-          </div>
+          <div class="card-icon icon-amber"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
           <h3>Signed A/B Firmware Upgrades</h3>
-          <p>
-            Signed upgrades write and verify the slot that is not running, then switch to it; <code>x28-bootok</code> manages the boot counter. Use <code>x28-upgrade</code> or the LuCI update notice. Nothing installs by itself; back up your settings first.
-          </p>
+          <p>Signed upgrades write and verify the slot that is not running, then switch to it; <code>x28-bootok</code> manages the boot counter. Use <code>x28-upgrade</code> or the LuCI update notice. Nothing installs by itself; back up your settings first.</p>
           <div class="card-badge">Signed Images + Signed opkg Feed</div>
         </div>
       </div>
+
+      <figure class="luci-shot">
+        <div class="browser-bar">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <div class="browser-address"><span>https://192.168.70.1/cgi-bin/luci/admin/status/overview</span></div>
+        </div>
+        <img src="img/8-done.png" alt="LuCI status page of the X28 running OpenWrt 23.05.5" loading="lazy">
+        <figcaption>LuCI on a real X28: OpenWrt 23.05.5 on the vendor 4.19.205 kernel.</figcaption>
+      </figure>
     </div>
   </section>
 
-  <!-- NEW SECTION: Telephony & SMS Suite (v1.1 Feature) -->
+  <!-- SMS and API -->
   <section class="section telephony-section" id="telephony">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">New in v1.1 · Interactive demo</span>
+        <span class="section-tag">New in v1.1</span>
         <h2 class="section-title">SMS Conversations & Local HTTP API</h2>
         <p class="section-desc">
-          Receive, send and automate text messages from your router: conversations in LuCI, a phone book kept on the router, and an HTTP API with keys for machines on your LAN. The window below is a demo with sample data, not a live router.
+          The <code>x28-telephony</code> package adds <strong>Services → Telephony</strong> to LuCI and an HTTP API for machines on your LAN. Voice calls are not supported yet. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TELEPHONY.md" target="_blank" rel="noopener">Documentation</a>
         </p>
       </div>
 
-      <!-- Main Telephony Showcase Window -->
-      <div class="telephony-window-card">
-        <!-- Window Chrome / Title Bar -->
-        <div class="window-chrome">
-          <div class="chrome-dots">
-            <span class="dot dot-red"></span>
-            <span class="dot dot-amber"></span>
-            <span class="dot dot-green"></span>
-          </div>
-          <div class="chrome-address">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            <span>https://192.168.70.1/cgi-bin/luci/admin/services/telephony</span>
-          </div>
-          <div class="chrome-chips">
-            <span class="chip-status chip-green">
-              <span class="live-pulse"></span>
-              SIM: 0/50 used
-            </span>
-            <span class="chip-status chip-blue">
-              Service: checks the SIM every 15 s
-            </span>
+      <div class="telephony-pillars-grid">
+        <div class="pillar-card">
+          <div class="pillar-icon icon-purple"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h4>Messages</h4>
+          <p>Conversations by number as in a messaging app: a paged list on the left, the thread with a reply box on the right. A new message takes its recipient from the phone book or a typed number. Delete a message or a whole conversation.</p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon icon-teal"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <h4>Phone book</h4>
+          <p>Names for numbers, kept on the router and not on the SIM. Received and sent messages are stored on the router too, root-only, and kept across firmware upgrades.</p>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon icon-blue"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></div>
+          <h4>The SIM does not fill up</h4>
+          <p>The SIM has 50 slots. The service looks at it every 15 seconds, copies each received message to the router and only then deletes it from the SIM. Long messages (up to 10 parts) arrive in parts and are shown joined.</p>
+        </div>
+      </div>
+
+      <div class="api-layout">
+        <div class="api-info-col">
+          <h4>Local HTTP API</h4>
+          <p>Any machine on your LAN (Home Assistant, n8n, Node-RED, a curl script) can send and list messages, and received messages can be pushed to an address you set. No cloud service is involved.</p>
+          <div class="api-feature-pills">
+            <div class="ap-pill"><span class="ap-icon">🔑</span><div><strong>API keys</strong><span>Created in LuCI and shown once; only the SHA-256 is stored.</span></div></div>
+            <div class="ap-pill"><span class="ap-icon">📬</span><div><strong>Push of received messages</strong><span>Each complete received message is POSTed as JSON to the address you set.</span></div></div>
+            <div class="ap-pill"><span class="ap-icon">⏱️</span><div><strong>Rate limit</strong><span>At most 30 messages sent per hour, API and LuCI together.</span></div></div>
           </div>
         </div>
 
-        <!-- LuCI Sub-Navigation Tabs -->
-        <div class="luci-tabs-bar">
-          <div class="luci-tabs-list">
-            <button class="luci-tab active" data-tab="messages">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-              <span>Messages</span>
-              <span class="tab-badge">3</span>
-            </button>
-            <button class="luci-tab" data-tab="phonebook">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              <span>Phone Book</span>
-            </button>
-            <button class="luci-tab" data-tab="api">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18"></line>
-              </svg>
-              <span>API</span>
-            </button>
-          </div>
-          <div class="luci-tabs-meta">
-            <span>Storage: <code>/etc/x28-telephony/messages</code></span>
-          </div>
-        </div>
+        <div class="api-code-col">
+          <div class="api-code-header"><span>curl</span><button class="btn-copy-code" id="copyApiCode">Copy send command</button></div>
+<pre class="api-code-pre"><code><span class="c-str"># list messages, oldest first</span>
+<span class="c-cmd">curl</span> -k -H <span class="c-str">"Authorization: Bearer $KEY"</span> \
+  https://192.168.70.1/cgi-bin/x28-telephony/messages
 
-        <!-- Window View Area -->
-        <div class="telephony-view-area">
-          
-          <!-- TAB 1: MESSAGES CONVERSATIONS -->
-          <div class="telephony-tab-pane active" id="pane-messages">
-            <div class="messenger-split-layout">
-              
-              <!-- Conversations Sidebar (Left) -->
-              <div class="messenger-sidebar">
-                <div class="sidebar-search-box">
-                  <div class="search-input-wrap">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" placeholder="Filter conversations..." class="search-input" id="searchConvoInput">
-                  </div>
-                </div>
-
-                <div class="convo-list" id="convoList">
-                  <div class="convo-item active" data-number="+989121234567" data-name="Hamrah-e Aval">
-                    <div class="convo-avatar avatar-mci">MCI</div>
-                    <div class="convo-meta">
-                      <div class="convo-top">
-                        <strong class="convo-name">Hamrah-e Aval</strong>
-                        <span class="convo-time">10:14 AM</span>
-                      </div>
-                      <div class="convo-num">+98 912 123 4567</div>
-                      <div class="convo-snippet" dir="auto">بسته اینترنت ۵G شما با موفقیت تمدید شد...</div>
-                    </div>
-                  </div>
-
-                  <div class="convo-item" data-number="+989350000000" data-name="Irancell 5G">
-                    <div class="convo-avatar avatar-irancell">MTN</div>
-                    <div class="convo-meta">
-                      <div class="convo-top">
-                        <strong class="convo-name">Irancell 5G</strong>
-                        <span class="convo-time">Yesterday</span>
-                      </div>
-                      <div class="convo-num">+98 935 000 0000</div>
-                      <div class="convo-snippet" dir="auto">کد تایید ورود شما: ۸۴۹۲۰۱</div>
-                    </div>
-                  </div>
-
-                  <div class="convo-item" data-number="+989120000000" data-name="Home Assistant">
-                    <div class="convo-avatar avatar-ha">HA</div>
-                    <div class="convo-meta">
-                      <div class="convo-top">
-                        <strong class="convo-name">Home Assistant</strong>
-                        <span class="convo-time">Nov 12</span>
-                      </div>
-                      <div class="convo-num">+98 912 000 0000</div>
-                      <div class="convo-snippet">WAN failover triggered. Operating on 5G...</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="convo-footer">
-                  <span>3 conversations · Paged view</span>
-                </div>
-              </div>
-
-              <!-- Active Chat Thread (Right) -->
-              <div class="messenger-thread">
-                <!-- Thread Top Bar -->
-                <div class="thread-topbar">
-                  <div class="thread-contact-info">
-                    <div class="thread-name-line">
-                      <h4 id="activeContactName">Hamrah-e Aval</h4>
-                    </div>
-                    <div class="thread-sub-line">
-                      <span class="num-mono" id="activeContactNum">+98 912 123 4567</span>
-                      <span class="sep">·</span>
-                      <span class="flash-tag">Stored on the router</span>
-                    </div>
-                  </div>
-
-                  <div class="thread-actions">
-                    <button class="btn-action-icon" title="Contact Details">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Messages Feed -->
-                <div class="thread-stream" id="threadStream">
-                  <div class="system-event-pill">
-                    <span>Copied to /etc/x28-telephony/messages, then deleted from the SIM</span>
-                  </div>
-
-                  <div class="bubble-wrap bubble-in">
-                    <div class="bubble-content" dir="auto">
-                      بسته اینترنت ۵G شما با موفقیت تمدید شد. حجم باقی‌مانده: ۴۵ گیگابایت برای دوره ۳۰ روزه.
-                    </div>
-                    <div class="bubble-footer">
-                      <span>10:14 AM</span>
-                      <span class="sep">·</span>
-                      <span>2 parts (UCS-2 Unicode)</span>
-                      <span class="status-tick">✓ Received</span>
-                    </div>
-                  </div>
-
-                  <div class="bubble-wrap bubble-out">
-                    <div class="bubble-content" dir="auto">
-                      Status requested via local API
-                    </div>
-                    <div class="bubble-footer">
-                      <span>10:15 AM</span>
-                      <span class="sep">·</span>
-                      <span>1 part (GSM-7)</span>
-                      <span class="status-tick tick-done">✓ Sent</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Compose Input Bar -->
-                <div class="thread-composer">
-                  <div class="composer-to-line">
-                    <span class="to-label">To:</span>
-                    <span class="to-target" id="composerToTarget">+98 912 123 4567 (Hamrah-e Aval)</span>
-                  </div>
-                  <div class="composer-input-row">
-                    <textarea 
-                      class="composer-textarea" 
-                      id="composerText" 
-                      placeholder="Type a message (demo: nothing is sent)" 
-                      rows="1"
-                    ></textarea>
-                    <div class="composer-buttons">
-                      <span class="char-counter" id="charCounter">0 / 160 (1 part)</span>
-                      <button class="btn btn-primary btn-compose-send" id="btnComposerSend">
-                        <span>Send</span>
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="22" y1="2" x2="11" y2="13"></line>
-                          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- TAB 2: PHONE BOOK -->
-          <div class="telephony-tab-pane" id="pane-phonebook">
-            <div class="phonebook-view">
-              <div class="phonebook-header">
-                <div>
-                  <h4>Router-Stored Phone Book</h4>
-                  <p>Names for numbers are kept on the router, not on the SIM.</p>
-                </div>
-              </div>
-
-              <div class="phonebook-table-wrap">
-                <table class="phonebook-table">
-                  <thead>
-                    <tr>
-                      <th>Name / Label</th>
-                      <th>Phone Number</th>
-                      <th>Category</th>
-                      <th>Storage</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><strong>Hamrah-e Aval</strong></td>
-                      <td><code>+98 912 123 4567</code></td>
-                      <td><span class="badge-tag">Cellular Operator</span></td>
-                      <td>Router</td>
-                      <td><button class="btn-table-action" onclick="switchContact('+989121234567')">Send SMS</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>Irancell 5G</strong></td>
-                      <td><code>+98 935 000 0000</code></td>
-                      <td><span class="badge-tag">Cellular Operator</span></td>
-                      <td>Router</td>
-                      <td><button class="btn-table-action" onclick="switchContact('+989350000000')">Send SMS</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>Home Assistant</strong></td>
-                      <td><code>+98 912 000 0000</code></td>
-                      <td><span class="badge-tag">Automation</span></td>
-                      <td>Router</td>
-                      <td><button class="btn-table-action" onclick="switchContact('+989120000000')">Send SMS</button></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 3: REST API & WEBHOOKS -->
-          <div class="telephony-tab-pane" id="pane-api">
-            <div class="api-view-layout">
-              <div class="api-info-col">
-                <h4>Local HTTP API</h4>
-                <p>
-                  Any machine on your LAN (Home Assistant, n8n, Node-RED, a curl script) can send and list messages, and received messages can be pushed to an address you set. No cloud service is involved.
-                </p>
-
-                <div class="api-feature-pills">
-                  <div class="ap-pill">
-                    <span class="ap-icon">🔑</span>
-                    <div>
-                      <strong>API Keys</strong>
-                      <span>Created in LuCI and shown once; only the SHA-256 is stored.</span>
-                    </div>
-                  </div>
-                  <div class="ap-pill">
-                    <span class="ap-icon">📬</span>
-                    <div>
-                      <strong>Push of Received Messages</strong>
-                      <span>Each complete received message is POSTed as JSON to the address you set.</span>
-                    </div>
-                  </div>
-                  <div class="ap-pill">
-                    <span class="ap-icon">⏱️</span>
-                    <div>
-                      <strong>Rate Limit</strong>
-                      <span>At most 30 messages sent per hour, API and LuCI together.</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="api-code-col">
-                <div class="api-code-header">
-                  <span>Send SMS via cURL</span>
-                  <button class="btn-copy-code" id="copyApiCode">Copy cURL</button>
-                </div>
-                <pre class="api-code-pre"><code><span class="c-cmd">curl</span> -k -H <span class="c-str">"Authorization: Bearer $X28_API_KEY"</span> \
+<span class="c-str"># send a message</span>
+<span class="c-cmd">curl</span> -k -H <span class="c-str">"Authorization: Bearer $KEY"</span> \
   -H <span class="c-str">"Content-Type: application/json"</span> \
   -d <span class="c-str">'{"to":"+989121234567","text":"Hello"}'</span> \
   https://192.168.70.1/cgi-bin/x28-telephony/messages</code></pre>
-
-                <div class="api-response-card">
-                  <div class="response-header">
-                    <span>Response (200)</span>
-                  </div>
-                  <pre class="response-body"><code>{"ok":true}</code></pre>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          <table class="answers-table">
+            <tr><td><code>200</code></td><td>done</td></tr>
+            <tr><td><code>400</code></td><td>bad number, or empty or too long text</td></tr>
+            <tr><td><code>401</code></td><td>no key, or a wrong one</td></tr>
+            <tr><td><code>429</code></td><td>more than 30 messages sent in the last hour</td></tr>
+            <tr><td><code>502</code></td><td>the modem refused the message; it is kept as failed</td></tr>
+          </table>
         </div>
       </div>
-
-      <!-- 3 Architecture Pillar Cards -->
-      <div class="telephony-pillars-grid">
-        <div class="pillar-card">
-          <div class="pillar-icon icon-teal">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            </svg>
-          </div>
-          <h4>The SIM Does Not Fill Up</h4>
-          <p>
-            The SIM has 50 slots. The <code>x28-telephony</code> service looks at it every 15 seconds, copies each received message to the router and only then deletes it from the SIM.
-          </p>
-        </div>
-
-        <div class="pillar-card">
-          <div class="pillar-icon icon-purple">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-              <line x1="6" y1="6" x2="6.01" y2="6"></line>
-              <line x1="6" y1="18" x2="6.01" y2="18"></line>
-            </svg>
-          </div>
-          <h4>Local HTTP API</h4>
-          <p>
-            Use the SIM from Home Assistant, a relay bot or an alerting script. Every call needs an API key; the API is reachable where LuCI is (the LAN by default).
-          </p>
-        </div>
-
-        <div class="pillar-card">
-          <div class="pillar-icon icon-blue">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            </svg>
-          </div>
-          <h4>Long Messages & Persian Text</h4>
-          <p>
-            Messages of up to 10 parts (1,530 GSM characters, 670 otherwise) in PDU mode through the modem's CLI. Receiving long Persian messages is tested; sending them is not yet.
-          </p>
-        </div>
-      </div>
-
     </div>
   </section>
 
-  <!-- Interactive Cellular & Band Lock Simulator -->
+  <!-- 5G control -->
   <section class="section cellular-section" id="cellular">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">Interactive demo</span>
+        <span class="section-tag">5G & LTE</span>
         <h2 class="section-title">5G Band & Cell Locking</h2>
         <p class="section-desc">
-          On the router you set the network mode, the 4G and 5G band locks and a cell lock on the LuCI interface page. Try the idea below: <strong>every number in this demo is made up</strong>; your signal and speed depend on your operator and location.
+          The modem is a normal netifd interface (<code>proto x28_mipc</code>) with its own LuCI page. Everything below is set on the interface page, under the Carrier tab. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/NATIVE-CELLULAR.md" target="_blank" rel="noopener">Documentation</a>
         </p>
       </div>
 
-      <div class="interactive-cellular-box">
-        <div class="sim-controls">
-          <div class="control-group">
-            <label class="control-label">Modem Mode:</label>
-            <div class="btn-group" id="modeSelector">
-              <button class="btn-toggle active" data-mode="sa">5G Standalone (SA)</button>
-              <button class="btn-toggle" data-mode="nsa">5G Non-Standalone (NSA)</button>
-              <button class="btn-toggle" data-mode="lte">4G LTE Only</button>
-            </div>
-          </div>
-
-          <div class="control-group">
-            <label class="control-label">5G NR Bands (Click to Lock):</label>
-            <div class="band-chips" id="bandChips">
-              <button class="chip active" data-band="n78" data-freq="3500 MHz" data-bw="100 MHz" data-rsrp="-78" data-sinr="24" data-speed="840">n78 (3.5 GHz C-Band)</button>
-              <button class="chip" data-band="n77" data-freq="3700 MHz" data-bw="80 MHz" data-rsrp="-82" data-sinr="21" data-speed="720">n77 (3.7 GHz)</button>
-              <button class="chip" data-band="n1" data-freq="2100 MHz" data-bw="20 MHz" data-rsrp="-71" data-sinr="19" data-speed="290">n1 (2.1 GHz FDD)</button>
-              <button class="chip" data-band="n3" data-freq="1800 MHz" data-bw="20 MHz" data-rsrp="-68" data-sinr="26" data-speed="310">n3 (1.8 GHz FDD)</button>
-              <button class="chip" data-band="n28" data-freq="700 MHz" data-bw="15 MHz" data-rsrp="-64" data-sinr="28" data-speed="180">n28 (700 MHz Low-Band)</button>
-              <button class="chip" data-band="n7" data-freq="2600 MHz" data-bw="20 MHz" data-rsrp="-79" data-sinr="18" data-speed="275">n7 (2.6 GHz)</button>
-            </div>
-          </div>
-
-          <div class="sim-actions">
-            <button class="btn btn-primary btn-sm" id="btnApplyBand">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>Apply Lock</span>
-            </button>
-            <button class="btn btn-secondary btn-sm" id="btnResetBands">Reset to Auto</button>
-          </div>
+      <div class="telephony-pillars-grid">
+        <div class="pillar-card">
+          <h4>Network mode</h4>
+          <p>Automatic, 4G only or 5G only. Set before the data call, and read back from the modem.</p>
         </div>
-
-        <div class="sim-display">
-          <div class="modem-status-card">
-            <div class="modem-header">
-              <div class="status-indicator">
-                <span class="live-dot pulse"></span>
-                <span id="simCarrier">Demo operator</span>
-              </div>
-              <span class="status-badge" id="simModeBadge">5G SA Attached</span>
-            </div>
-
-            <div class="metric-gauges">
-              <div class="gauge-item">
-                <div class="gauge-title">Signal (RSRP)</div>
-                <div class="gauge-value" id="valRsrp">-78 dBm</div>
-                <div class="gauge-bar"><div class="gauge-fill fill-green" id="barRsrp" style="width: 82%;"></div></div>
-                <div class="gauge-sub">Sample value</div>
-              </div>
-
-              <div class="gauge-item">
-                <div class="gauge-title">Signal Quality (SINR)</div>
-                <div class="gauge-value" id="valSinr">+24 dB</div>
-                <div class="gauge-bar"><div class="gauge-fill fill-teal" id="barSinr" style="width: 80%;"></div></div>
-                <div class="gauge-sub">Sample value</div>
-              </div>
-
-              <div class="gauge-item">
-                <div class="gauge-title">Speed (made up)</div>
-                <div class="gauge-value" id="valSpeed">840 Mbps</div>
-                <div class="gauge-bar"><div class="gauge-fill fill-purple" id="barSpeed" style="width: 84%;"></div></div>
-                <div class="gauge-sub">Not a measurement</div>
-              </div>
-            </div>
-
-            <div class="sim-raw-terminal">
-              <div class="raw-title">Demo log (not real output):</div>
-              <pre class="raw-log" id="simLog">> [x28-mipc] Selected NR5G SA band: n78 (ARFCN: 633334, BW: 100MHz)
-> [x28-mipc] PLMN: 43235 | Cell ID: 0x48A291 | TAC: 0x1F2A
-> [x28-mipc] Signal: RSRP -78 dBm, RSRQ -10 dB, SINR 24 dB
-> [netifd] Interface 'wan_5g' is now up (IP: 10.145.88.212/24)</pre>
-            </div>
-          </div>
+        <div class="pillar-card">
+          <h4>Band locks</h4>
+          <p>Allow or deny lists of LTE bands, and a 5G band mask set with <code>x28-nrband</code>. A mask outside the bands the modem supports is refused.</p>
         </div>
+        <div class="pillar-card">
+          <h4>Cell lock</h4>
+          <p>Lock to one cell by its EARFCN and PCI, or turn the lock off again.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Operator selection</h4>
+          <p>Automatic or manual, with a network scan. A scan can take a few minutes and drops the data connection, which comes back by itself.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>APN & IP type</h4>
+          <p>IPv4, IPv6 or both. Leave the APN empty and it is taken from the SIM's operator. Roaming is off by default.</p>
+        </div>
+        <div class="pillar-card">
+          <h4>Modem status</h4>
+          <p>Operator, registration, serving cell and neighbours with RSRP and RSRQ, carrier aggregation and the 5G (EN-DC) state.</p>
+        </div>
+      </div>
+
+      <div class="band-card">
+        <h4>Bands the modem supports and the lock accepts</h4>
+        <div class="band-row"><b>LTE</b><div class="band-list"><span>B1</span><span>B3</span><span>B5</span><span>B7</span><span>B8</span><span>B20</span><span>B28</span><span>B32</span><span>B38</span><span>B40</span><span>B41</span><span>B42</span><span>B43</span></div></div>
+        <div class="band-row"><b>5G NR</b><div class="band-list nr"><span>n1</span><span>n3</span><span>n5</span><span>n7</span><span>n8</span><span>n20</span><span>n28</span><span>n38</span><span>n40</span><span>n41</span><span>n77</span><span>n78</span></div></div>
+        <p>Which of these your operator uses depends on your location. See the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md" target="_blank" rel="noopener">test log</a> for what has been checked on real SIMs.</p>
       </div>
     </div>
   </section>
 
-  <!-- Thermals Section -->
-  <section class="section thermals-section" id="thermals">
+
+  <!-- VPN and proxy -->
+  <section class="section passwall-section" id="vpn">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">Thermal Engineering</span>
-        <h2 class="section-title">About 40 °C at Idle</h2>
+        <span class="section-tag">VPN & Proxy</span>
+        <h2 class="section-title">Tunnels and Proxies, Managed from LuCI</h2>
         <p class="section-desc">
-          Measured on one test unit: the SoC idled at 65 °C on stock firmware without a fan, and reads about 40 °C at idle on this image. Whether a fan ran during the second reading was not recorded; a no-fan reading is still to be taken. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/THERMAL.md" target="_blank" rel="noopener">Thermal notes</a>.
+          The router has what it takes to put your whole LAN through a tunnel or a proxy. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PASSWALL2.md" target="_blank" rel="noopener">Passwall2 setup notes and measured performance</a>
         </p>
       </div>
 
-      <div class="thermal-comparison-card">
-        <div class="thermal-bars">
-          <div class="thermal-bar-col stock-col">
-            <div class="thermal-header">
-              <div class="badge-stock">Stock Vendor Firmware</div>
-              <div class="temp-display hot">~65 °C</div>
-            </div>
-            <div class="bar-visual-container">
-              <div class="bar-fill bar-stock" style="height: 75%;"></div>
-              <span class="marker marker-hot">Idle, no fan</span>
-            </div>
-            <ul class="thermal-points">
-              <li>SoC, CPU and modem sensors all at 65 °C</li>
-              <li>Full vendor service stack running</li>
-              <li>Kernel trip points are 85 / 95 / 115 °C</li>
-            </ul>
-          </div>
-
-          <div class="thermal-vs">
-            <span class="vs-circle">VS</span>
-            <div class="diff-badge">-25 °C</div>
-          </div>
-
-          <div class="thermal-bar-col openwrt-col">
-            <div class="thermal-header">
-              <div class="badge-openwrt">X28 OpenWrt (v1.1.1)</div>
-              <div class="temp-display cool">~40 °C</div>
-            </div>
-            <div class="bar-visual-container">
-              <div class="bar-fill bar-openwrt" style="height: 38%;"></div>
-              <span class="marker marker-cool">Idle, CPU 97 % idle</span>
-            </div>
-            <ul class="thermal-points">
-              <li>✅ SoC 39.6 to 40.4 °C with data up</li>
-              <li>✅ Vendor daemons run only as the modem backend</li>
-              <li>✅ <code>schedutil</code> governor, 0.5 to 2.0 GHz</li>
-            </ul>
-          </div>
-        </div>
+      <div class="passwall-features-grid">
+        <div class="pf-item"><div class="pf-icon">🧭</div><div><h4>Passwall2</h4><p>Transparent proxy with xray: the whole LAN goes through the node you pick, switched from LuCI.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔐</div><div><h4>WireGuard</h4><p>A module built for the vendor kernel, with LuCI support and the wireguard-tools.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔑</div><div><h4>OpenVPN</h4><p>OpenVPN with OpenSSL and its LuCI page; the tunnels you enable start at boot.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔗</div><div><h4>L2TP</h4><p>L2TP client, configured as a LuCI interface.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🔌</div><div><h4>PPTP</h4><p>PPTP client, configured as a LuCI interface.</p></div></div>
+        <div class="pf-item"><div class="pf-icon">🚇</div><div><h4>SSH tunnels</h4><p>Forward ports and tunnel traffic over SSH.</p></div></div>
       </div>
+      <p class="vpn-note">And more: other packages from OpenWrt's feeds and the signed X28 feed install with <code>opkg</code> or <strong>System → Software</strong>. Kernel modules from the official feeds do not load on the vendor kernel, so incompatible ones are refused instead of installed broken.</p>
     </div>
   </section>
 
-  <!-- Passwall2 & LuCI Showcase -->
-  <section class="section passwall-section" id="passwall">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Proxy & Routing</span>
-        <h2 class="section-title">Passwall2 in LuCI</h2>
-        <p class="section-desc">
-          A real screenshot from the X28: Passwall2 with connectivity checks through the configured node. Passwall2, xray and the TPROXY kernel modules ship in the image. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PASSWALL2.md" target="_blank" rel="noopener">Setup notes and measured performance</a>.
-        </p>
-      </div>
-
-      <div class="passwall-showcase">
-        <div class="browser-mockup">
-          <div class="browser-bar">
-            <div class="browser-dots">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="browser-address">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              <span>https://192.168.70.1/cgi-bin/luci/admin/services/passwall2</span>
-            </div>
-            <div class="browser-status">OpenWrt 23.05.5</div>
-          </div>
-
-          <div class="browser-content">
-            <img src="x28-passwall2-luci.png" alt="Passwall2 running in LuCI on the X28 with connectivity checks" class="showcase-img">
-          </div>
-        </div>
-
-        <div class="passwall-features-grid">
-          <div class="pf-item">
-            <div class="pf-icon">⚡</div>
-            <div>
-              <h4>Xray Core</h4>
-              <p><code>xray-core</code> is preinstalled with <code>luci-app-passwall2</code>; other cores are not in the image.</p>
-            </div>
-          </div>
-          <div class="pf-item">
-            <div class="pf-icon">🛡️</div>
-            <div>
-              <h4>Transparent Proxy</h4>
-              <p>TPROXY for router and LAN traffic, with Passwall2's rules deciding what goes direct and what goes through a node.</p>
-            </div>
-          </div>
-          <div class="pf-item">
-            <div class="pf-icon">🔍</div>
-            <div>
-              <h4>Connectivity Checks</h4>
-              <p>Test nodes and connectivity from the Passwall2 page in LuCI, as in the screenshot.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FLASHER & OPENWRT FORUM TUTORIAL SECTION -->
+  <!-- Install guide: the steps follow the OpenWrt Forum tutorial -->
   <section class="section flasher-section" id="flasher">
     <div class="container">
       <div class="section-header">
         <span class="section-tag">Install</span>
         <h2 class="section-title">Install with x28-flasher</h2>
         <p class="section-desc">
-          The flasher is the only supported way to install, back up and recover. It walks you through a verified full backup before anything is written.
+          The flasher is the only supported way to install, back up and recover. These are the steps of the tutorial on the OpenWrt Forum; the screenshots are from flasher v0.4.0, later versions may look slightly different.
         </p>
       </div>
 
-      <!-- FORUM TUTORIAL BANNER CARD -->
       <div class="forum-banner-card">
         <div class="forum-card-content">
           <div class="forum-icon-badge">
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.08L2 22l5.05-1.34C8.5 21.49 10.2 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
-            </svg>
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.08L2 22l5.05-1.34C8.5 21.49 10.2 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
           </div>
           <div class="forum-text">
             <div class="forum-badge-pill">Discussion & Questions</div>
-            <h3 class="forum-headline">Project thread on the OpenWrt Forum</h3>
-            <p class="forum-desc">
-              Progress notes, troubleshooting and questions in the thread <em>"ZLT X28 5G CPE (MT6890) custom OpenWrt 23.05 running as my daily router"</em>. This is community firmware, not an official OpenWrt image.
-            </p>
+            <h3 class="forum-headline">The tutorial lives on the OpenWrt Forum</h3>
+            <p class="forum-desc">Questions, troubleshooting and progress notes are in the thread <em>"ZLT X28 5G CPE (MT6890) custom OpenWrt 23.05 running as my daily router"</em>. This is community firmware, not an official OpenWrt image.</p>
           </div>
           <a href="https://forum.openwrt.org/t/zlt-x28-5g-cpe-mt6890-custom-openwrt-23-05-running-as-my-daily-router-heading-for-a-stable-release-need-advice-on-publishing-and-the-wiki-page/254974/5" target="_blank" rel="noopener" class="btn btn-forum-cta">
             <span>Read on OpenWrt Forum</span>
-            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-              <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
-            </svg>
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
           </a>
         </div>
       </div>
 
-      <div class="install-grid">
-        <div class="install-steps">
-          <div class="step-card">
+      <div class="warning-callout">
+        <div class="callout-icon">⚠️</div>
+        <div class="callout-body">
+          <strong>Flashing can brick your router.</strong> Never write partitions or change the boot order by hand. Read the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md" target="_blank" rel="noopener">recovery guide</a> first. A firmware upgrade writes the inactive slot, so the first one can replace the stock fallback.
+        </div>
+      </div>
+
+      <div class="guide">
+        <div class="guide-step ">
+          <div class="guide-text">
             <div class="step-num">1</div>
-            <div class="step-content">
-              <h4>Get x28-flasher</h4>
-              <p>Download the flasher for Windows, macOS or Linux from <a href="#downloads">Downloads</a> or <a href="https://github.com/mralinp/x28-flasher" target="_blank" rel="noopener">github.com/mralinp/x28-flasher</a>.</p>
+            <div>
+              <h4>Download and launch the flasher</h4>
+              <p>Download the latest X28 Flasher for your operating system, install it and launch it.</p>
+              <div class="os-pick" id="osPick"><p>Get it from <a href="https://github.com/mralinp/x28-flasher/releases" target="_blank" rel="noopener">the flasher releases</a>.</p></div>
             </div>
           </div>
-
-          <div class="step-card">
+          <div class="guide-shots"><img src="img/1-launch.jpeg" alt="The X28 Flasher application at launch" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
             <div class="step-num">2</div>
-            <div class="step-content">
-              <h4>Connect USB-A to USB-C</h4>
-              <p>Connect the router's USB-C port to your computer with a <strong>USB-A to USB-C</strong> cable. <em>USB-C to USB-C does not work.</em></p>
+            <div>
+              <h4>Connect to your device</h4>
+              <p>Use a <strong>USB-A to USB-C</strong> cable; USB-C to USB-C does not work. Follow these steps in the exact order:</p>
+              <ol>
+                <li>Connect the USB cable between your computer and the ZLT X28.</li>
+                <li>In the flasher, click <strong>Connect Device</strong>.</li>
+                <li>Click <strong>Start</strong>.</li>
+                <li>Wait about 10 seconds.</li>
+                <li>Connect the router's power adapter.</li>
+                <li>Wait until the device reading completes.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not connect the power adapter before the 10-second wait. The order matters for the flasher to reach the device.</p>
             </div>
           </div>
-
-          <div class="step-card">
+          <div class="guide-shots"><img src="img/2-connect-a.jpeg" alt="Flasher: Connect device page" loading="lazy"><img src="img/2-connect-b.png" alt="Flasher: connection started, waiting for the device" loading="lazy"><img src="img/2-connect-c.png" alt="Flasher: device connecting" loading="lazy"><img src="img/2-connect-d.png" alt="Flasher: device information read" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
             <div class="step-num">3</div>
-            <div class="step-content">
-              <h4>Create Verified Backup</h4>
-              <p>Follow the guided steps: connect, make a <strong>verified full backup</strong> and enable root access. Keep a second copy of the backup offline.</p>
+            <div>
+              <h4>Back up your original firmware</h4>
+              <p>Before flashing anything, back up the original firmware.</p>
+              <ol>
+                <li>Open the backup section in the flasher.</li>
+                <li>Follow the instructions to create a backup.</li>
+                <li>Save the backup somewhere safe, and keep a second copy offline.</li>
+                <li>Make sure the backup completes successfully.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not skip this step. The backup is how you restore the original vendor firmware if anything goes wrong. It takes about 20 to 50 minutes; if it fails, retry and it resumes.</p>
             </div>
           </div>
-
-          <div class="step-card">
+          <div class="guide-shots"><img src="img/3-backup.jpeg" alt="Flasher: backup page" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
             <div class="step-num">4</div>
-            <div class="step-content">
-              <h4>Prepare, Flash & Pick the Slot</h4>
-              <p>The flasher prepares the image from the release and your own backup, flashes it and selects the boot slot. Stock firmware stays in the other slot until your first firmware upgrade.</p>
+            <div>
+              <h4>Download the signed OpenWrt image</h4>
+              <ol>
+                <li>Go to <strong>Get an image</strong>.</li>
+                <li>Select <strong>Download the signed image</strong>.</li>
+                <li>Click <strong>Download</strong> and wait for it to finish.</li>
+              </ol>
+              <p>You do not need Docker or files from your vendor firmware to get a flashable image.</p>
             </div>
           </div>
-
-          <div class="step-card">
+          <div class="guide-shots"><img src="img/4-download.png" alt="Flasher: Get an image, download the signed image" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
             <div class="step-num">5</div>
-            <div class="step-content">
-              <h4>Open LuCI</h4>
-              <p>Connect to Ethernet or Wi-Fi, open <a href="https://192.168.70.1/cgi-bin/luci" target="_blank" rel="noopener">https://192.168.70.1/cgi-bin/luci</a>, accept the self-signed certificate and set a root password. SSH is on port 22 from the LAN.</p>
+            <div>
+              <h4>Identify your current boot slot</h4>
+              <p>In the <strong>Device read</strong> section, find the device information: MAC address, IMEI, serial number and the <strong>current boot slot</strong> (A or B). Note the slot; you select the same one when flashing.</p>
             </div>
           </div>
+          <div class="guide-shots"><img src="img/5-slot.png" alt="Flasher: device information with the current boot slot" loading="lazy"></div>
         </div>
-
-        <div class="install-flasher-preview">
-          <div class="flasher-image-card">
-            <img src="x28-flasher.png" alt="x28-flasher guided installation utility" class="flasher-img">
-            <div class="flasher-caption">
-              <span>x28-flasher: guided backup, flashing and recovery</span>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">6</div>
+            <div>
+              <h4>Configure the flash</h4>
+              <ol>
+                <li>Go to <strong>Flash OpenWrt</strong> and select <strong>Built/Downloaded Images</strong>.</li>
+                <li>Under <strong>Image to Flash</strong>, select the image at the top of the list: the latest one, downloaded or assembled locally.</li>
+                <li>Select the path to your backup. It is required on purpose, so you cannot skip the backup.</li>
+                <li>Select the slot your device is booting from, as found in step 5.</li>
+              </ol>
+              <p class="note warn"><strong>Warning:</strong> The selected slot must match the current boot slot. Flashing the wrong slot can cause boot problems.</p>
             </div>
           </div>
-
-          <div class="warning-callout">
-            <div class="callout-icon">⚠️</div>
-            <div class="callout-body">
-              <strong>Flashing can brick your router.</strong>
-              Never write partitions or change the boot order by hand. Read the <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/RECOVERY.md" target="_blank" rel="noopener">recovery guide</a> first. A firmware upgrade writes the inactive slot, so the first one can replace the stock fallback.
-            </div>
-          </div>
+          <div class="guide-shots"><img src="img/6-configure.jpeg" alt="Flasher: Flash OpenWrt configuration" loading="lazy"></div>
         </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">7</div>
+            <div>
+              <h4>Start flashing</h4>
+              <ol>
+                <li>Click <strong>Start</strong>. Untick <strong>Rehearsal</strong> for the real write; a rehearsal writes your backup to that slot again to check that writing works.</li>
+                <li>Read and accept the risk warning.</li>
+                <li>Type the confirmation phrase the flasher asks for, and submit it.</li>
+                <li>Wait until the flasher reports <strong>Finished</strong>.</li>
+              </ol>
+              <p class="note"><strong>Important:</strong> Do not disconnect the USB cable or interrupt power while flashing.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/7-flash-a.png" alt="Flasher: start the flash" loading="lazy"><img src="img/7-flash-b.png" alt="Flasher: risk warning" loading="lazy"><img src="img/7-flash-c.png" alt="Flasher: confirmation phrase" loading="lazy"><img src="img/7-flash-d.png" alt="Flasher: flash finished" loading="lazy"></div>
+        </div>
+        <div class="guide-step ">
+          <div class="guide-text">
+            <div class="step-num">8</div>
+            <div>
+              <h4>Disconnect and reboot</h4>
+              <ol>
+                <li>Click <strong>Disconnect</strong> in the flasher.</li>
+                <li>Disconnect the USB cable.</li>
+                <li>Unplug the router's power adapter, then plug it in again.</li>
+                <li>Wait for the router to boot.</li>
+              </ol>
+              <p>The X28 now boots into OpenWrt. Open <a href="https://192.168.70.1/cgi-bin/luci" target="_blank" rel="noopener">https://192.168.70.1/cgi-bin/luci</a>, accept the self-signed certificate and set a root password. SSH is on port 22 from the LAN.</p>
+            </div>
+          </div>
+          <div class="guide-shots"><img src="img/8-done.png" alt="LuCI status page after the first boot" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="recovery-card">
+        <h3>Recovery: restore the original vendor firmware</h3>
+        <p>If the router does not boot correctly, you can restore the original firmware from your verified backup.</p>
+        <ol>
+          <li>Reconnect the device to the flasher as in step 2.</li>
+          <li>Go to <strong>Flash OpenWrt</strong> and select <strong>Rootfs from a verified backup</strong>.</li>
+          <li>Select your backup.</li>
+          <li>Choose the rootfs partition of the slot you flashed: <code>rootfs_a</code> for slot A, <code>rootfs_b</code> for slot B.</li>
+          <li>Start the restore and wait until it finishes.</li>
+          <li>Disconnect the device and power-cycle the router.</li>
+        </ol>
+        <p>This restores the selected rootfs from your backup. Whether the vendor firmware then runs fully depends on the backup and on the state of the other partitions. Developers can still assemble images locally from a vendor backup (needs Docker). Problems? <a href="https://github.com/mralinp/x28-flasher/issues" target="_blank" rel="noopener">Open an issue</a> with the flasher and firmware versions, your device and the logs.</p>
       </div>
     </div>
   </section>
@@ -981,15 +582,17 @@
         <span class="section-tag">Shell preview</span>
         <h2 class="section-title">A Normal OpenWrt Shell</h2>
         <p class="section-desc">
-          SSH in and use <code>uci</code>, <code>opkg</code> and the project's own tools. Click a command to see sample output; this is a simulation, not a connection to a router.
+          SSH in and use <code>uci</code>, <code>opkg</code> and the project's own tools. Click a command to run it in the simulated console; the output is what the tools print.
         </p>
       </div>
 
       <div class="terminal-wrapper">
         <div class="term-toolbar">
           <span class="toolbar-label">Quick Commands:</span>
+          <button class="cmd-pill" data-cmd="x28-upgrade --help">x28-upgrade --help</button>
+          <button class="cmd-pill" data-cmd="x28-update-check --help">x28-update-check --help</button>
+          <button class="cmd-pill" data-cmd="x28-sms --help">x28-sms --help</button>
           <button class="cmd-pill" data-cmd="x28-sms poll">x28-sms poll</button>
-          <button class="cmd-pill" data-cmd="cat /sys/class/thermal/thermal_zone0/temp">SoC temperature</button>
           <button class="cmd-pill" data-cmd="opkg update">opkg update</button>
         </div>
 
@@ -1017,28 +620,57 @@
           </div>
         </div>
       </div>
+
+      <div class="table-card tools-card">
+        <table class="tools-table">
+          <thead><tr><th>Tool</th><th>What it does</th><th>Synopsis, from the source</th></tr></thead>
+          <tbody>
+            <tr><td><code>x28-upgrade</code><span>x28-update</span></td><td>Upgrade to the newest signed image. Without <code>-y</code> it only checks; with it, it writes the other slot and keeps your changed settings.</td><td><code>x28-upgrade [--refresh | -y [-b]]</code></td></tr>
+            <tr><td><code>x28-update-check</code><span>x28-update</span></td><td>Read-only check for a newer signed release; prints JSON for LuCI.</td><td><code>x28-update-check [--refresh]</code></td></tr>
+            <tr><td><code>x28-sms</code><span>x28-telephony</span></td><td>Text messages, phone book, API keys and the HTTP API. Output is JSON.</td><td><code>x28-sms list | poll | send N TEXT | delete ID… | contacts | contact-set N NAME | contact-del N | keys | key-add LABEL | key-del ID | webhook [URL]</code></td></tr>
+            <tr><td><code>x28-apn</code><span>x28-mipc</span></td><td>The APNs of the SIM's operator, from the database the stock firmware ships.</td><td><code>x28-apn [imsi]</code></td></tr>
+            <tr><td><code>x28-modem-status</code><span>x28-mipc</span></td><td>Read-only modem state for LuCI's Carrier tab: operator, registration, serving cell and signal.</td><td><code>x28-modem-status</code></td></tr>
+            <tr><td><code>x28-plmn-scan</code><span>x28-mipc</span></td><td>Scan for networks; the modem leaves its network meanwhile.</td><td><code>x28-plmn-scan --start | --state | --last</code></td></tr>
+            <tr><td><code>x28-nrband</code><span>x28-nrband</span></td><td>The 5G band mask and the 5G signal, over the modem's MIPC channel.</td><td><code>x28-nrband get | set W0 W1 W2 | signal</code></td></tr>
+          </tbody>
+        </table>
+        <p class="tools-foot">Full <code>--help</code> output and man pages for every tool are planned: <a href="https://github.com/mralinp/zlt-x28-openwrt/issues/570" target="_blank" rel="noopener">#570</a>.</p>
+      </div>
     </div>
   </section>
 
-  <!-- Hardware Teardown & Specs -->
+  <!-- Hardware -->
   <section class="section hardware-section" id="hardware">
     <div class="container">
       <div class="section-header">
         <span class="section-tag">Hardware</span>
-        <h2 class="section-title">Inside the X28</h2>
+        <h2 class="section-title">ZLT X28 & X28 PRO Specifications</h2>
         <p class="section-desc">
-          Measured on a test unit running this image. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/HARDWARE.md" target="_blank" rel="noopener">Full hardware notes</a>.
+          Built around the MediaTek MT6890 platform. <a href="https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/HARDWARE.md" target="_blank" rel="noopener">Full hardware notes</a>
         </p>
       </div>
 
       <div class="hardware-grid">
-        <div class="hardware-media">
-          <div class="board-container">
-            <img src="x28-board-back.jpg" alt="ZLT X28 board, back side" class="board-img" loading="lazy">
-          </div>
-          <div class="hotspot-info-box">
-            <h4>The board, back side</h4>
-            <p>The X28 has one combined MT7915D Wi-Fi chip; the X28 PRO has two MT7915 chips, one per band. That is the one hardware difference between the models.</p>
+        <div class="soc-card">
+          <svg class="mtk-logo" viewBox="0 0 24 24" role="img" aria-label="MediaTek"><path fill="currentColor" d="M3.863 8.996c-.296 0-.664.21-.815.467L.064 14.537c-.15.257-.029.467.267.467h19.805c.297 0 .665-.21.816-.467l2.983-5.074c.15-.257.03-.467-.268-.467zm3.41 1.975h1.09l-.232.402h-.776c-.238 0-.312.093-.312.338v.807h1.37l-.233.402H6.502v-1.197c0-.589.307-.752.771-.752zm1.444 0h.937c.703 0 1.002.27 1.002.959 0 .73-.301.99-.976.99h-.963zm7.832 0h1.09l-.233.402h-.775c-.239 0-.313.093-.313.338-.004.264-.002.539-.002.807h1.372l-.233.402h-1.678v-1.197c0-.589.308-.752.772-.752zm-11.567.004v.986l.569-.984.65-.002v1.941h-.547v-1.191l-.672 1.191h-.546v-1.191l-.688 1.19h-.535l1.121-1.938zm5.98 0h.546v1.941h-.545zm1.798 0h.781v1.941h-.553v-1.383l-.797 1.383h-.552zm1.256 0h1.714l-.232.404h-.504v1.537h-.533v-1.537h-.68zm3.873 0h.547v1.941h-.547zm1.345 0h.545l-.558.968-.002.004h.002l.558.969h-.545l-.56-.97zm-9.994.398v1.145h.297c.432 0 .567-.104.567-.586 0-.483-.135-.559-.567-.559zm-1.847.416h.87l-.185.318h-.86zm9.255 0h.872l-.186.318h-.86Z"/></svg>
+          <svg class="chip-art" viewBox="0 0 240 240" role="img" aria-label="MT6890 chip">
+            <defs><linearGradient id="chipg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2a44"/><stop offset="1" stop-color="#0b1424"/></linearGradient></defs>
+            <g class="chip-pins" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+              <path d="M70 24v22M90 24v22M110 24v22M130 24v22M150 24v22M170 24v22M70 194v22M90 194v22M110 194v22M130 194v22M150 194v22M170 194v22M24 70h22M24 90h22M24 110h22M24 130h22M24 150h22M24 170h22M194 70h22M194 90h22M194 110h22M194 130h22M194 150h22M194 170h22"/>
+            </g>
+            <rect x="46" y="46" width="148" height="148" rx="14" fill="url(#chipg)" stroke="currentColor" stroke-width="2"/>
+            <rect class="chip-core" x="64" y="64" width="112" height="112" rx="8" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+            <path class="chip-trace" d="M64 80h24l10-10h24M176 160h-24l-10 10h-24M80 64v20l8 8M160 176v-20l-8-8" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="120" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="18" font-weight="700" fill="currentColor">MT6890</text>
+            <text x="120" y="136" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="currentColor" fill-opacity=".7">4× Cortex-A55</text>
+          </svg>
+          <div class="spec-tiles">
+            <div class="spec-tile"><b>4</b><span>Cortex-A55 cores</span></div>
+            <div class="spec-tile"><b>2.0 GHz</b><span>max CPU speed</span></div>
+            <div class="spec-tile"><b>5G NR + LTE</b><span>Quectel RG500L-EU</span></div>
+            <div class="spec-tile"><b>Wi-Fi</b><span>MT7915 dual band</span></div>
+            <div class="spec-tile"><b>1 GiB</b><span>RAM</span></div>
+            <div class="spec-tile"><b>1 GiB</b><span>NAND, A/B slots</span></div>
           </div>
         </div>
 
@@ -1046,54 +678,19 @@
           <h3 class="specs-title">Technical Specifications</h3>
           <table class="specs-table">
             <tbody>
-              <tr>
-                <td>Processor</td>
-                <td><strong>MediaTek MT6890 (T750)</strong>, 4x Cortex-A55, 0.5 to 2.0 GHz</td>
-              </tr>
-              <tr>
-                <td>Architecture</td>
-                <td><strong>aarch64</strong> (64-bit ARM, musl libc)</td>
-              </tr>
-              <tr>
-                <td>Kernel</td>
-                <td><strong>4.19.205</strong> vendor kernel with OpenWrt 23.05.5 userspace</td>
-              </tr>
-              <tr>
-                <td>Cellular Modem</td>
-                <td><strong>Quectel RG500L-EU</strong>, 5G NR + LTE, on the SoC's modem processor; 4 antennas, one nano-SIM</td>
-              </tr>
-              <tr>
-                <td>SMS & Telephony</td>
-                <td><strong>x28-telephony</strong>: text messages in LuCI + local HTTP API; no voice calls yet</td>
-              </tr>
-              <tr>
-                <td>Wi-Fi Subsystem</td>
-                <td><strong>MediaTek MT7915</strong>, dual band</td>
-              </tr>
-              <tr>
-                <td>Ethernet</td>
-                <td>4 LAN sockets: one 2.5 G, three 1 G</td>
-              </tr>
-              <tr>
-                <td>Memory</td>
-                <td>1 GiB RAM; Linux gets about 628 MiB, the rest is the modem's</td>
-              </tr>
-              <tr>
-                <td>Flash</td>
-                <td>1 GiB NAND, 51 partitions, A/B slots; about 288 MiB for installs and settings</td>
-              </tr>
-              <tr>
-                <td>Reset Button</td>
-                <td>Hold for 10 s to reset to defaults</td>
-              </tr>
-              <tr>
-                <td>Recovery Port</td>
-                <td>USB-C, MediaTek preloader; USB-A to USB-C cable only</td>
-              </tr>
-              <tr>
-                <td>Serial Console</td>
-                <td>UART, 921600 8N1, 1.8 V logic, unpopulated 3-hole footprint</td>
-              </tr>
+              <tr><td>Processor</td><td><strong>MediaTek MT6890 (T750)</strong>, 4x Cortex-A55, 0.5 to 2.0 GHz</td></tr>
+              <tr><td>Architecture</td><td><strong>aarch64</strong> (64-bit ARM, musl libc)</td></tr>
+              <tr><td>Kernel</td><td><strong>4.19.205</strong> vendor kernel with OpenWrt 23.05.5 userspace</td></tr>
+              <tr><td>Cellular Modem</td><td><strong>Quectel RG500L-EU</strong>, 5G NR + LTE, on the SoC's modem processor; 4 antennas, one nano-SIM</td></tr>
+              <tr><td>SMS & Telephony</td><td><strong>x28-telephony</strong>: text messages in LuCI + local HTTP API</td></tr>
+              <tr><td>Voice / VoIP</td><td><span class="tag-wip">In development</span></td></tr>
+              <tr><td>Wi-Fi Subsystem</td><td><strong>MediaTek MT7915</strong>, dual band (X28: one MT7915D chip; X28 PRO: two MT7915 chips)</td></tr>
+              <tr><td>Ethernet</td><td>4 LAN sockets: one 2.5 G, three 1 G</td></tr>
+              <tr><td>Memory</td><td>1 GiB RAM; Linux gets about 628 MiB, the rest is the modem's</td></tr>
+              <tr><td>Flash</td><td>1 GiB NAND, 51 partitions, A/B slots; about 288 MiB for installs and settings</td></tr>
+              <tr><td>Reset Button</td><td>Hold for 10 s to reset to defaults</td></tr>
+              <tr><td>Recovery Port</td><td>USB-C, MediaTek preloader; USB-A to USB-C cable only</td></tr>
+              <tr><td>Serial Console</td><td>UART, 921600 8N1, 1.8 V logic, unpopulated 3-hole footprint</td></tr>
             </tbody>
           </table>
         </div>
@@ -1133,9 +730,9 @@
               <td><span class="tag-yes">Conversations in LuCI + local HTTP API; messages kept on the router</span></td>
             </tr>
             <tr>
-              <td><strong>Idle SoC Temperature</strong></td>
-              <td>~65 °C (test unit, no fan)</td>
-              <td><span class="tag-yes">~40 °C (test unit)</span></td>
+              <td><strong>VoIP & Voice Calls</strong></td>
+              <td>Voice calls through the vendor firmware</td>
+              <td><span class="tag-wip">In development</span> VoIP with a VoIP server on the router; not ready yet</td>
             </tr>
             <tr>
               <td><strong>5G Band & Cell Locking</strong></td>
@@ -1150,7 +747,7 @@
             <tr>
               <td><strong>VPN & Proxy</strong></td>
               <td>Not part of the vendor UI</td>
-              <td><span class="tag-yes">WireGuard, OpenVPN, Passwall2</span></td>
+              <td><span class="tag-yes">Passwall2, WireGuard, OpenVPN, L2TP, PPTP, SSH tunnels</span></td>
             </tr>
             <tr>
               <td><strong>Package Management</strong></td>
