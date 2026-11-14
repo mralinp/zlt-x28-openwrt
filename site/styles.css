@@ -60,10 +60,10 @@
 
   --text-main: #0f1b2d;
   --text-muted: #475569;
-  --text-dim: #94a3b8;
+  --text-dim: #64748b;
 
   --teal-core: #0d9488;
-  --teal-light: #14b8a6;
+  --teal-light: #0f766e;
   --teal-glow: rgba(13, 148, 136, 0.15);
   --teal-glow-bright: rgba(13, 148, 136, 0.3);
 
@@ -1898,3 +1898,17 @@ button {
   .hud-card { position: static; width: 100%; margin-top: 12px; animation: none; }
   .hud-card:first-of-type { margin-top: 0; }
 }
+
+/* light theme: the amber pieces were drawn for a dark background */
+[data-theme="light"] .btn-forum { background: rgba(245, 158, 11, 0.16); color: #92400e; border-color: rgba(180, 83, 9, 0.45); box-shadow: none; }
+[data-theme="light"] .btn-forum:hover { background: rgba(245, 158, 11, 0.28); color: #78350f; border-color: #b45309; }
+[data-theme="light"] .forum-banner-card { background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(255, 255, 255, 0.9) 100%); border-color: rgba(180, 83, 9, 0.4); box-shadow: var(--shadow-card); }
+[data-theme="light"] .forum-icon-badge { color: #b45309; background: rgba(245, 158, 11, 0.2); border-color: rgba(180, 83, 9, 0.4); }
+[data-theme="light"] .forum-badge-pill { color: #b45309; }
+[data-theme="light"] .forum-headline { color: var(--text-main); }
+[data-theme="light"] .warning-callout { color: #78350f; background: rgba(245, 158, 11, 0.14); border-color: rgba(180, 83, 9, 0.4); }
+[data-theme="light"] .warning-callout a { color: #92400e; text-decoration: underline; }
+[data-theme="light"] .tag-wip { color: #92400e; background: rgba(245, 158, 11, 0.18); border-color: rgba(180, 83, 9, 0.45); }
+[data-theme="light"] .tag-new { color: #6b21a8; background: rgba(168, 85, 247, 0.12); border-color: rgba(126, 34, 206, 0.4); }
+[data-theme="light"] .status-online { color: #15803d; }
+.step-num, .os-tabs button.active { background: #0f766e; border-color: #0f766e; }
