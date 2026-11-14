@@ -1862,3 +1862,25 @@ button {
   .luci-shots, .carrier-layout { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) { .pillar-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* article series */
+.articles-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
+  gap: 40px;
+  align-items: center;
+  padding: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+.articles-logo { display: flex; justify-content: center; }
+.articles-logo img { width: 100%; max-width: 254px; height: auto; }
+.logo-for-dark { display: none; }
+[data-theme="dark"] .logo-for-light { display: none; }
+[data-theme="dark"] .logo-for-dark { display: block; }
+.articles-text p { margin: 10px 0 14px; color: var(--text-muted); line-height: 1.6; }
+.articles-text .articles-title { color: var(--text-main); font-weight: 600; }
+.footer-sisoog { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; font-size: 0.85rem; color: var(--text-muted); }
+.footer-sisoog img { height: 30px; width: auto; }
+@media (max-width: 768px) { .articles-card { grid-template-columns: minmax(0, 1fr); padding: 24px; gap: 24px; } }
