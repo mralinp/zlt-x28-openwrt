@@ -14,7 +14,7 @@
 [![CI](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-[Get started](#get-started) · [Documentation](docs/README.md) · [Contributing](#contributing) · [Releases](https://github.com/mralinp/zlt-x28-openwrt/releases)
+[Get started](#get-started) · [Documentation](docs/README.md) · [Articles](#articles-and-tutorials) · [Contributing](#contributing) · [Releases](https://github.com/mralinp/zlt-x28-openwrt/releases)
 
 </div>
 
@@ -65,6 +65,17 @@ Use **[x28-flasher](https://github.com/mralinp/x28-flasher)** for installation, 
 - **Packages:** use LuCI's **System → Software** or `opkg`. The image includes our signed feed for packages compatible with the vendor kernel; incompatible kernel modules are refused rather than installed.
 
 See [firmware upgrade details](docs/research/sysupgrade-design.md) and the [package-feed guide](docs/PACKAGE-FEED.md) for compatibility, safety and known limits.
+
+## Articles and tutorials
+
+<a href="https://sisoog.com/zlt-x28-modem/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sisoog-logo-dark.svg">
+    <img src="docs/assets/sisoog-logo.svg" alt="Sisoog" width="200">
+  </picture>
+</a>
+
+An article series by Ali Naderi Parizi on [Sisoog](https://sisoog.com/), in Persian, follows this project from the first look at the hardware to signed A/B upgrades. Part 1 is online: [ZLT X28 modem: hardware, UART console and access to the 5G modem](https://sisoog.com/zlt-x28-modem/).
 
 ## Contributing
 
