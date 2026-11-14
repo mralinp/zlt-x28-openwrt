@@ -58,6 +58,7 @@ docs/
 ├── assets/                   logo kit (SVG, icons, social preview) and BRAND.md usage guide
 ├── images/                   board photos (UART footprint)
 ├── archive/                  superseded plans, readmes and status snapshots
+├── VENDOR-GAP.md            what the stock UI did and what the native image still lacks
 └── (stock-firmware overlay, historical) vendor-command-map.md, luci-on-stock.md, luci-fix-notes.md
 ```
 
