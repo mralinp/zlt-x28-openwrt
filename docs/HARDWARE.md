@@ -49,7 +49,7 @@ What Linux's 628 MiB held at the time of measuring:
 
 `MemAvailable` was 237 MiB. That is the number to watch, not `MemFree`.
 
-**About 200 MiB of the 628 is still not attributed** (the 286 figure above was taken before `vmalloc`, CMA and the vendor drivers were counted;
+**About 140 MiB of the 628 is the two Wi-Fi radios (70 MiB each while up; measured by switching them off) and about 60 MiB is still not attributed** (the 286 figure above was taken before `vmalloc`, CMA and the vendor drivers were counted;
 that counting now gives 56 MiB of RAM-backed `vmalloc`, mainly `mt_wifi` and the Wi-Fi offload, and 16 MiB of CMA, all used). The likely owners are the
 `mt_wifi`/`mtk_warp` and modem network driver pools; the kernel cannot say without `CONFIG_PAGE_OWNER`. The full table, the carve-outs and the commands
 are in [research/memory-accounting.md](research/memory-accounting.md) ([#299](https://github.com/mralinp/zlt-x28-openwrt/issues/299)).

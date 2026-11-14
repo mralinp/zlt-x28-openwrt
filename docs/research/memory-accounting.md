@@ -18,7 +18,7 @@ Read-only measurements on the test unit (image 1.1.1, slot A, 5 min after boot, 
 
 So of the 896 MiB the kernel sees, 268 MiB never reaches the allocator (`present` 896 minus `managed` 628). The two big ones are the modem ROM and the kernel image.
 
-## What the 628 MiB holds
+## What the 628 MiB holds (before the Wi-Fi measurement below)
 
 | MiB | Owner | Source |
 |---:|---|---|
@@ -28,21 +28,43 @@ So of the 896 MiB the kernel sees, 268 MiB never reaches the allocator (`present
 | 56.3 | vmalloc, RAM-backed: `AdapterBlockAllocateMemory` 22.5 (`mt_wifi`), `load_module` 15.1, `wed_rx_bm_init` 7.0 (Wi-Fi offload), `ged_alloc` 5.4 (GPU), `_do_fork` 3.8 | `/proc/vmallocinfo` entries with `pages=` |
 | 16.0 | CMA, fully used | `CmaTotal`, `CmaFree` 0 |
 | 9.7 | programs, kernel stacks, page tables, percpu | `AnonPages`, `KernelStack`, `PageTables`, `Percpu` |
-| **about 201** | **not attributed** | the remainder |
+| **about 201** | **not attributed**; about 140 of it is the two Wi-Fi radios (Measurements) | the remainder |
 
 Not RAM, so not part of the above: `/proc/vmallocinfo` shows `ccci_map_phy_addr` 108.6 MiB, `paging_init` 32.5, `warp_cmd_process_msg` 4.1 as `phys=` (ioremap) mappings. They map the carve-outs and consume address space, not pages.
 
 `dma_buf` has no objects, `ion` and the Mali GPU (`gpu_memory` 5 pages) hold almost nothing, and `ccmni`, `mt_wifi` and `mtk_warp` export no size parameters.
 
-## What is not known
+## Measurements (2026-11-14, #299 and #301)
 
-About 200 MiB of pages is held by something that is not slab, page cache, vmalloc or CMA. The likely owners are direct `alloc_pages`/`dma_alloc_coherent` pools of `mt_wifi`/`mtk_warp` (receive and DMA rings) and the modem network driver (`ccmni`, `ccci`). It cannot be split further here: `CONFIG_PAGE_OWNER` and `CONFIG_DEBUG_KMEMLEAK` are off, and `/sys/kernel/debug/page_owner` does not exist. The kernel command line is fixed by the bootloader.
+**Wi-Fi interfaces hold most of the unattributed RAM.** On the test unit (image 1.1.1, WAN up), `MemFree` with `ip link set <if> down/up`, settled 6 s or more:
+
+| State | `MemFree` MiB | Difference |
+|---|---:|---:|
+| both radios up (`ra0` 2.4 GHz, `rai0` 5 GHz) | 208.6 | |
+| `rai0` down | 279.0 | +70.4 |
+| `ra0` and `rai0` down (`wifi down`) | 348.3 | +139.7 |
+| `ra0` up only | 279.1 | +70.5 |
+
+Each radio interface holds about 70 MiB while it is up, 140 MiB for both: 22% of Linux's 628 MiB and about 70% of the previously unattributed 200 MiB. `VmallocUsed` falls by about 7 MiB (`wed_rx_bm_init`); the rest is page allocations (descriptor and buffer rings of the vendor `mt_wifi` and `mtk_warp`), invisible in `/proc/meminfo`. With Wi-Fi off the unit reaches `MemAvailable` 367 MiB. The modules stayed loaded (unloading them on the only test unit risks a crash for a few MiB).
+
+**The modem's 256 MiB is requested by the modem firmware, not by the device tree.** `md1img_a` (an 80 MiB partition) holds the MOLY image `MT6890_EVB_QUECTEL_1907MP1_RG500L_MDBIN_PCB01_MT6890_S00.MOLY_NR15_R3_MD700_MP_V53_5_P98.bin` (build 2023/12/20, Quectel RG500L). Parsed with the MediaTek image header (magic `0x58881688`):
+
+| Section | Size |
+|---|---:|
+| `md1rom` | 29.07 MiB |
+| `md1drdi` | 2.92 MiB |
+| certificates | about 7 KiB |
+| rest of the partition | empty (`0xff`), data ends at 32 MiB |
+
+Its `CHECK_HEADER` (version 6, at the end of `md1rom`, offset `0x1d10d80`) carries `0x10000000` at `+0xac`: 256 MiB, the size of `md1rom` in the device tree. Other fields hold 245 MiB and 11 MiB (sum 256) and sizes near the shared memory (`0x6520000` = 101.1 MiB; the DT block is 103.6 MiB). The field meanings are inferred from the layout of the vendor `md_check_header` structure; only the 256 MiB value is matched to a device-tree region, the others are not confirmed. The image is 32 MiB, so about 224 MiB of the 256 is the modem's heap and working memory, which the modem firmware itself declares.
+
+**Reading.** LK builds `md1rom` and the shared-memory blocks from what this modem firmware asks for. They cannot be shrunk from Linux, the device tree or the AP side alone; they need a modem firmware build with a smaller layout, which only the modem vendor (Quectel, MediaTek) can make. The Wi-Fi driver's 140 MiB is the part the project can change.
 
 ## What can shrink
 
-- **Fixed by hardware or firmware**: the 128 MiB carve-outs (device tree), `md1rom` 256 MiB (the modem image must stay in place while the modem runs; see #301), the kernel image.
-- **Possible, not tried**: unload the Wi-Fi stack on a unit used without Wi-Fi (frees the `mt_wifi` and `wed` vmalloc, about 30 MiB, and its DMA pools, an unknown share of the 200 MiB); measure `MemFree` before and after. Needs a reboot-safe test on a unit that has a wired path, so it is a follow-up.
-- **To measure the 200 MiB**: a kernel with `CONFIG_PAGE_OWNER=y` (our own kernel, #130), or compare `MemFree` across `rmmod mt_wifi` and `rmmod mtk_warp`.
+- **Wi-Fi driver pools, about 140 MiB**: the vendor `mt_wifi` and `mtk_warp` allocate about 70 MiB per radio and export no size parameter. An open driver sizes its rings itself: upstream `mt76` supports the MT7915 (`mt7915e`). Whether this board's Wi-Fi attaches the way `mt7915e` expects, and whether the WED offload needs the vendor `mtk_warp`, is untested. This is the lever for the v2 firmware and for the open-source driver goal.
+- **Fixed by the modem firmware**: `md1rom` 256 MiB and the shared memory about 104 MiB (see above), the 128 MiB of firmware carve-outs, the kernel image, the 16 MiB CMA (used by drivers).
+- **About 60 MiB** of Linux memory is still unattributed (the modem network driver `ccmni`/`ccci` and others). Measure it the same way on a spare unit, or with `CONFIG_PAGE_OWNER` on our own kernel (#130).
 
 ## Commands
 
@@ -51,4 +73,6 @@ ssh x28 'grep -E "^(MemTotal|MemFree|MemAvailable|Buffers|Cached|Slab|SReclaimab
 ssh x28 'grep "System RAM" /proc/iomem; cat /sys/kernel/debug/memblock/reserved'
 ssh x28 'awk "/pages=/{for(i=1;i<=NF;i++)if(\$i~/^pages=/){split(\$i,a,\"=\");pg=a[2]};c=\$3;sub(/\\+0x.*/,\"\",c);s[c]+=pg*4/1024}END{for(k in s)printf \"%8.1f %s\\n\",s[k],k}" /proc/vmallocinfo | sort -rn'
 ssh x28 'cd /sys/firmware/devicetree/base/reserved-memory; for d in */; do [ -f $d/reg ] && echo "$d $(hexdump -v -e "1/1 \"%02x\"" $d/reg)"; done'
+ssh x28 'ip link set rai0 down; ip link set ra0 down; sleep 6; grep -E "^(MemFree|MemAvailable):" /proc/meminfo; wifi reload'   # Wi-Fi off: +140 MiB; wifi reload restores both radios
+ssh x28 'dd if=/dev/mtd17ro bs=1M 2>/dev/null' > md1img_a.bin   # read-only; parse the image headers (magic 88 16 88 58) and CHECK_HEADER
 ```
