@@ -71,6 +71,21 @@ mtwifi_whnat() {
 	case "$1" in 0|1) echo "WHNAT=$1" ;; esac
 }
 
+# mtwifi_perf <ifname>: the vendor's "Performance Mode" for one radio, what its lan_mgr (mtkt750_lan_mgr_wifi_performance_mode) writes
+# into the Wi-Fi start script when SYS_WLAN_PERFORMANCE_MODE_SW is 1: clear-channel assessment on, smart carrier sense off, TX burst
+# off and two MAC registers of the radio. The driver forgets them when the card is reopened, so unsetting the option and restarting
+# Wi-Fi is the undo. Not measured for speed yet; see #583.
+mtwifi_perf() {
+	local ifn="$1" iw="${MTWIFI_IWPRIV:-iwpriv}" r1 r2
+	case "$ifn" in
+		ra0) r1=820E4014 r2=820E31A4 ;;
+		rai0) r1=820F401C r2=820F31B4 ;;
+		*) return 1 ;;
+	esac
+	"$iw" "$ifn" set EDCCAEnable=1 && "$iw" "$ifn" set SCSEnable=0 && "$iw" "$ifn" set TxBurst=0 &&
+		"$iw" "$ifn" mac "$r1=ffff0000" && "$iw" "$ifn" mac "$r2=00020101"
+}
+
 # Prints "PMFMFPC PMFMFPR" for ieee80211w (0 off, 1 optional, 2 required); unset keeps the stock profile's 1 0.
 mtwifi_pmf() {
 	case "$1" in
@@ -124,7 +139,7 @@ mtwifi_channel() {
 
 drv_mtwifi_init_device_config() {
 	config_add_string country
-	config_add_int txpower_pct beacon_int whnat
+	config_add_int txpower_pct beacon_int whnat performance
 }
 
 drv_mtwifi_init_iface_config() {
@@ -154,11 +169,11 @@ mtwifi_setup_vif() {
 }
 
 drv_mtwifi_setup() {
-	local channel htmode country band txpower_pct beacon_int whnat ifname dat rai0_up cc
+	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up cc
 	local vif_name= vif_auth="OPEN NONE" vif_ssid= vif_key= vif_hidden=0 vif_isolate=0 vif_wmm=1 vif_dtim=1
 	local vif_pmf="1 0" vif_policy=0 vif_acl=
 	json_select config
-	json_get_vars channel htmode country band txpower_pct beacon_int whnat
+	json_get_vars channel htmode country band txpower_pct beacon_int whnat performance
 	json_select ..
 	set -- $(mtwifi_band "$band" "$interface")
 	[ "$#" = 2 ] || { wireless_setup_failed INVALID_BAND; return 1; }
@@ -193,6 +208,10 @@ drv_mtwifi_setup() {
 		ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	fi
 	[ "$ifname" = rai0 ] || [ -z "$rai0_up" ] || ip link set dev rai0 up 2>/dev/null
+	# Performance mode needs the interface up; a failure is logged, never fatal (Wi-Fi works without it).
+	if [ "$performance" = 1 ]; then
+		mtwifi_perf "$ifname" >/dev/null 2>&1 || logger -t mtwifi "performance mode not applied on $ifname"
+	fi
 	[ -z "$vif_name" ] || wireless_add_vif "$vif_name" "$ifname"
 	wireless_set_up
 }
