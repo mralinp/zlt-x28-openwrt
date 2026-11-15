@@ -14,7 +14,7 @@ every backup we have is from an already unlocked unit, so the unlock steps are i
 | `http.cgi` strings | `SYS_UNLOCK_NCK_CODE_COUNT`, `SYS_UNLOCK_SIM_CODE_ENABLE`, `SYS_UNLOCK_SIM_NCK_CODE`, the flag files `/mnt/data/var/run/nck_unlock_success` and `nck_unlock_failed`, and the message "nck code limit, function close". |
 | `usr/bin/dialer`, `usr/bin/configloader` strings | Both read `SYS_LOCK_OPERATOR_SW` and `SYS_LOCK_OPERATOR_LIST`; `dialer` also uses `/mnt/data/etc/tzcfg/sim_lock_file` and `apn_imsi`. |
 | `/etc/init.d/0mount_all` | `/mnt/data` is the `user_config` partition (mtd48), mounted as yaffs2. |
-| `user_config` of five backups | A shell-style settings file (`system_config.use`) with lines `export KEY="value"`. In all five: `SYS_LOCK_OPERATOR_SW="0"`, `SYS_LOCK_OPERATOR_LIST=""`, `SYS_LOCK_SIM_SW="0"`, `SYS_LOCK_PHONE_SW="0"`. No `sim_lock_file` is present. |
+| `user_config` of six backups | A shell-style settings file (`system_config.use`) with lines `export KEY="value"`. In all six: `SYS_LOCK_OPERATOR_SW="0"`, `SYS_LOCK_OPERATOR_LIST=""`, `SYS_LOCK_SIM_SW="0"`, `SYS_LOCK_PHONE_SW="0"`. No `sim_lock_file` is present. No `export SYS_UNLOCK_*` values appear — the `SYS_UNLOCK_*` names visible in the partition binary are string literals inside firmware blobs (configloader or similar), not set config values. No `nck_unlock_success` or `nck_unlock_failed` flag files are present. |
 
 ## How the lock works
 
@@ -27,7 +27,11 @@ Two mechanisms sit side by side in the stock config:
    function close"). The lock state itself lives in the modem, not in a Linux file.
 
 `SYS_LOCK_SIM_SW`, `SYS_LOCK_SIM_INITIAL_PIN` and `SYS_LOCK_SIM_CHANGED_PIN` sit next to them but look like the SIM **PIN** feature, and
-`SYS_LOCK_PHONE_SW` like a phone lock. They are not operator locks; leave them alone.
+`SYS_LOCK_PHONE_SW` / `SYS_LOCK_PHONE_IMSI` like a phone lock. They are not operator locks; leave them alone.
+
+Additional keys seen as bare strings (key names only, no values) in the `user_config` partition binary (from firmware blobs, not `system_config.use`):
+`SYS_LOCK_OPERATOR_LIST_1` (a second PLMN list slot), `SYS_UNLOCK_PIN_CODE_FOREVER_ENABLE`, `SYS_UNLOCK_SIM_NCK_CODE_RULE`.
+These are known to `configloader` / `http.cgi` but are never set in any of our backups.
 
 ## How to clear the operator lock by hand (inferred, not tested on a locked unit)
 
@@ -59,6 +63,20 @@ erases, slot A when A's boot tries are above 3 (see [slot-selection](slot-select
 web page below.
 
 On a unit with region code `MY0588` the stock web UI does the same thing itself: Advanced, **SIM lock**, switch the PLMN lock off and save.
+
+## What the backup search found (2026-11-15)
+
+Six `user_config` images were searched (`strings` on the raw yaffs2 partition): five `x28-backup-*` tarballs and one `overlay-refresh-*`.
+
+| Question | Finding |
+|---|---|
+| `nck_unlock_success` / `nck_unlock_failed` flag files | Absent in every backup. No NCK unlock was ever completed via the web UI on this unit. |
+| `export SYS_UNLOCK_NCK_CODE_COUNT=...` | Never set. Counter was never written to `system_config.use`. |
+| `export SYS_UNLOCK_SIM_NCK_CODE=...` | Never set. |
+| `sim_lock_file` | Absent. |
+| Bare `SYS_UNLOCK_*` key names (no `export`) | Present — they are string literals inside firmware blobs in the partition, not config values. |
+
+Conclusion: the unit was never NCK-locked, or the paid unlock Tozed applied was done at the modem level (e.g. via an AT command that changes the 3GPP lock state directly) and left no trace in the Linux `user_config` partition. The backup evidence is consistent with the unit simply being an unlocked unit.
 
 ## What is not known
 

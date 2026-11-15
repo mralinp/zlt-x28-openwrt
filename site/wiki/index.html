@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X28 OpenWrt Docs</title>
+  <meta name="description" content="Documentation for OpenWrt on the ZLT X28 and X28 PRO: install, packages, cellular, upgrades, recovery, build and test log.">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    /* The docs viewer: the pages are the .md files next to this file, rendered in the browser. */
+    .docs { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; max-width: 1240px; margin: 0 auto; padding: 40px 24px 80px; }
+    .docs-side { position: sticky; top: calc(var(--nav-height) + 24px); align-self: start; max-height: calc(100vh - var(--nav-height) - 48px); overflow-y: auto; font-size: 0.92rem; }
+    .docs-side ul { list-style: none; margin: 4px 0 18px; padding: 0; }
+    .docs-side p { margin: 0; color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .docs-side p:first-child a { font-size: 0.92rem; text-transform: none; letter-spacing: 0; }
+    .docs-side a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text-muted); text-decoration: none; }
+    .docs-side a:hover { color: var(--text-main); background: var(--bg-subtle); }
+    .docs-side a.active { color: var(--teal-light); background: var(--bg-subtle); font-weight: 600; }
+    [data-theme="light"] .docs-side a.active { color: var(--teal-core); }
+
+    .md { min-width: 0; line-height: 1.7; color: var(--text-main); }
+    .md h1 { font-size: 2rem; margin: 0 0 20px; }
+    .md h2 { font-size: 1.4rem; margin: 40px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
+    .md h3 { font-size: 1.1rem; margin: 28px 0 10px; }
+    .md h2, .md h3 { scroll-margin-top: calc(var(--nav-height) + 16px); }
+    .md p, .md ul, .md ol, .md blockquote, .md pre { margin: 0 0 16px; }
+    .md ul, .md ol { padding-left: 24px; }
+    .md li { margin: 4px 0; }
+    .md a { color: var(--teal-light); }
+    [data-theme="light"] .md a { color: var(--teal-core); }
+    .md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px; }
+    .md pre { background: var(--bg-card-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+    .md pre code { background: none; padding: 0; }
+    .md blockquote { border-left: 3px solid var(--accent-amber); padding: 2px 16px; color: var(--text-muted); }
+    .md .tbl { overflow-x: auto; margin: 0 0 18px; }
+    .md table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+    .md th, .md td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; vertical-align: top; }
+    .md th { background: var(--bg-subtle); white-space: nowrap; }
+    .md .mermaid { text-align: center; overflow-x: auto; margin: 0 0 18px; }
+    .md-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-dim); }
+
+    @media (max-width: 860px) {
+      .docs { grid-template-columns: 1fr; gap: 16px; padding: 20px 16px 60px; }
+      .docs-side { position: static; max-height: none; border-bottom: 1px solid var(--border-color); }
+      .docs-side ul { display: flex; flex-wrap: wrap; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="../" class="nav-brand" aria-label="X28 OpenWrt Home">
+        <img src="../logo-dark-horizontal.svg" alt="X28 OpenWrt" class="brand-logo" id="brandLogo">
+      </a>
+      <nav class="nav-links">
+        <a href="../">Home</a>
+        <a href="./">Docs</a>
+        <a href="../#downloads">Downloads</a>
+        <a href="https://github.com/mralinp/zlt-x28-openwrt" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="themeToggle" class="btn-icon" aria-label="Toggle Dark/Light Mode">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="docs">
+    <aside class="docs-side" id="side" aria-label="Documentation pages"></aside>
+    <main>
+      <article class="md" id="page"></article>
+      <p class="md-foot"><a id="edit" target="_blank" rel="noopener">Edit this page on GitHub</a></p>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script>
+    // Routes: #/Page and #/Page/heading-id. A page is <Page>.md next to this file; they are our own files, so the HTML is not sanitized.
+    const SRC = 'https://github.com/mralinp/zlt-x28-openwrt/blob/develop/site/wiki/';
+    const html = document.documentElement, side = document.getElementById('side'), page = document.getElementById('page');
+    const slug = (s) => s.toLowerCase().replace(/[^\w\- ]/g, '').replace(/ /g, '-');   // GitHub's heading ids
+    const route = () => { const [p, a] = location.hash.replace(/^#\/?/, '').split('/'); return [/^[\w-]+$/.test(p) ? p : 'Home', a]; };
+    const local = (href) => /^([\w-]+)\.md(?:#(.*))?$/.exec(href || '');
+    let shown;
+
+    function links(root) {   // Page.md#x -> #/Page/x, so the same files also read correctly on GitHub
+      for (const a of root.querySelectorAll('a[href]')) {
+        const href = a.getAttribute('href'), m = local(href);
+        if (m) a.setAttribute('href', '#/' + m[1] + (m[2] ? '/' + m[2] : ''));
+        else if (/^https?:/.test(href)) { a.target = '_blank'; a.rel = 'noopener'; }
+      }
+    }
+
+    async function mermaid() {
+      const blocks = page.querySelectorAll('code.language-mermaid');
+      if (!blocks.length) return;
+      for (const c of blocks) { const d = document.createElement('div'); d.className = 'mermaid'; d.textContent = c.textContent; c.parentElement.replaceWith(d); }
+      const m = (await import('https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs')).default;
+      m.initialize({ startOnLoad: false, theme: html.dataset.theme === 'dark' ? 'dark' : 'default' });
+      await m.run({ nodes: page.querySelectorAll('.mermaid') });
+    }
+
+    async function show() {
+      const [name, anchor] = route();
+      if (name !== shown) {
+        const r = await fetch(name + '.md');
+        page.innerHTML = r.ok ? marked.parse(await r.text()) : '<h1>Page not found</h1><p><a href="#/Home">Back to the docs home</a></p>';
+        for (const h of page.querySelectorAll('h1, h2, h3')) h.id = h.id || slug(h.textContent);
+        for (const t of page.querySelectorAll('table')) { const w = document.createElement('div'); w.className = 'tbl'; t.replaceWith(w); w.append(t); }
+        links(page);
+        shown = name;
+        document.title = (page.querySelector('h1')?.textContent || name) + ' · X28 OpenWrt Docs';
+        document.getElementById('edit').href = SRC + name + '.md';
+        for (const a of side.querySelectorAll('a')) a.classList.toggle('active', a.getAttribute('href') === '#/' + name);
+        await mermaid().catch(() => {});   // a diagram that fails to load stays as its source text
+      }
+      const target = anchor && document.getElementById(anchor);
+      target ? target.scrollIntoView() : scrollTo(0, 0);
+    }
+
+    function theme(t) {
+      html.dataset.theme = t;
+      document.getElementById('brandLogo').src = t === 'dark' ? '../logo-dark-horizontal.svg' : '../logo-horizontal.svg';
+    }
+    let saved; try { saved = localStorage.getItem('x28-theme'); } catch (e) { /* storage blocked */ }
+    theme(saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const t = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      theme(t);
+      try { localStorage.setItem('x28-theme', t); } catch (e) { /* storage blocked */ }
+      shown = null; show();   // redraw diagrams in the new theme
+    });
+
+    fetch('_Sidebar.md').then((r) => r.text()).then((t) => { side.innerHTML = marked.parse(t); links(side); shown = null; show(); });
+    addEventListener('hashchange', show);
+  </script>
+</body>
+</html>

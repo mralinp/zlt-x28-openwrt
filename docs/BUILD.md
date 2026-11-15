@@ -383,7 +383,7 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   handler maps (#166): `txpower_pct` (`TxPower`, a percentage: the driver has no dBm setting), `beacon_int`, `hidden`,
   `isolate`, `wmm`, `dtim_period`, `macfilter`/`maclist` (`AccessPolicy0`/`AccessControlList0`; the driver renumbers the
   5 GHz BSS to slot 1 in `DBDC_card0.dat`) and `ieee80211w` (`PMFMFPC`/`PMFMFPR`). netifd reads a handler's option list
-  only at start, so a new option needs a netifd restart on a running unit. A band whose networks are all disabled can't be
+  only at start, so a new option needs a netifd restart on a running unit. Two more radio options exist in UCI only (no LuCI field): `whnat` (`WHNAT`; `0` switches the offload engine off and frees about 65 MiB per radio, #597) and `performance` (`1` runs the vendor's Performance Mode tweaks after the radio is up: `iwpriv` `EDCCAEnable=1`, `SCSEnable=0`, `TxBurst=0` and two MAC registers, #583; undo by unsetting it and restarting Wi-Fi). A band whose networks are all disabled can't be
   switched off on its own (`RadioOn=0` turned the whole card's flag off and `ra0` beaconed an open `HT_AP0`): `rai0` goes
   down; `ra0` goes down too unless it has to carry `rai0`, and then it gets a hidden WPA2 network with a random key.
   The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an

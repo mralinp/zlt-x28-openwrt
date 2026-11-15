@@ -7,12 +7,34 @@
 # status: 1 available, 2 current, 3 forbidden (3GPP), 0 unknown. act: 0 GSM, 2 UMTS, 7 LTE, 12/13 NR.
 
 OUT=${X28_PLMN_SCAN_FILE:-/tmp/x28-plmn-scan}
+SOCK=${X28_AT_SOCK:-/dev/adb_atci_socket}
 STATE=$OUT.state
 
 parse() {
 	# +COPS: (2,"long","short","43244","2715",7),(1,"long","short","43235","7ED8",7),,(0-3),(0-2)  (the quoted hex is the area code)
 	tr -d '\r' | sed -n 's/^+COPS: *//p' | sed 's/),,.*//; s/^(//; s/)$//; s/),(/\n/g' | awk -F, '
 		{ gsub(/"/, ""); if ($4 ~ /^[0-9]+$/) printf "%s\t%s\t%s\t%s\n", $4, $2, $NF, $1 }'
+}
+
+# `mipc_wan_cli --at_cmd` gives up after about 5 s and segfaults, and a scan takes 30 s or more, so its answer was always lost.
+# The modem's AT socket waits as long as we ask: send the command, read until OK or ERROR (or $2 seconds).
+at() {
+	lua - "$SOCK" "$1" "$2" <<'LUA'
+local nixio = require "nixio"
+local s = nixio.socket("unix", "stream")
+if not s:connect(arg[1]) then os.exit(1) end
+s:send(arg[2] .. "\r")
+local buf, t0 = "", os.time()
+while os.time() - t0 < tonumber(arg[3]) do
+	if (nixio.poll({{fd = s, events = nixio.poll_flags("in")}}, 1000) or 0) > 0 then
+		local d = s:recv(4096)
+		if not d or #d == 0 then break end
+		buf = buf .. d
+		if buf:find("\nOK") or buf:find("ERROR") then break end
+	end
+end
+io.write(buf)
+LUA
 }
 
 selftest() {
@@ -32,11 +54,7 @@ case "$1" in
 		( r=failed; "$0" >/dev/null 2>&1 && r=done; echo "$r" > "$STATE" ) >/dev/null 2>&1 &
 		;;
 	*)
-		# mipc_wan_cli sometimes crashes on the first call (observed); retry.
-		for i in 1 2 3; do
-			res="$(mipc_wan_cli --at_cmd 'at+cops=?' 2>/dev/null | parse)"
-			[ -n "$res" ] && break
-		done
+		res="$(at 'AT+COPS=?' 300 2>/dev/null | parse)"
 		[ -n "$res" ] || exit 1
 		printf '%s\n' "$res" > "$OUT"
 		printf '%s\n' "$res" ;;

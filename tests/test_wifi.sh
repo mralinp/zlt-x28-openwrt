@@ -16,6 +16,17 @@ mtwifi_auth wep-open && exit 1
 [ "$(mtwifi_band 5g)" = "rai0 $dir/mt7915.dbdc.b1.dat" ] && ! mtwifi_band 6g || exit 1
 [ "$(mtwifi_band '' radio_2g)" = "ra0 $dir/mt7915.dbdc.b0.dat" ] && [ "$(mtwifi_band 2g radio_5g)" = "ra0 $dir/mt7915.dbdc.b0.dat" ] && ! mtwifi_band '' radio0 || exit 1
 [ "$(mtwifi_pmf '')" = "1 0" ] && [ "$(mtwifi_pmf 0)" = "0 0" ] && [ "$(mtwifi_pmf 2)" = "1 1" ] || exit 1
+[ "$(mtwifi_whnat 0)" = WHNAT=0 ] && [ "$(mtwifi_whnat 1)" = WHNAT=1 ] && [ -z "$(mtwifi_whnat '')" ] && [ -z "$(mtwifi_whnat 2)" ] || exit 1
+printf 'Default\nWHNAT=1\n' > "$dir/w.dat"
+mtwifi_render "$dir/w.dat" $(mtwifi_whnat 0)
+grep -qx 'WHNAT=0' "$dir/w.dat" && grep -qx 'WHNAT=1' "$dir/w.dat.stock" || exit 1  # the stock copy keeps 1
+mtwifi_render "$dir/w.dat" $(mtwifi_whnat '')
+grep -qx 'WHNAT=1' "$dir/w.dat" || exit 1  # unset: stock again
+log=$dir/iw.log; : > "$log"; printf '#!/bin/sh\necho "$@" >> %s\n' "$log" > "$dir/iw"; chmod +x "$dir/iw"
+MTWIFI_IWPRIV="$dir/iw" mtwifi_perf ra0 && MTWIFI_IWPRIV="$dir/iw" mtwifi_perf rai0 || exit 1
+[ "$(cat "$log")" = "$(printf '%s\n' 'ra0 set EDCCAEnable=1' 'ra0 set SCSEnable=0' 'ra0 set TxBurst=0' 'ra0 mac 820E4014=ffff0000' 'ra0 mac 820E31A4=00020101' 'rai0 set EDCCAEnable=1' 'rai0 set SCSEnable=0' 'rai0 set TxBurst=0' 'rai0 mac 820F401C=ffff0000' 'rai0 mac 820F31B4=00020101')" ] || { cat "$log"; exit 1; }
+mtwifi_perf wlan0 && exit 1  # only the two Wi-Fi interfaces
+printf '#!/bin/sh\nexit 1\n' > "$dir/iwfail"; chmod +x "$dir/iwfail"; MTWIFI_IWPRIV="$dir/iwfail" mtwifi_perf ra0 && exit 1  # a failing command is reported
 [ "$(mtwifi_policy allow)" = 1 ] && [ "$(mtwifi_policy deny)" = 2 ] && [ "$(mtwifi_policy '')" = 0 ] || exit 1
 [ "$(mtwifi_country IR)" = "IR 1 4" ] && [ "$(mtwifi_country US)" = "US 0 13" ] && [ "$(mtwifi_country '')" = "US 0 13" ] && [ "$(mtwifi_country XX)" = "US 0 13" ] || exit 1
 [ "$(grep -c . "$MTWIFI_REGIONS")" -gt 150 ] && ! grep -qv '^[A-Z][A-Z] [01] [0-9]*$' "$MTWIFI_REGIONS" || exit 1

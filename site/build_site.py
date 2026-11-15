@@ -14,7 +14,12 @@ def gh(*a):
 
 
 def downloads(repo):
-    return sum(a['download_count'] for pages in json.loads(gh('api', '--paginate', '--slurp', f'repos/{repo}/releases?per_page=100')) for r in pages for a in r['assets'])
+    """Downloads of what people install: files of the vX.Y.Z releases, without checksum and signature files.
+    The feed-N and kmods-* releases hold the opkg feed, which every router and CI run fetches (feed-3 alone is 5,000+),
+    so counting them would call package fetches downloads."""
+    return sum(a['download_count'] for pages in json.loads(gh('api', '--paginate', '--slurp', f'repos/{repo}/releases?per_page=100'))
+               for r in pages if re.match(r'v\d', r['tag_name'])
+               for a in r['assets'] if not re.search(r'(SHA256SUMS.*|\.sha256|\.sig)$', a['name']))
 
 
 def release(repo):
