@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../package/x28-update/htdocs/luci-static/resources/view/status/include/05_x28update.js'), 'utf8');
+let logs = ['flashing 1.1.0', 'flashing 1.1.0\nFAILED: backup failed'];
+let reconnects = 0, timers = 0, modal;
+const ctx = { fs: { read: async () => logs.shift() }, ui: { showModal: title => modal = title, awaitReconnect: () => reconnects++ }, E: () => ({}), _: s => s, baseclass: {extend: x => x}, window: {setTimeout: cb => {timers++; cb();}} };
+vm.createContext(ctx);
+vm.runInContext('(function(){' + source.replace('return baseclass.extend', 'globalThis.follow = follow; return baseclass.extend') + '})()', ctx);
+(async () => { await ctx.follow(); assert.equal(timers, 1); assert.equal(reconnects, 1); assert.equal(modal, 'Upgrade refused'); console.log('late upgrade failure: ok'); })().catch(e => {console.error(e); process.exitCode=1;});
