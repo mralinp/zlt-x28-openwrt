@@ -6,6 +6,9 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- Fix `opkg update` failing on the x28 feed: `uclient-fetch` hangs on GitHub's 4 KB response header, so `opkg` now downloads through `curl` (a `wget` wrapper in `/usr/sbin`, #616).
+- Fix LuCI's System page refusing to save ("Design" has no value): the image now registers the Bootstrap themes, and the built-image check fails without them (#614).
+
 - Fix the first phonebook save on an empty telephony store and keep LuCI watching for upgrade failures after flashing is announced.
 
 - Messages in LuCI are shown as conversations, with paging and a phone book picker for the recipient (#554).
