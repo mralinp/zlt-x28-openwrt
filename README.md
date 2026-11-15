@@ -85,7 +85,7 @@ Bug reports, test results and pull requests are welcome.
 2. Branch from `develop` as `feature|fix|docs|chore|research/<issue>-slug`.
 3. Submit a PR into `develop` with a Conventional Commit title and a reference to the issue. Include test results, anything not verified, and a safety/rollback note for changes that affect the device.
 
-See the [contribution workflow](docs/WORKFLOW.md) for labels, milestones and review requirements.
+See the [contribution workflow](docs/WORKFLOW.md) for labels, milestones and review requirements. Reverse-engineering and clean-room rules: [docs/CLEAN-ROOM.md](docs/CLEAN-ROOM.md).
 
 ## Documentation
 
