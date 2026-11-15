@@ -4,14 +4,15 @@
 OpenWrt 23.05.5 userspace).** The feed carries kernel packages built for that exact kernel and its config. It is not valid for
 other devices or kernels, and nothing here makes the official 23.05 kernel packages (5.15) work.
 
-The feed is a normal signed `opkg` feed, published as the newest GitHub release of this repository:
+The feed is a normal signed `opkg` feed, published on the dedicated `feed-3` GitHub release:
 
 ```text
-src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download
+src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3
 ```
 
-Images built with the flasher since mralinp/x28-flasher#72 carry this line and the key; older images carry the `feed-2`
-line (see "Using it" to switch). Signing key fingerprint:
+Images built with the flasher since mralinp/x28-flasher#72 carry the key but may use
+`releases/latest/download`; older images carry the `feed-2` line. Switch either to the explicit feed URL below.
+Since v1.0.0, `latest` points to firmware releases, which do not carry the package index. Signing key fingerprint:
 **`7fec994ab0d15b97`** (`package/x28-feed/files/x28-feed.pub`, installed as `/etc/opkg/keys/7fec994ab0d15b97`). `opkg`
 checks the signature; do not turn that off.
 
@@ -79,7 +80,7 @@ reboot**, so reboot after upgrading them. A module package never replaces a load
 firmware release bundle holds the exact set it was made from. This `opkg` cannot install from a URL, so download the file first, then install it from `/tmp`:
 
 ```sh
-cd /tmp && uclient-fetch -O x28-base_0.1.0-1_all.ipk https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download/x28-base_0.1.0-1_all.ipk
+cd /tmp && uclient-fetch -O x28-base_0.1.0-1_all.ipk https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3/x28-base_0.1.0-1_all.ipk
 sha256sum x28-base_0.1.0-1_all.ipk     # compare with the bundle's SHA256SUMS
 opkg install --force-downgrade /tmp/x28-base_0.1.0-1_all.ipk
 ```
@@ -89,13 +90,13 @@ The `-rN` revisions order correctly. Reboot afterwards if the package is a boot-
 
 ## Using it
 
-On an image built with the current flasher the line and the key are already there. On a running unit or an older image:
+On a running unit, check the key and replace the existing X28 feed line:
 
 ```sh
 # the key ships with images; check it
 ls /etc/opkg/keys/7fec994ab0d15b97
-# replace an older x28 line (feed-1, feed-2) with the stable URL
-sed -i 's|^src/gz x28 .*|src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download|' /etc/opkg/customfeeds.conf
+# replace the x28 line, including the broken releases/latest/download URL
+sed -i 's|^src/gz x28 .*|src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3|' /etc/opkg/customfeeds.conf
 opkg update
 opkg upgrade kmod-sched-core   # or any built module; see `opkg list-upgradable`
 ```
@@ -124,10 +125,10 @@ A newly built version of a module has a higher revision (`-r2`, …), so `opkg u
 4. `tools/build/feed_release.py` refuses anything but the reviewed index (the SHA-256 pinned in the script, with the plain
    listing in [feed-index.txt](research/feed-index.txt)), signs it with the offline key and verifies the signature.
    Signing on a Mac uses `tools/build/usign/`, a container built from the exact `usign`/`libubox` commits OpenWrt 23.05 uses.
-5. There is **one feed release**, marked **latest**, and it is updated in place: new packages are uploaded first, then the
-   index (`Packages`, `Packages.gz`, `Packages.sig`) is replaced last, so clients switch to the new set at once. Firmware
-   releases are created with `--latest=false`, so they never take that slot. The tag is only a label (it is still
-   `feed-3`); the URL does not contain it. `feed-1` and `feed-2` are old and only used by older images.
+5. There is **one current feed release**, `feed-3`, updated in place: new packages are uploaded first, then the
+   index (`Packages`, `Packages.gz`, `Packages.sig`) is replaced last. Clients use its explicit
+   `releases/download/feed-3` URL. Firmware releases may be marked latest; never use
+   `releases/latest/download` for the feed. `feed-1` and `feed-2` are old and only used by older images.
 
 The details, commands and the trust model are in [research/signed-package-feed.md](research/signed-package-feed.md).
 

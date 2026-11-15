@@ -10,6 +10,7 @@
 **OpenWrt 23.05.5 for the ZLT X28 and X28 PRO 5G routers.**
 
 [![Release](https://img.shields.io/github/v/release/mralinp/zlt-x28-openwrt?include_prereleases&label=release)](https://github.com/mralinp/zlt-x28-openwrt/releases)
+[![Downloads](https://img.shields.io/github/downloads/mralinp/zlt-x28-openwrt/total)](https://github.com/mralinp/zlt-x28-openwrt/releases)
 [![CI](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 

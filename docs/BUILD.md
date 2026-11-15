@@ -530,7 +530,7 @@ unavailable. This is a locally tested candidate, not a hosted feed or installed 
 
 The [signed-feed preparation](research/signed-package-feed.md) freezes the reviewed feed (209 packages in `feed-3`)
 (stubs and vendor ipset), signs and verifies it locally, and stages an allowlisted release bundle. Its public
-key is checked in; its private key stays outside Git. It is hosted as release assets (`feed-1`, `feed-2`, and `feed-3` on the stable URL `https://github.com/mralinp/zlt-x28-openwrt/releases/latest/download`, see [PACKAGE-FEED](PACKAGE-FEED.md)), and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
+key is checked in; its private key stays outside Git. It is hosted as release assets (`feed-1`, `feed-2`, and `feed-3` on the explicit URL `https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3`, see [PACKAGE-FEED](PACKAGE-FEED.md)), and `first_boot.py` puts its URL and key in the image, replaces the stock kernel records with a `kernel` record, and clears the old `kmod-*` files (#202). Check a built rootfs with `tools/build/image_feed_test.sh`.
 
 ## VPN set and WireGuard in the image (#230)
 
