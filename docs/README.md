@@ -60,6 +60,7 @@ docs/
 ├── images/                   board photos (UART footprint)
 ├── archive/                  superseded plans, readmes and status snapshots
 ├── VENDOR-GAP.md            what the stock UI did and what the native image still lacks
+├── CLEAN-ROOM.md            reverse-engineering and clean-room rules, what the repository may publish
 └── (stock-firmware overlay, historical) vendor-command-map.md, luci-on-stock.md, luci-fix-notes.md
 ```
 
