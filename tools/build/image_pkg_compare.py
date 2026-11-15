@@ -19,7 +19,7 @@ def compare(rootfs, packages):
     tar = tarfile.open(rootfs)
     members = {m.name.lstrip('./'): m for m in tar if m.isfile()}
     rows = []
-    for name, _, _, files, _, _, _ in packages:
+    for name, _, _, files, *_ in packages:
         for dest, data, mode in files:
             m = members.get(dest.lstrip('./'))
             if m is None:

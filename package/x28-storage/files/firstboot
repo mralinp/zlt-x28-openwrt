@@ -1,0 +1,33 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Factory reset (#551). Takes the place of base-files' firstboot, which LuCI's "Perform reset" and the reset button
+# (x28-wps) call: jffs2reset clears only rootfs_data, and this unit's overlay is on user_data (79_x28_user_data).
+# A live upper must never be deleted, so this spoils the volume's extroot tag instead: at the next boot the preinit hook
+# takes the overlay for another image's and removes it, settings and installed packages alike.
+#   firstboot [-y] [-r]    -y: do not ask, -r: reboot now (the overlay goes during that boot)
+
+X28_FB_OVERLAY=${X28_FB_OVERLAY:-/overlay}
+tag="$X28_FB_OVERLAY/etc/.extroot-uuid"
+
+# No tag: the overlay is rootfs_data (a fall-back boot, or user_data is not in use), which the stock reset does reach.
+[ -f "$tag" ] || exec "${X28_FB_JFFS2RESET:-/sbin/jffs2reset}" "$@"
+
+yes= reboot=
+while getopts yr o; do
+	case "$o" in y) yes=1 ;; r) reboot=1 ;; *) exit 1 ;; esac
+done
+if [ -z "$yes" ]; then
+	echo "This will erase all settings and remove any installed packages. Are you sure? [N/y]"
+	read -r a
+	[ "$a" = y ] || exit 1
+fi
+
+echo reset > "$tag" && sync || { echo "firstboot: cannot mark the overlay for reset" >&2; exit 1; }
+# Settings an unfinished upgrade kept would be restored into the fresh overlay (x28_ud_keep).
+rm -f "$X28_FB_OVERLAY"/x28-keep-*.tgz "$X28_FB_OVERLAY/x28-keep.new"; sync
+logger -t firstboot "overlay marked for factory reset"
+if [ -n "$reboot" ]; then
+	${X28_FB_REBOOT:-reboot}
+else
+	echo "The overlay is erased at the next boot. Reboot to finish the reset."
+fi

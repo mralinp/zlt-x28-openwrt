@@ -125,7 +125,7 @@ x28_mipc_epbse() {
 x28_mipc_bandlock() {
  local mode="$1" list="$2" cur lo hi b lo_l=0 hi_l=0 want i=0
  cur="$(x28_mipc_epbse 'at+epbse?')"
- case "$cur" in [0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*) ;; *) return 1 ;; esac
+ case "$cur" in [0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*,[0-9]*) ;; *) [ "$mode" = none ]; return ;; esac
  for b in $list; do
   if [ "$b" -le 32 ]; then lo_l=$((lo_l | (1 << (b - 1)))); else hi_l=$((hi_l | (1 << (b - 33)))); fi
  done
@@ -425,9 +425,9 @@ x28_mipc_setup() {
 # The cell lock runs first so that clearing it can never be hidden by a later step that fails (strict locks stay until the owner removes them).
  x28_mipc_celllock "$celllock" || { proto_notify_error "$interface" CELL_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
  x28_mipc_operator "$plmn" || { proto_notify_error "$interface" OPERATOR_FAILED; return 1; }
- [ -z "$nrband_mode" ] || x28_mipc_nrband "$nrband_mode" "$nrbands" || { proto_notify_error "$interface" NRBAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
- [ -z "$lteband_mode" ] || x28_mipc_bandlock "$lteband_mode" "$bands" || { proto_notify_error "$interface" BAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
- [ -z "$netmode" ] || x28_mipc_netmode "$netmode" || { proto_notify_error "$interface" NETMODE_FAILED; proto_block_restart "$interface"; return 1; }
+ x28_mipc_nrband "${nrband_mode:-none}" "$nrbands" || { proto_notify_error "$interface" NRBAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
+ x28_mipc_bandlock "${lteband_mode:-none}" "$bands" || { proto_notify_error "$interface" BAND_LOCK_FAILED; proto_block_restart "$interface"; return 1; }
+ x28_mipc_netmode "${netmode:-auto}" || { proto_notify_error "$interface" NETMODE_FAILED; proto_block_restart "$interface"; return 1; }
  # Roaming is off by default, like the vendor's data-roaming switch: refuse the bearer while roaming unless asked.
  if [ "$roaming" != 1 ] && [ "$(x28_mipc_reg)" = 5 ]; then
   proto_notify_error "$interface" ROAMING_DISABLED; return 1

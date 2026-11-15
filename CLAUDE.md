@@ -15,8 +15,7 @@ plus a recovery slot on B. History: `CHANGELOG.md`.
 
 ## Hardware safety rules (learned the hard way)
 - The router is the user's internet connection. One change per step. Back up the file/config first and check the backup is non-empty.
-- Read-only recon by default (`ssh router '...'`, GET calls through the bridge). Ask before anything that writes to flash, changes network/LAN/WAN, the modem mode, passwords, or reboots.
-- Never run vendor binaries with unknown flags (`sms_mgr -h` rebooted the device). Never put the LAN IP/netmask behind an automatic apply path.
+- On the native image (our firmware) the owner's test unit is for working: run commands, read vendor tool usage, change WAN/modem config (APN, bands, mode, operator) and restart services without asking, one change at a time with its undo ready and the result read back. Still ask before anything that writes to flash, changes the LAN IP/netmask, changes passwords, or reboots, and never put the LAN IP/netmask behind an automatic apply path. Another address than the one the owner names (the default device) is never touched.
 - Never enter passwords, forge sessions (`ubus session create`), or run broad `find / -exec rm|chown` on the router. Sending an SMS or placing a call needs the user to name the number.
 - Flash/bootloader work (`risk/brick`) requires: full verified mtd dump, UART access, tested way back, and only the inactive A/B slot.
 - Native image flashing goes only through the guarded sessions in `tools/recovery/` of the separate repo mralinp/x28-flasher (it pins this one as a submodule) (dry run first; typed phrase from the owner for each step;

@@ -10,11 +10,11 @@
 **OpenWrt 23.05.5 for the ZLT X28 and X28 PRO 5G routers.**
 
 [![Release](https://img.shields.io/github/v/release/mralinp/zlt-x28-openwrt?include_prereleases&label=release)](https://github.com/mralinp/zlt-x28-openwrt/releases)
-[![Downloads](https://img.shields.io/github/downloads/mralinp/zlt-x28-openwrt/total)](https://github.com/mralinp/zlt-x28-openwrt/releases)
+[![Firmware downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmralinp.github.io%2Fzlt-x28-openwrt%2Fstats.json&query=%24.downloads%5B%27mralinp%2Fzlt-x28-openwrt%27%5D&label=firmware%20downloads&color=blue)](https://github.com/mralinp/zlt-x28-openwrt/releases)
 [![CI](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/mralinp/zlt-x28-openwrt/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-[Get started](#get-started) · [Documentation](docs/README.md) · [Contributing](#contributing) · [Releases](https://github.com/mralinp/zlt-x28-openwrt/releases)
+[Get started](#get-started) · [Documentation](docs/README.md) · [Articles](#articles-and-tutorials) · [Contributing](#contributing) · [Releases](https://github.com/mralinp/zlt-x28-openwrt/releases)
 
 </div>
 
@@ -28,10 +28,11 @@ Tested on **X28 and X28 PRO**. A native OpenWrt userspace replaces the stock int
 | Cellular | 5G data, APN settings, operator selection, band/cell locking and signal status in LuCI |
 | Networking | Dual-band Wi-Fi, LAN, DHCP/DNS, firewall, NAT and IPv6 on LAN |
 | VPN and proxy | WireGuard, OpenVPN and Passwall2 preinstalled |
+| Text messages (SMS) | The `x28-telephony` package: send and receive in LuCI (Services > Telephony), a phone book, and an HTTP API with API keys for machines on the LAN |
 | Updates | Working signed firmware upgrades and a signed, kernel-compatible `opkg` package feed |
 | Hardware | Front-panel LEDs and boot-counter management; about 40 °C idle SoC temperature on the test unit |
 
-This is community firmware using the vendor 4.19.205 kernel, not an official OpenWrt device image. Most feature testing was on the X28; not every feature has been verified on both models. SMS and voice are not supported yet. See [status and limitations](docs/STATUS.md) and [test evidence](docs/TESTING.md).
+This is community firmware using the vendor 4.19.205 kernel, not an official OpenWrt device image. Most feature testing was on the X28; not every feature has been verified on both models. Text messages work through `x28-telephony` ([details](docs/TELEPHONY.md)); voice calls are not supported yet. See [status and limitations](docs/STATUS.md) and [test evidence](docs/TESTING.md).
 
 ## LuCI and Passwall2
 
@@ -65,6 +66,17 @@ Use **[x28-flasher](https://github.com/mralinp/x28-flasher)** for installation, 
 
 See [firmware upgrade details](docs/research/sysupgrade-design.md) and the [package-feed guide](docs/PACKAGE-FEED.md) for compatibility, safety and known limits.
 
+## Articles and tutorials
+
+<a href="https://sisoog.com/zlt-x28-modem/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sisoog-logo-dark.svg">
+    <img src="docs/assets/sisoog-logo.svg" alt="Sisoog" width="200">
+  </picture>
+</a>
+
+An article series by Ali Naderi Parizi on [Sisoog](https://sisoog.com/), in Persian, follows this project from the first look at the hardware to signed A/B upgrades. Part 1 is online: [ZLT X28 modem: hardware, UART console and access to the 5G modem](https://sisoog.com/zlt-x28-modem/).
+
 ## Contributing
 
 Bug reports, test results and pull requests are welcome.
@@ -73,11 +85,11 @@ Bug reports, test results and pull requests are welcome.
 2. Branch from `develop` as `feature|fix|docs|chore|research/<issue>-slug`.
 3. Submit a PR into `develop` with a Conventional Commit title and a reference to the issue. Include test results, anything not verified, and a safety/rollback note for changes that affect the device.
 
-See the [contribution workflow](docs/WORKFLOW.md) for labels, milestones and review requirements.
+See the [contribution workflow](docs/WORKFLOW.md) for labels, milestones and review requirements. Reverse-engineering and clean-room rules: [docs/CLEAN-ROOM.md](docs/CLEAN-ROOM.md).
 
 ## Documentation
 
-The **[documentation index](docs/README.md)** covers installation, recovery, firmware upgrades, packages, hardware and development. See the [changelog](CHANGELOG.md) for release history.
+The **[wiki](site/wiki/Home.md)** is the short version: install, packages, cellular, upgrades, recovery, build and test results. The **[documentation index](docs/README.md)** covers installation, recovery, firmware upgrades, packages, hardware and development. See the [changelog](CHANGELOG.md) for release history.
 
 ## Credits and license
 

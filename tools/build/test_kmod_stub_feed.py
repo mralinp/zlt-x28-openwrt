@@ -176,11 +176,11 @@ class Build(unittest.TestCase):
             (root / 'x/tool').write_text('#!/bin/sh\n')
             (root / 'x/data').write_text('d\n')
             spec = root / 'spec.ini'
-            spec.write_text('[x28-svc]\nversion = 1.2.3\nrelease = 4\ndepends = netifd jshn\ndescription = A service\n  on two lines\n'
+            spec.write_text('[x28-svc]\nversion = 1.2.3\nrelease = 4\ndepends = netifd jshn\nreplaces = base-files\ndescription = A service\n  on two lines\n'
                             'files =\n    0755 /etc/init.d/x28-svc x/svc.init\n    0755 /sbin/x28-tool x/tool\n'
                             '[x28-plain]\nversion = 0.1.0\nrelease = 1\ndescription = Data\nfiles =\n    0644 /usr/share/x28/data x/data\n')
             pk = {p[0]: p for p in f.read_packages(spec)}
-            name, depends, description, files, arch, scripts, version = pk['x28-svc']
+            name, depends, description, files, arch, scripts, version, replaces = pk['x28-svc']
             self.assertEqual((depends, description, arch, version), ('netifd, jshn', 'A service on two lines', 'all', '1.2.3-4'))
             self.assertEqual([(n, m) for n, _, m in files], [('./etc/init.d/x28-svc', 0o755), ('./sbin/x28-tool', 0o755)])
             self.assertEqual([n for n, _ in scripts], ['postinst', 'prerm'])
@@ -194,13 +194,15 @@ class Build(unittest.TestCase):
             index = f.parse_index((out / 'Packages').read_text())
             self.assertEqual((index['x28-svc']['Version'], index['x28-svc']['Architecture'], index['x28-svc']['Depends']), ('1.2.3-4', 'all', 'netifd, jshn'))
             self.assertEqual(index['x28-svc']['Filename'], 'x28-svc_1.2.3-4_all.ipk')
+            self.assertEqual(index['x28-svc']['Replaces'], 'base-files')  # opkg lets it overwrite a base-files file
+            self.assertNotIn('Replaces', index['x28-plain'])
             outer = tarfile.open(out / 'x28-svc_1.2.3-4_all.ipk', 'r:gz')
             data = tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz')
             self.assertEqual(data.getmember('./etc/init.d/x28-svc').mode, 0o755)
             self.assertTrue(data.getmember('./sbin').isdir() and data.getmember('./etc/init.d').isdir())  # parent directories
 
     def test_the_real_spec_builds_and_every_init_script_has_its_start_line(self):
-        for name, depends, description, files, arch, scripts, version in f.read_packages():
+        for name, depends, description, files, arch, scripts, version, replaces in f.read_packages():
             self.assertRegex(version, r'^\d+\.\d+\.\d+-\d+$', name)
             self.assertTrue(description and '\n' not in description, name)
             for dest, data, mode in files:

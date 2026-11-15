@@ -45,7 +45,9 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock 
 - Wi-Fi client and throughput tests and more LED states are pending. A 26.6 h soak showed no unexplained restart, but
   available memory falls ([#213](https://github.com/mralinp/zlt-x28-openwrt/issues/213)). The load average of about 3 is
   vendor threads in uninterruptible sleep, harmless ([TESTING 33](TESTING.md)).
-- SMS and voice worked on the stock-firmware overlay (voice blocked by the SIM) and are not ported to the native image.
+- Text messages (SMS) are on the native image since v1.1.0 through the `x28-telephony` package: LuCI pages under Services > Telephony,
+  a phone book and an HTTP API ([TELEPHONY](TELEPHONY.md), with what is not verified). Voice calls are not ported: they worked
+  on the stock-firmware overlay only as far as the SIM allowed.
 - One SIM, one carrier. Differences between X28 and X28 PRO hardware are only known where [TESTING](TESTING.md) 42 to 44 record them.
 - Recovery is the flasher over DL mode, not a recovery slot: it needs a computer, USB and your own download agent. DL cannot write `misc`, so it cannot reset the A/B state ([slot-b-reuse](research/slot-b-reuse.md)).
 - Since v0.76.0 `sysupgrade` always writes the slot that is not running; that rule, the image built in CI, `x28-upgrade` and the LuCI update notice have no test record on a unit yet. Also unproven: `sysupgrade -k` (settings are not kept, [#477](https://github.com/mralinp/zlt-x28-openwrt/issues/477)), LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
@@ -62,5 +64,5 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock 
 
 ## Next
 
-See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, the rest of `sysupgrade` (keeping settings, LuCI's flash page, the hardware pass), a stable release and the OpenWrt wiki device page; later fan control, SMS/voice on the native image and an own 4.19 kernel built from a
+See [ROADMAP.md](ROADMAP.md) and [PROJECT-PLAN.md](PROJECT-PLAN.md): test slot A, the rest of `sysupgrade` (keeping settings, LuCI's flash page, the hardware pass), a stable release and the OpenWrt wiki device page; later fan control, voice calls on the native image and an own 4.19 kernel built from a
 sibling-device SDK ([#130](https://github.com/mralinp/zlt-x28-openwrt/issues/130)).

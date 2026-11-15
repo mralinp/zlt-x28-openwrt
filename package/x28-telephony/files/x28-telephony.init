@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Moves received text messages from the SIM to the router. Until the modem answers AT, a poll finds nothing.
+
+START=95
+USE_PROCD=1
+
+start_service() {
+	procd_open_instance
+	procd_set_param command /bin/sh -c 'while :; do /usr/sbin/x28-sms poll >/dev/null 2>&1; sleep 15; done'
+	procd_set_param respawn
+	procd_close_instance
+}

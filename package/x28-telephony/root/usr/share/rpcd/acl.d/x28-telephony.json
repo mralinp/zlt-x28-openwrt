@@ -1,0 +1,18 @@
+{
+	"x28-telephony": {
+		"description": "Text messages, the phone book and the API keys of the X28 SIM",
+		"read": {
+			"file": {
+				"/usr/sbin/x28-sms list": [ "exec" ],
+				"/usr/sbin/x28-sms contacts": [ "exec" ],
+				"/usr/sbin/x28-sms keys": [ "exec" ],
+				"/usr/sbin/x28-sms webhook": [ "exec" ]
+			}
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/x28-sms *": [ "exec" ]
+			}
+		}
+	}
+}

@@ -12,7 +12,7 @@ define Package/x28-mipc
   CATEGORY:=Network
   SUBMENU:=WWAN
   TITLE:=Native X28 MIPC netifd protocol (IPv4, IPv6, APN from SIM)
-  DEPENDS:=+netifd +jshn +flock +mipc-wan
+  DEPENDS:=+netifd +jshn +flock +mipc-wan +lua +luci-lib-nixio
   PKGARCH:=all
 endef
 

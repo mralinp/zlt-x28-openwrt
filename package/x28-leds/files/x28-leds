@@ -93,6 +93,7 @@ selftest() {
 case "$1" in
 	selftest) selftest ;;
 	once) apply "$(poll)" ;;
+	blink) apply "$(for t in $POWER $WIFI $LTE $NR $RED $GREEN $BLUE; do echo "$t 2 200"; done)" ;;  # the factory reset's signal (x28-wps)
 	off) apply "$(for t in $POWER $WIFI $LTE $NR $RED $GREEN $BLUE; do echo "$t 0 0"; done)" ;;
 	*)
 		last=
