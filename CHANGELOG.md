@@ -6,6 +6,7 @@ milestones below, written by hand, and the full per-release list at the bottom, 
 
 ## Unreleased
 
+- `opkg` downloads are retried after a dropped transfer (curl error 56), not only after a timeout (#619).
 - Fix `opkg update` failing on the x28 feed: `uclient-fetch` hangs on GitHub's 4 KB response header, so `opkg` now downloads through `curl` (a `wget` wrapper in `/usr/sbin`, #616).
 - Fix LuCI's System page refusing to save ("Design" has no value): the image now registers the Bootstrap themes, and the built-image check fails without them (#614).
 
