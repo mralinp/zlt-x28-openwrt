@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Installed as /usr/sbin/wget, ahead of the uclient-fetch link in PATH: opkg's downloads go through curl (#616).
 # uclient-fetch hangs on a response header line over 4096 bytes, and github.com sends one, so the x28 feed never downloaded.
+# --retry alone skips a dropped transfer (curl error 56), which this link produces now and then (#619).
 # Only opkg's own form (-q [--no-check-certificate] [--timeout N] [-Y on] -O FILE URL) is handled; anything else runs uclient-fetch unchanged.
 out= url= k= t= y= need=
 for a in "$@"; do
@@ -17,4 +18,4 @@ for a in "$@"; do
 	esac
 done
 [ -n "$url" ] && [ -n "$out" ] || exec /bin/uclient-fetch "$@"
-exec curl -fsSL $k --connect-timeout 20 --max-time "${t:-300}" --retry 2 -o "$out" "$url"
+exec curl -fsSL $k --connect-timeout 20 --max-time "${t:-300}" --retry 2 --retry-all-errors -o "$out" "$url"
