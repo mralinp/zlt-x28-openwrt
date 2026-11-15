@@ -56,7 +56,19 @@ Each radio interface holds about 70 MiB while it is up, 140 MiB for both: 22% of
 | certificates | about 7 KiB |
 | rest of the partition | empty (`0xff`), data ends at 32 MiB |
 
-Its `CHECK_HEADER` (version 6, at the end of `md1rom`, offset `0x1d10d80`) carries `0x10000000` at `+0xac`: 256 MiB, the size of `md1rom` in the device tree. Other fields hold 245 MiB and 11 MiB (sum 256) and sizes near the shared memory (`0x6520000` = 101.1 MiB; the DT block is 103.6 MiB). The field meanings are inferred from the layout of the vendor `md_check_header` structure; only the 256 MiB value is matched to a device-tree region, the others are not confirmed. The image is 32 MiB, so about 224 MiB of the 256 is the modem's heap and working memory, which the modem firmware itself declares.
+Its `CHECK_HEADER` (version 6, at the end of `md1rom`, offset `0x1d10d80`) carries `0x10000000` at `+0xac`: 256 MiB, the size of `md1rom` in the device tree. It is a `md_check_header` v6 (`ccci` kernel driver names; `mem_size` at `+0xac`). Read field by field from the image on the unit (`md1img_a`, 2026-11-15, SHA-256 of the 32 MiB dump starts `81a43ddb8a6abc18`; build `MOLY.NR15.R3.MD700.MP.V53.5.P98`, `ext_attr` 0 = "no shrink"):
+
+| Region (`region_info`) | Offset | Size | Driver name |
+|---:|---:|---:|---|
+| 0 | `0x0` | 35.00 MiB | ROM and DSP |
+| 1 | `0x2300000` | 5.00 MiB | MCU read-write, hardware read-only |
+| 2 | `0x2800000` | 101.12 MiB (`0x6520000`) | MCU read-only, hardware read-write |
+| 3 | `0x8d20000` | 114.88 MiB (`0x72e0000`) | MCU read-write, hardware read-write |
+| total | | **256.00 MiB** | equals `mem_size` |
+
+This replaces the earlier reading of "245 MiB and 11 MiB" (not separate fields) and shows that the 101 MiB figure is region 2 inside `md1rom`, not a separate shared-memory block. The two roughly 100 MiB regions are accessed directly by the modem's hardware, so they are probably data buffers, not idle heap; that is an inference from the names, not measured.
+
+The header also lists seven **free padding blocks** (`padding_blk`, offset and length inside the 256 MiB), 36.06 MiB in total, all inside regions 0, 1 and 3 (28.62 MiB of it one block in region 3 at `0xb8b0000`). The SDK kernel driver only defines the field and nothing in it uses it; the bootloader source is not available, so who may reuse these blocks, and whether they are alignment gaps or really free memory, is not known. Linux has no mapping for the region (see the probe below), so it could not use them as things stand.
 
 **Reading.** LK builds `md1rom` and the shared-memory blocks from what this modem firmware asks for. They cannot be shrunk from Linux, the device tree or the AP side alone; they need a modem firmware build with a smaller layout, which only the modem vendor (Quectel, MediaTek) can make. The Wi-Fi driver's 140 MiB is the part the project can change.
 
