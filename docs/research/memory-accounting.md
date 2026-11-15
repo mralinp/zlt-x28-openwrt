@@ -10,7 +10,7 @@ Read-only measurements on the test unit (image 1.1.1, slot A, 5 min after boot, 
 |---:|---|---|
 | 128.2 | Not System RAM: `md_smem_cache` 103.6 (`0x66000000`, `no-map`), ATF, ATF log, SSPM, MCUPM, MEDMCU, `md_smem_ncache` 5, `wocpu*` Wi-Fi offload, pstore, minirdump, log store | firmware carve-outs, fixed by the device tree |
 | 895.8 | System RAM (`DMA32` present) | |
-| 258.0 | `0x6de00000..0x7dffffff`, `md1rom` (256) plus 2 | in System RAM but reserved at boot (`memblock reserved`), never given to Linux |
+| 258.0 | `0x6de00000..0x7dffffff`, `md1rom` (256) plus 2 | counted as System RAM by the kernel (`memblock reserved`, `pfn_valid`) but absent from the linear map: a direct read faults (see "Probe of the 256 MiB") |
 | 32.5 | kernel image (`0x40080000..0x42100fff`) | reserved |
 | 16.0 | CMA area (`0x65000000`, `CmaTotal` 16 MiB, `CmaFree` 0) | counted in `MemTotal`, all in use by drivers |
 | about 20 | early allocations, `pl-drambuf`, `pl-boottag`, `aee-lk`, small memblock blocks | reserved |
@@ -59,6 +59,15 @@ Each radio interface holds about 70 MiB while it is up, 140 MiB for both: 22% of
 Its `CHECK_HEADER` (version 6, at the end of `md1rom`, offset `0x1d10d80`) carries `0x10000000` at `+0xac`: 256 MiB, the size of `md1rom` in the device tree. Other fields hold 245 MiB and 11 MiB (sum 256) and sizes near the shared memory (`0x6520000` = 101.1 MiB; the DT block is 103.6 MiB). The field meanings are inferred from the layout of the vendor `md_check_header` structure; only the 256 MiB value is matched to a device-tree region, the others are not confirmed. The image is 32 MiB, so about 224 MiB of the 256 is the modem's heap and working memory, which the modem firmware itself declares.
 
 **Reading.** LK builds `md1rom` and the shared-memory blocks from what this modem firmware asks for. They cannot be shrunk from Linux, the device tree or the AP side alone; they need a modem firmware build with a smaller layout, which only the modem vendor (Quectel, MediaTek) can make. The Wi-Fi driver's 140 MiB is the part the project can change.
+
+**Probe of the 256 MiB (test unit, 2026-11-15, #301).** Whether the modem touches more than its 32 MiB image is not measured, because Linux cannot read the region:
+
+- `/dev/mem` is blocked (`CONFIG_STRICT_DEVMEM=y`) and `/proc/kcore` is not built.
+- A small read-only module reading the linear-map address of `0x6de00000` took a translation fault (`scan_init`, `do_translation_fault`); the kernel panicked and the unit rebooted by itself (one unplanned reboot; it came back normally on slot A).
+- Mapping the range with `__ioremap` is refused (`WARN_ON(pfn_valid(...))`, returns NULL): the kernel counts it as RAM, yet it has no mapping. Nothing was read.
+- A read would need a hand-built mapping (`vmap` with explicit page protection), with reboot risk, or the modem vendor's tooling, or JTAG/UART. Until then, "224 MiB is heap and working memory" stays an inference from the header.
+
+Method note: a freestanding module (no kernel headers) builds on macOS with `clang -target aarch64-linux-gnu -ffreestanding -mgeneral-regs-only -fno-pic -fno-asynchronous-unwind-tables`. The module header (`.gnu.linkonce.this_module`, 0x380 bytes, `init` at 0x170, `exit` at 0x318), the `.plt`, `.init.plt` and `.text.ftrace_trampoline` stubs, the `vermagic` string and the CRCs of `module_layout`, `printk`, `memstart_addr` and `__ioremap` were copied from the unit's own stock modules (`__versions`), because the SDK kernel tree is 4.19.190 and the unit runs 4.19.205. It loaded and ran on the unit; only the memory access was wrong.
 
 ## What can shrink
 
