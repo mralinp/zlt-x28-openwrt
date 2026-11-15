@@ -15,6 +15,8 @@ mknod -m 444 $R/dev/urandom c 1 9
 cat > $R/t.sh <<'T'
 set -eu
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+# first_boot.py strips the theme's uci-defaults; without these entries LuCI's System page cannot be saved (#614).
+for t in Bootstrap BootstrapDark BootstrapLight; do uci -q get luci.themes.$t >/dev/null || { echo "FAIL: luci.themes.$t is not set"; exit 1; }; done
 # Only our own modules may be recorded; the stock kmod records are gone (#202).
 test "$(ls /usr/lib/opkg/info | grep '^kmod-' | grep -vcE '^kmod-(wireguard|ipt-tproxy|ipt-socket)\.')" = 0
 test "$(opkg list-installed | grep '^kmod-' | grep -vcE '^kmod-(wireguard|ipt-tproxy|ipt-socket) ')" = 0
