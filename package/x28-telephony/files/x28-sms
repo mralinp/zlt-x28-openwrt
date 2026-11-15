@@ -242,6 +242,7 @@ local function append(name, r)
 	return f and f:write(line(r)) and f:close() and true or false
 end
 local function save(name, t)
+	os.execute("mkdir -p -m 700 " .. sq(DIR))
 	local f = io.open(DIR .. "/" .. name .. ".new", "w")
 	if not f then return false end
 	for _, r in ipairs(t) do f:write(line(r)) end

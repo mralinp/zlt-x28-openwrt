@@ -10,6 +10,12 @@ run() { lua "$sms" "$@"; }
 
 run selftest >/dev/null
 
+# A contact can be the first write: save() runs before append() creates the store.
+run contact-set +15550001234 Test | grep -q '"ok":true'
+run contacts | grep -q '"name":"Test"'
+run contact-del +15550001234 >/dev/null
+rm -rf "$X28_SMS_DIR"
+
 mkdir "$dir/sim"
 cat > "$dir/at" <<AT
 #!/bin/sh
