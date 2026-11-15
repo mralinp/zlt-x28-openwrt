@@ -109,3 +109,16 @@ jobs:
           VERSION=${TAG#v}
           sha256sum "x28-sysupgrade-${VERSION}.tar" > "x28-sysupgrade-${VERSION}.tar.sha256"
           gh release upload "$TAG" "x28-sysupgrade-${VERSION}.tar" "x28-sysupgrade-${VERSION}.tar.sha256" --clobber
+
+  # Events made with the workflow token start no workflow, so publishing the release never redeployed the site (#621); the nightly
+  # run was its only update. Its own job, so the signing job above gets no extra permission. Stable tags only: the site shows the latest.
+  site:
+    needs: sign
+    if: ${{ !contains(inputs.tag, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write    # start pages.yml
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main -R "$GITHUB_REPOSITORY"
