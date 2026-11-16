@@ -8,7 +8,7 @@ This wiki is the short version of everything in [`docs/`](https://github.com/mra
 says what you need to know and links to the full document with the evidence. When the wiki and a document disagree, the document
 (and [TESTING](https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md)) wins.
 
-**Current release:** v1.1.1 (stable, 2026-11-13). Wiki written 2026-11-14.
+**Current release:** v1.2.2 (stable, 2026-11-15). Wiki written 2026-11-14, last edited 2026-11-16.
 
 ## Pages
 

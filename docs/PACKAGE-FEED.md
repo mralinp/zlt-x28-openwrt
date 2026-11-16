@@ -77,10 +77,10 @@ boot-critical ones (`x28-bootok`, `x28-kmods`, `x28-modem`) are replaced on disk
 reboot**, so reboot after upgrading them. A module package never replaces a loaded module until then.
 
 **Rolling back.** The feed keeps one current version per package, but the older `.ipk` files stay on the feed release until we clean them up, and every
-firmware release bundle holds the exact set it was made from. This `opkg` cannot install from a URL, so download the file first, then install it from `/tmp`:
+firmware release bundle holds the exact set it was made from. This `opkg` cannot install from a URL, so download the file first, with `curl` (`uclient-fetch` hangs on GitHub's long response headers, #616), then install it from `/tmp`:
 
 ```sh
-cd /tmp && uclient-fetch -O x28-base_0.1.0-1_all.ipk https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3/x28-base_0.1.0-1_all.ipk
+cd /tmp && curl -fsSL -o x28-base_0.1.0-1_all.ipk https://github.com/mralinp/zlt-x28-openwrt/releases/download/feed-3/x28-base_0.1.0-1_all.ipk
 sha256sum x28-base_0.1.0-1_all.ipk     # compare with the bundle's SHA256SUMS
 opkg install --force-downgrade /tmp/x28-base_0.1.0-1_all.ipk
 ```
@@ -100,6 +100,15 @@ sed -i 's|^src/gz x28 .*|src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/r
 opkg update
 opkg upgrade kmod-sched-core   # or any built module; see `opkg list-upgradable`
 ```
+
+**Downloads go through `curl` (v1.2.1 and later).** `opkg` fetches with `wget`, which on the image is `uclient-fetch`. That tool hangs on any HTTP response with a
+header line over 4096 bytes, and `github.com` answers a release download with one (about 4.2 KB), so on v1.2.0 and older `opkg update` waits out a timeout on the
+`x28` feed and fails with `wget returned 4` after more than a minute. The `x28-update` package installs `/usr/sbin/wget`, ahead of that link in `PATH`: it runs
+`opkg`'s own form of call (`-O file URL`) through `curl`, with two retries on any error, and hands every other call to `uclient-fetch`. On v1.2.0 or older, upgrade the
+image first (`x28-upgrade` already uses `curl`). Measurements: [TESTING 56](TESTING.md#56-opkg-downloads-from-github-uclient-fetch-and-long-response-headers-616-619-2026-11-15).
+
+LuCI's **System > Software > Update lists** can still end in `JSON Parse error: Unexpected EOF` on a slow link: the update fetches 9 lists and their signatures one
+after another (48 to 130 s on the test unit) and LuCI stops waiting after 30 s (`rpcd`) or 60 s (`uhttpd`). `opkg update` over SSH is not affected.
 
 Built modules are installed in `/lib/modules/x28/`, out of reach of the kernel's on-demand `modprobe`. Each module package also
 ships a list, `/etc/x28-kmods.d/NN-<package>` (`NN` is 50 plus its depth among our packages, so a package loads after the ones it
