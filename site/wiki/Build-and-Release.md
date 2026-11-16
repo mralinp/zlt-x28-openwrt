@@ -42,7 +42,8 @@ x86_64 container with the work directory inside the container (APFS is case-inse
 | `userspace.yml` | PRs touching `tools/build/`, manual | builds the open rootfs, boot-tests it in QEMU |
 | `release.yml` | pushes to `develop` and `main` that touch release inputs | computes the version, tags, publishes the assembly bundle |
 | `image.yml` | called by Release | builds the full image from the assembly and the private stock rootfs |
-| `sign-image.yml` | manual, owner-approved | signs the sysupgrade image and attaches it |
+| `sign-image.yml` | manual, owner-approved | signs the sysupgrade image and attaches it; for a stable tag it then starts `pages.yml` |
+| `pages.yml` | pushes to `develop` under `site/`, nightly, manual, after a stable release is signed | builds and deploys the website and the feed mirror |
 
 ## Release model
 

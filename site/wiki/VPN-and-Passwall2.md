@@ -57,7 +57,8 @@ Tried: more parallel streams. Untested ideas: a lighter transport (plain VLESS o
 
 ### Upgrades through Passwall2
 
-`x28-upgrade` downloads firmware with `curl`, because `uclient-fetch` timed out through the proxy (#524).
+`x28-upgrade` downloads firmware with `curl`, because `uclient-fetch` timed out on the downloads (#524). Later measurements found that `uclient-fetch` hangs on GitHub's long response headers
+with or without Passwall2 in the path (#616); the firmware downloads were not re-tested with it.
 
 Full document: [PASSWALL2](https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/PASSWALL2.md), tests 37 and 39 to 41 in
 [TESTING](https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md).

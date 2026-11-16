@@ -58,7 +58,7 @@ Back up your settings first. An upgrade keeps settings from the second upgrade o
 |---|---|
 | LAN went dark after a Passwall2 change | `ssh x28 '/etc/init.d/passwall2 stop'` |
 | No DHCP after boot on a PRO | wait about 35 s; `x28-dhcp` restarts `dnsmasq` by itself |
-| `opkg update` fails on the `x28` feed | the feed line still says `releases/latest/download`: fix it as in [Package feed](Package-Feed.md#using-it) |
+| `opkg update` fails on the `x28` feed | the feed line still says `releases/latest/download`: fix it as in [Package feed](Package-Feed.md#using-it). On v1.2.0 or older it also hangs for over a minute and ends with `wget returned 4`: upgrade to v1.2.1 or later |
 | A cell or band lock left you without service | remove the lock in the Carrier tab; manual undo commands are in [Cellular](Cellular-and-Telephony.md#locks) |
 | The unit does not boot | after 6 failed tries the preloader boots the other slot. If both are bad: the flasher over USB ([Recovery](Recovery-and-Safety.md)) |
 
