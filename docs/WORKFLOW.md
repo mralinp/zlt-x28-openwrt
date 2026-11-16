@@ -48,6 +48,16 @@ develop ──────────────── PR (merge commit) ─�
 Because PRs are squash-merged, the **PR title becomes the commit and decides the version bump**. CI rejects
 PR titles that are not Conventional Commits (`scripts/release.py check-title`).
 
+## Hotfixes and release plumbing
+
+- **A release hotfix** (v1.2.1, v1.2.2) branches from `main` as `fix/<issue>-slug` and goes into `main` by PR with a merge commit; the PR title decides the patch bump.
+  A sync PR (`chore/<issue>-sync-main-hotfix`, merge commit) then brings `main` back into `develop`.
+- **Closing keywords.** `Closes #n` in the body of a squash-merged PR does not close the issue when the commit later reaches `main`: only the squash commit's own message counts.
+  Close such issues by hand after the release, with the evidence (v1.2.0 left #577 open this way).
+- **Workflows started by workflows.** An event created with the workflow token starts no workflow, so `gh release create` in `release.yml` never started `pages.yml`.
+  Follow-ups are started with `gh workflow run`: Release, Image, Sign image, and for a stable tag Pages (#621), so the site shows the new version once the signed image is attached.
+- **Workflow files run from `main`.** `sign-image.yml` is always dispatched with `--ref main`, and the nightly `pages.yml` run uses the default branch, so a change to them takes effect when it reaches `main`.
+
 ## Commits
 Conventional Commits: `type(scope): summary`, e.g. `feat(adapter): sync dhcp range from vendor`. Reference the issue in the body (`Refs #12`).
 

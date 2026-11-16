@@ -593,6 +593,9 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   starts it again once `xt_TPROXY` is in, in case its own delayed start came first. `S80ucitrack` is kept too: without it
   LuCI's Save & Apply never restarts non-procd services such as Passwall2, so its switch saves but does nothing. See
   [PASSWALL2](PASSWALL2.md).
+- **LuCI themes (#614):** the profile strips `etc/uci-defaults/30_luci-theme-bootstrap`, the script that registers the installed themes. Without its entries `/etc/config/luci`
+  has an empty `config internal themes` section and LuCI's System page refuses every save (`Option "Design" contains an invalid input value`), so `first_boot.py`
+  writes the Bootstrap, BootstrapDark and BootstrapLight entries itself (x28-flasher#125, in v1.2.1 and later). The other stripped scripts were not reviewed (list in x28-flasher#124).
 - **LAN kill switch (#251):** the clean rootfs contains `/etc/x28-killswitch.sh`, its fw3 include, and Passwall2
   service hooks. Enabling Passwall2 blocks direct non-ICMP cellular forwarding for IPv4/IPv6 LAN
   clients; disabling it clears the guard. ICMP (including ping) stays direct, not tunnelled. Router-originated
@@ -600,7 +603,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   [behavior and limits](PASSWALL2.md#lan-kill-switch) and [test evidence](TESTING.md#40-passwall2-lan-kill-switch-with-direct-icmp-2026-11-02).
 
 The feed is now [`feed-3`](PACKAGE-FEED.md) (the CI build still takes the ipset packages from `feed-2`; they are the same files). Without Passwall2 the rootfs is 11.4 of 30 MiB (image 219
-was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh`.
+was 7.6); with Passwall2, xray, the modules and `ipset` it is 23.75 MiB (#248). Check a built image with `image_feed_test.sh` (it also fails when the LuCI theme entries are missing, #614).
 
 ## Getting an image from the x28-flasher wizard (#285)
 

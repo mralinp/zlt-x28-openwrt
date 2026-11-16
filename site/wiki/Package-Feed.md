@@ -44,6 +44,10 @@ sed -i 's|^src/gz x28 .*|src/gz x28 https://github.com/mralinp/zlt-x28-openwrt/r
 opkg update
 ```
 
+Since v1.2.1 `opkg` downloads through `curl` (`/usr/sbin/wget`, from `x28-update`): `uclient-fetch` hangs on GitHub's long response headers, so on v1.2.0 and older
+`opkg update` fails on the `x28` feed with `wget returned 4`. Upgrade the image (`x28-upgrade`), and fetch packages by hand with `curl`, not `uclient-fetch`
+([TESTING 56](https://github.com/mralinp/zlt-x28-openwrt/blob/main/docs/TESTING.md#56-opkg-downloads-from-github-uclient-fetch-and-long-response-headers-616-619-2026-11-15)).
+
 `opkg` may print `cannot find dependency kernel (= 5.15…)` while installing. It refers to the official record it is ignoring;
 the install continues.
 
