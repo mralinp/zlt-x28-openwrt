@@ -102,6 +102,64 @@ return network.registerProtocol('x28_mipc', {
    }, this));
   };
   option.cfgvalue = function() { return this.status; };
+  // Auto-tune (x28-autotune): resets the settings below, tries automatic, 4G only and each seen 4G band, keeps the fastest.
+  var tuneRows = function(res, full) {
+   return (res.stdout || '').split('\n').filter(function(l) { return l; }).map(function(l) {
+    var f = l.split('\t');
+    if (f[0] == 'best') return _('Kept: %s').format(f[1] || _('automatic (no configuration reached the speed-test servers)'));
+    return full ? '%s: %s Mbit/s, ping %s ms, %s, RSRP %s'.format(f[0], f[1], f[2], f[3], f[4]) : '%s: %s Mbit/s, ping %s ms'.format(f[0], f[1], f[2]);
+   }).join('\n');
+  };
+  option = section.taboption('carrier', form.Button, 'autotune', _('Auto-tune'),
+   _('Resets the settings below (roaming on, automatic operator, mode and bands, no cell lock), then tries automatic, 4G only and a lock to each 4G band the modem sees, measures speed and ping for each, and keeps the fastest. Takes up to about 10 minutes; the connection drops at every step and each test downloads for up to 16 s.'));
+  option.inputtitle = _('Auto-tune');
+  option.inputstyle = 'apply';
+  option.onclick = function() {
+   var log = E('pre', {}, _('Resetting and waiting for the first connection...'));
+   var stopped = false;
+   var poll = function() {
+    return fs.exec('/sbin/x28-autotune', ['--last']).then(function(res) {
+     log.textContent = tuneRows(res, true) || _('Resetting and waiting for the first connection...');
+     return fs.exec('/sbin/x28-autotune', ['--state']);
+    }).then(function(res) {
+     if (stopped) return;
+     if ((res.stdout || '').trim() !== 'running') { window.location.reload(); return; }
+     return new Promise(function(resolve) { window.setTimeout(resolve, 5000); }).then(poll);
+    });
+   };
+   return new Promise(function(resolve) {
+    ui.showModal(_('Auto-tune'), [
+     E('p', _('This resets your Carrier settings, turns roaming on (roaming may cost money) and drops the connection several times. The previous settings can be restored afterwards.')),
+     E('div', { 'class': 'right' }, [
+      E('button', { 'class': 'btn', 'click': function() { ui.hideModal(); resolve(); } }, _('Cancel')), ' ',
+      E('button', { 'class': 'btn cbi-button-apply', 'click': function() {
+       ui.showModal(_('Auto-tune running'), [log, E('div', { 'class': 'right' }, E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
+        stopped = true;
+        fs.exec('/sbin/x28-autotune', ['--stop']).finally(function() { window.location.reload(); });
+       } }, _('Stop and restore')))]);
+       fs.exec('/sbin/x28-autotune', ['--start']).then(poll).catch(function(e) {
+        ui.hideModal();
+        ui.addNotification(null, E('p', _('Auto-tune could not be started: %s').format(e.message || e)), 'danger');
+       }).then(resolve);
+      } }, _('Start'))
+     ])
+    ]);
+   });
+  };
+  option = section.taboption('carrier', form.Button, 'autotune_restore', _('Before auto-tune'),
+   _('Puts back the Carrier settings that were in place before the last auto-tune.'));
+  option.inputtitle = _('Restore');
+  option.load = function() {
+   return fs.exec('/sbin/x28-autotune', ['--last']).then(L.bind(function(res) {
+    var rows = tuneRows(res, false);
+    if (rows) this.description = _('Puts back the Carrier settings that were in place before the last auto-tune. Its results:') + '\n' + rows;
+   }, this)).catch(function() {});
+  };
+  option.onclick = function() {
+   return fs.exec('/sbin/x28-autotune', ['--restore']).then(function() { window.location.reload(); }).catch(function(e) {
+    ui.addNotification(null, E('p', _('Could not restore: %s').format(e.message || e)), 'danger');
+   });
+  };
   option = section.taboption('carrier', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';

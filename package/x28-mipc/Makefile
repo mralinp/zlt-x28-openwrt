@@ -12,7 +12,7 @@ define Package/x28-mipc
   CATEGORY:=Network
   SUBMENU:=WWAN
   TITLE:=Native X28 MIPC netifd protocol (IPv4, IPv6, APN from SIM)
-  DEPENDS:=+netifd +jshn +flock +mipc-wan +lua +luci-lib-nixio
+  DEPENDS:=+netifd +jshn +flock +mipc-wan +lua +luci-lib-nixio +curl
   PKGARCH:=all
 endef
 
@@ -33,6 +33,7 @@ define Package/x28-mipc/install
 	$(INSTALL_BIN) ./files/x28-apn $(1)/sbin/x28-apn
 	$(INSTALL_BIN) ./files/x28-plmn-scan $(1)/sbin/x28-plmn-scan
 	$(INSTALL_BIN) ./files/x28-modem-status $(1)/sbin/x28-modem-status
+	$(INSTALL_BIN) ./files/x28-autotune $(1)/sbin/x28-autotune
 endef
 
 $(eval $(call BuildPackage,x28-mipc))
