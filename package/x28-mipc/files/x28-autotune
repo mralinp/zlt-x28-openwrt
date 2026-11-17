@@ -1,14 +1,15 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
-# bands, no cell lock), then tries "automatic", "4G only" and a 4G lock to each LTE band the modem sees, measures each one's
+# bands, no cell lock), then tries "automatic", "4G only" and 4G locks to pairs and single LTE bands the modem sees (a single
+# band rules out carrier aggregation across bands, a pair keeps it possible), measures each one's
 # download bandwidth (all speed-test servers at once, 8 s) and keeps the one with the most. Ping is not scored (a latency
-# mode for gaming is a later option). The data connection drops at every step, for up to about 10 minutes in all. The
+# mode for gaming is a later option). The data connection drops at every step, for up to about 15 minutes in all. The
 # previous settings are saved first: `--restore` puts
 # them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
-# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP" per configuration and "best<TAB>label" at the end,
+# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA" per configuration (CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
 # `--stop` stops a run and restores. Speed-test servers: `list autotune_url` on the interface overrides the defaults.
 
 OUT=${X28_AUTOTUNE_FILE:-/tmp/x28-autotune}
@@ -21,13 +22,15 @@ CARRIER='roaming plmn celllock netmode lteband_mode lteband_list nrband_mode nrb
 iface() { uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='x28_mipc'$/\1/p" | head -n 1; }
 
 # Candidates from x28-modem-status lines: "label<TAB>netmode<TAB>lteband_mode<TAB>bands". Automatic first (it is also the
-# fallback), 4G only, then one lock per LTE band that has a measured cell, strongest first, at most 5.
+# fallback), 4G only, then of the 3 strongest LTE bands with a measured cell: each pair, then each band alone.
 candidates() {
 	printf 'automatic\tauto\tnone\t\n4G only\t4g\tnone\t\n'
 	awk -F'\t' '($1 == "serving" || $1 == "cell") && $3 ~ /^[0-9]+$/ && $4 ~ /^-?[0-9.]+$/ {
 		if (!($3 in best) || $4 + 0 > best[$3]) best[$3] = $4 + 0 }
-		END { for (b in best) printf "%s\t%s\n", best[b], b }' | sort -t'	' -k1,1nr | head -n 5 |
-		awk -F'\t' '{ printf "4G band %s\tauto\tallow\t%s\n", $2, $2 }'
+		END { for (b in best) printf "%s\t%s\n", best[b], b }' | sort -t'	' -k1,1nr | head -n 3 |
+		awk -F'\t' '{ b[NR] = $2 } END {
+			for (i = 1; i <= NR; i++) for (j = i + 1; j <= NR; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\n", b[i], b[j], b[i], b[j]
+			for (i = 1; i <= NR; i++) printf "4G band %s\tauto\tallow\t%s\n", b[i], b[i] }'
 }
 
 # Label of the highest Mbit/s (the first on a tie: automatic is listed first); nothing when no configuration moved any data.
@@ -77,9 +80,11 @@ measure() {
 	done | awk '{ s += $1 } END { printf "%.1f\n", s * 8 / 1000000 }'
 }
 
+# "<network><TAB><serving RSRP><TAB><CA>" from x28-modem-status lines.
 net() {
-	/sbin/x28-modem-status 2>/dev/null | awk -F'\t' '$1 == "rat" { r = $2 } $1 == "serving" && !s { s = $4 }
-		END { printf "%s\t%s\n", r ? r : "-", s ? s : "-" }'
+	awk -F'\t' '$1 == "rat" { r = $2 } $1 == "serving" && !s { s = $4 }
+		$1 == "ca" && split($2, a, " ") { c = a[1] "x " substr(a[4], 2) " MHz" }
+		END { printf "%s\t%s\t%s\n", r ? r : "-", s ? s : "-", c ? c : "-" }'
 }
 
 run() {
@@ -94,7 +99,7 @@ run() {
 		[ -n "$label" ] || continue
 		[ "$label" = automatic ] || apply "$mode" "$lte" "$bands"
 		if wait_up; then res="$(measure)"; else res=0.0; fi
-		printf '%s\t%s\t%s\n' "$label" "$res" "$(net)" >> "$OUT"
+		printf '%s\t%s\t%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" >> "$OUT"
 	done <<EOF
 $cands
 EOF
@@ -119,13 +124,16 @@ restore() {
 
 selftest() {
 	got=$(printf 'rat\tlte_ca\nserving\t1500:496\t3\t-82.0\t-10.0\ncell\t1500:134\t3\t-89.0\t-17.5\ncell\t2850:105\t7\t-110.0\t-18.5\ncell\t300:1\t1\t-95.5\t-12\nnrcell\t650000:134\tn78\t?\t?\ncell\t9:9\t?\t?\t?\n' | candidates | tr '\t\n' '|;')
-	want='automatic|auto|none|;4G only|4g|none|;4G band 3|auto|allow|3;4G band 1|auto|allow|1;4G band 7|auto|allow|7;'
+	want='automatic|auto|none|;4G only|4g|none|;4G bands 3+1|auto|allow|3 1;4G bands 3+7|auto|allow|3 7;4G bands 1+7|auto|allow|1 7;4G band 3|auto|allow|3;4G band 1|auto|allow|1;4G band 7|auto|allow|7;'
 	[ "$got" = "$want" ] || { echo "candidates got $got"; return 1; }
 	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n4G band 3\t31.0\tlte_ca\t-90\n' | best)
 	[ "$got" = '4G band 3' ] || { echo "best got $got"; return 1; }
 	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n' | best)
 	[ "$got" = automatic ] || { echo "best tie got $got"; return 1; }
 	[ -z "$(printf 'automatic\t0.0\t-\t-\nbest\t\n' | best)" ] || { echo "best should be empty without data"; return 1; }
+	got=$(printf 'rat\tlte_ca\nca\t4 carriers: 15+20+20+15 (70 MHz)\nserving\t1500:496\t3\t-82.0\t-10.0\n' | net | tr '\t' '|')
+	[ "$got" = 'lte_ca|-82.0|4x 70 MHz' ] || { echo "net got $got"; return 1; }
+	[ "$(printf 'rat\tlte\n' | net | tr '\t' '|')" = 'lte|-|-' ] || { echo "net without CA"; return 1; }
 	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
 	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
 	echo "selftest ok"
