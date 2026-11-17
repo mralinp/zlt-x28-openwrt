@@ -27,10 +27,10 @@ candidates() {
 	printf 'automatic\tauto\tnone\t\n4G only\t4g\tnone\t\n'
 	awk -F'\t' '($1 == "serving" || $1 == "cell") && $3 ~ /^[0-9]+$/ && $4 ~ /^-?[0-9.]+$/ {
 		if (!($3 in best) || $4 + 0 > best[$3]) best[$3] = $4 + 0 }
-		END { for (b in best) printf "%s\t%s\n", best[b], b }' | sort -t'	' -k1,1nr | head -n 3 |
-		awk -F'\t' '{ b[NR] = $2 } END {
-			for (i = 1; i <= NR; i++) for (j = i + 1; j <= NR; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\n", b[i], b[j], b[i], b[j]
-			for (i = 1; i <= NR; i++) printf "4G band %s\tauto\tallow\t%s\n", b[i], b[i] }'
+		END {  # strongest 3 by selection: busybox sort misorders negative decimals
+			for (n = 0; n < 3; n++) { k = ""; for (x in best) if (k == "" || best[x] > best[k]) k = x; if (k == "") break; b[n + 1] = k; delete best[k] }
+			for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\n", b[i], b[j], b[i], b[j]
+			for (i = 1; i <= n; i++) printf "4G band %s\tauto\tallow\t%s\n", b[i], b[i] }'
 }
 
 # Label of the highest Mbit/s (the first on a tie: automatic is listed first); nothing when no configuration moved any data.
@@ -111,7 +111,8 @@ EOF
 	apply "$mode" "$lte" "$bands"
 	wait_up || { label=automatic; apply auto none ''; }
 	printf 'best\t%s\n' "${win:+$label}" >> "$OUT"
-	logger -t x28-autotune "kept $label (${win:-no configuration moved any data})"
+	[ -n "$win" ] && win="most bandwidth" || win="no configuration moved any data"
+	logger -t x28-autotune "kept $label ($win)"
 }
 
 restore() {
