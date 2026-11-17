@@ -3,14 +3,16 @@
 # Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
 # bands, no cell lock), then tries "automatic", "4G only" and 4G locks to pairs and single LTE bands the modem sees (a single
 # band rules out carrier aggregation across bands, a pair keeps it possible), measures each one's
-# download bandwidth (all speed-test servers at once, 8 s) and keeps the one with the most. Ping is not scored (a latency
+# download bandwidth (8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
+# international paths can be throttled far below the radio's capacity) and keeps the one with the most. Ping is not scored (a latency
 # mode for gaming is a later option). The data connection drops at every step, for up to about 15 minutes in all. The
 # previous settings are saved first: `--restore` puts
 # them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
 # one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA" per configuration (CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
-# `--stop` stops a run and restores. Speed-test servers: `list autotune_url` on the interface overrides the defaults.
+# `--stop` stops a run and restores. Speed-test URLs: `list autotune_url` on the interface overrides the server lookup; the
+# fallback when the lookup fails is $URLS.
 
 OUT=${X28_AUTOTUNE_FILE:-/tmp/x28-autotune}
 STATE=$OUT.state
@@ -18,6 +20,14 @@ PID=$OUT.pid
 BAK=$OUT.bak
 URLS='https://speed.cloudflare.com/__down?bytes=25000000 http://speedtest.tele2.net/10MB.zip'
 CARRIER='roaming plmn celllock netmode lteband_mode lteband_list nrband_mode nrband_list'
+
+# Nearest speedtest.net servers for this connection (the list API orders them by distance to the caller's IP): two download
+# URLs per host, 4 hosts, so 8 streams. Reads the API's JSON with sed: one "host":"name:port" per server.
+SERVERS='https://www.speedtest.net/api/js/servers?engine=js&limit=4'
+servers() {
+	tr ',' '\n' | sed -n 's/.*"host": *"\([A-Za-z0-9.-]*:[0-9]*\)".*/\1/p' | head -n 4 |
+		awk '{ u = "http://" $1 "/download?size=100000000"; print u; print u }'
+}
 
 iface() { uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='x28_mipc'$/\1/p" | head -n 1; }
 
@@ -71,8 +81,8 @@ wait_up() {
 	sleep 5  # let the bearer and the routes settle before measuring
 }
 
-# Download bandwidth in Mbit/s: every server at once for up to 8 s, the streams' rates summed, so the link is the limit rather
-# than one server (a slow or blocked one only adds 0).
+# Download bandwidth in Mbit/s: every URL at once for up to 8 s, the streams' rates summed, so the link is the limit rather
+# than one server or stream (a slow or blocked one only adds 0).
 measure() {
 	local u
 	for u in $URLS; do
@@ -88,12 +98,14 @@ net() {
 }
 
 run() {
-	local cands label mode lte bands res win line
+	local cands label mode lte bands res win line s
 	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
 	[ -s "$BAK" ] || save > "$BAK"
 	: > "$OUT"
 	apply auto none ''
 	wait_up || true  # the cell list below needs registration only, not data
+	[ -n "$CUSTOM" ] || { s="$(curl -s -m 10 "$SERVERS" 2>/dev/null | servers)"; [ -n "$s" ] && URLS=$s; }
+	logger -t x28-autotune "measuring with: $(echo "$URLS" | sed 's|^[a-z]*://||; s|/.*||' | sort -u | tr '\n' ' ')"
 	cands="$(/sbin/x28-modem-status 2>/dev/null | candidates)"
 	while IFS='	' read -r label mode lte bands; do
 		[ -n "$label" ] || continue
@@ -136,6 +148,8 @@ selftest() {
 	got=$(printf 'rat\tlte_ca\nca\t4 carriers: 15+20+20+15 (70 MHz)\nserving\t1500:496\t3\t-82.0\t-10.0\n' | net | tr '\t' '|')
 	[ "$got" = 'lte_ca|-82.0|4x 70 MHz' ] || { echo "net got $got"; return 1; }
 	[ "$(printf 'rat\tlte\n' | net | tr '\t' '|')" = 'lte|-|-' ] || { echo "net without CA"; return 1; }
+	got=$(printf '[{"url":"http://a.example:8080/speedtest/upload.php","host":"a.example:8080","id":"1"},{"host": "b.example:8080"},{"host":"bad host"}]' | servers | tr '\n' ' ')
+	[ "$got" = 'http://a.example:8080/download?size=100000000 http://a.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 ' ] || { echo "servers got $got"; return 1; }
 	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
 	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
 	echo "selftest ok"
@@ -144,7 +158,7 @@ selftest() {
 [ "$1" = selftest ] && { selftest; exit; }
 IF=$(iface)
 [ -n "$IF" ] || { echo 'no x28_mipc interface' >&2; exit 1; }
-u="$(uci -q get "network.$IF.autotune_url")" && URLS=$u
+u="$(uci -q get "network.$IF.autotune_url")" && URLS=$u CUSTOM=1
 
 case "$1" in
 	--last) cat "$OUT" 2>/dev/null ;;
