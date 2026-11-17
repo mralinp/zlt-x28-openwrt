@@ -97,6 +97,7 @@ run() {
 	cands="$(/sbin/x28-modem-status 2>/dev/null | candidates)"
 	while IFS='	' read -r label mode lte bands; do
 		[ -n "$label" ] || continue
+		[ "$(cat "$STATE" 2>/dev/null)" = running ] || return 1  # stopped (--stop restores)
 		[ "$label" = automatic ] || apply "$mode" "$lte" "$bands"
 		if wait_up; then res="$(measure)"; else res=0.0; fi
 		printf '%s\t%s\t%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" >> "$OUT"
@@ -151,13 +152,15 @@ case "$1" in
 	--start)
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] && exit 0
 		echo running > "$STATE"
-		rm -f "$BAK"
+		rm -f "$BAK" "$PID"; : > "$OUT"
 		( r=failed; "$0" run >/dev/null 2>&1 && r=done; [ "$(cat "$STATE")" = running ] && echo "$r" > "$STATE" ) >/dev/null 2>&1 &
 		;;
 	--stop)
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] || exit 0
 		echo failed > "$STATE"
-		kill "$(cat "$PID" 2>/dev/null)" 2>/dev/null
+		p="$(cat "$PID" 2>/dev/null)"
+		# Only our own job: a stale PID file may name another process by now.
+		[ -n "$p" ] && grep -q x28-autotune "/proc/$p/cmdline" 2>/dev/null && kill "$p"
 		restore ;;
 	--restore) restore ;;
 	run) echo $$ > "$PID"; run ;;
