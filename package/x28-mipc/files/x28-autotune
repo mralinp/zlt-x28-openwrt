@@ -3,14 +3,15 @@
 # Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
 # bands, no cell lock), then tries "automatic", "4G only" and 4G locks to pairs and single LTE bands the modem sees (a single
 # band rules out carrier aggregation across bands, a pair keeps it possible), measures each one's
-# download bandwidth (8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
+# download bandwidth (twice 8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
 # international paths can be throttled far below the radio's capacity) and keeps the one with the most. Ping is not scored (a latency
-# mode for gaming is a later option). The data connection drops at every step, for up to about 15 minutes in all. The
+# mode for gaming is a later option). The data connection drops at every step, for up to about 20 minutes in all. The
 # previous settings are saved first: `--restore` puts
 # them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
-# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA" per configuration (CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
+# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA<TAB>sample1/sample2" per configuration (Mbit/s: the average of
+# the two samples; CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
 # `--stop` stops a run and restores. Speed-test URLs: `list autotune_url` on the interface overrides the server lookup; the
 # fallback when the lookup fails is $URLS.
 
@@ -43,9 +44,12 @@ candidates() {
 			for (i = 1; i <= n; i++) printf "4G band %s\tauto\tallow\t%s\n", b[i], b[i] }'
 }
 
-# Label of the highest Mbit/s (the first on a tie: automatic is listed first); nothing when no configuration moved any data.
+# Label of the highest Mbit/s, but a lock or mode wins only with at least 15% more than automatic: a single cell's speed
+# swings by more than that between samples (27 to 98 Mbit/s seen on one SIM), and automatic adapts when the cell changes.
+# Nothing when no configuration moved any data.
 best() {
-	awk -F'\t' '$1 != "best" && $2 + 0 > m { m = $2 + 0; l = $1 } END { if (l != "") print l }'
+	awk -F'\t' '$1 == "best" { next } $1 == "automatic" { a = $2 + 0 } $2 + 0 > m { m = $2 + 0; l = $1 }
+		END { if (l == "") exit; if (l != "automatic" && m < a * 1.15) l = "automatic"; print l }'
 }
 
 save() {
@@ -98,7 +102,7 @@ net() {
 }
 
 run() {
-	local cands label mode lte bands res win line s
+	local cands label mode lte bands res win line s r1 r2
 	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
 	[ -s "$BAK" ] || save > "$BAK"
 	: > "$OUT"
@@ -111,8 +115,10 @@ run() {
 		[ -n "$label" ] || continue
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] || return 1  # stopped (--stop restores)
 		[ "$label" = automatic ] || apply "$mode" "$lte" "$bands"
-		if wait_up; then res="$(measure)"; else res=0.0; fi
-		printf '%s\t%s\t%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" >> "$OUT"
+		# Two samples, scored by their average: one 8 s sample is too noisy to rank configurations.
+		if wait_up; then r1="$(measure)"; r2="$(measure)"; else r1=0.0 r2=0.0; fi
+		res="$(awk -v a="$r1" -v b="$r2" 'BEGIN { printf "%.1f", (a + b) / 2 }')"
+		printf '%s\t%s\t%s\t%s/%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" "$r1" "$r2" >> "$OUT"
 	done <<EOF
 $cands
 EOF
@@ -144,6 +150,9 @@ selftest() {
 	[ "$got" = '4G band 3' ] || { echo "best got $got"; return 1; }
 	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n' | best)
 	[ "$got" = automatic ] || { echo "best tie got $got"; return 1; }
+	[ "$(printf 'automatic\t50.0\n4G only\t55.0\n' | best)" = automatic ] || { echo "best under the margin"; return 1; }
+	[ "$(printf 'automatic\t50.0\n4G only\t60.0\n4G band 3\t58.0\n' | best)" = '4G only' ] || { echo "best over the margin"; return 1; }
+	[ "$(printf 'automatic\t0.0\n4G only\t3.0\n' | best)" = '4G only' ] || { echo "best with automatic at 0"; return 1; }
 	[ -z "$(printf 'automatic\t0.0\t-\t-\nbest\t\n' | best)" ] || { echo "best should be empty without data"; return 1; }
 	got=$(printf 'rat\tlte_ca\nca\t4 carriers: 15+20+20+15 (70 MHz)\nserving\t1500:496\t3\t-82.0\t-10.0\n' | net | tr '\t' '|')
 	[ "$got" = 'lte_ca|-82.0|4x 70 MHz' ] || { echo "net got $got"; return 1; }

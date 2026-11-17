@@ -107,11 +107,11 @@ return network.registerProtocol('x28_mipc', {
    return (res.stdout || '').split('\n').filter(function(l) { return l; }).map(function(l) {
     var f = l.split('\t');
     if (f[0] == 'best') return _('Kept: %s').format(f[1] || _('automatic (no configuration reached the speed-test servers)'));
-    return full ? '%s: %s Mbit/s, %s, RSRP %s, CA %s'.format(f[0], f[1], f[2], f[3], f[4] || '-') : '%s: %s Mbit/s, CA %s'.format(f[0], f[1], f[4] || '-');
+    return full ? '%s: %s Mbit/s (samples %s), %s, RSRP %s, CA %s'.format(f[0], f[1], f[5] || '-', f[2], f[3], f[4] || '-') : '%s: %s Mbit/s, CA %s'.format(f[0], f[1], f[4] || '-');
    }).join('\n');
   };
   option = section.taboption('carrier', form.Button, 'autotune', _('Auto-tune'),
-   _('Resets the settings below (roaming on, automatic operator, mode and bands, no cell lock), then tries automatic, 4G only and locks to pairs and single 4G bands the modem sees (a pair keeps carrier aggregation possible, a single band does not), measures the download bandwidth of each, and keeps the one with the most. Takes up to about 15 minutes; the connection drops at every step and each test downloads for 8 s from the nearest speedtest.net servers (on a fast link that is about 100 MB per test).'));
+   _('Resets the settings below (roaming on, automatic operator, mode and bands, no cell lock), then tries automatic, 4G only and locks to pairs and single 4G bands the modem sees (a pair keeps carrier aggregation possible, a single band does not), measures the download bandwidth of each twice, and keeps the one with the most; a lock or mode is kept only when it beats automatic by 15% or more. Takes up to about 20 minutes; the connection drops at every step and each step downloads twice for 8 s from the nearest speedtest.net servers (on a fast link that is about 200 MB per step).'));
   option.inputtitle = _('Auto-tune');
   option.inputstyle = 'apply';
   option.onclick = function() {
