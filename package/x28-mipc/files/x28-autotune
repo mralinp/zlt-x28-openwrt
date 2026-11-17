@@ -1,13 +1,14 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
-# bands, no cell lock), then tries "automatic", "4G only" and a 4G lock to each LTE band the modem sees, measures each
-# (download speed over several servers, then ping) and keeps the fastest. The data connection drops at every step, for up to
-# about 10 minutes in all; each step downloads for at most 2 x 8 s. The previous settings are saved first: `--restore` puts
+# bands, no cell lock), then tries "automatic", "4G only" and a 4G lock to each LTE band the modem sees, measures each one's
+# download bandwidth (all speed-test servers at once, 8 s) and keeps the one with the most. Ping is not scored (a latency
+# mode for gaming is a later option). The data connection drops at every step, for up to about 10 minutes in all. The
+# previous settings are saved first: `--restore` puts
 # them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
-# one "label<TAB>Mbit/s<TAB>ping ms<TAB>network<TAB>serving RSRP" per configuration and "best<TAB>label" at the end,
+# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP" per configuration and "best<TAB>label" at the end,
 # `--stop` stops a run and restores. Speed-test servers: `list autotune_url` on the interface overrides the defaults.
 
 OUT=${X28_AUTOTUNE_FILE:-/tmp/x28-autotune}
@@ -15,7 +16,6 @@ STATE=$OUT.state
 PID=$OUT.pid
 BAK=$OUT.bak
 URLS='https://speed.cloudflare.com/__down?bytes=25000000 http://speedtest.tele2.net/10MB.zip'
-PINGS='1.1.1.1 8.8.8.8 9.9.9.9'
 CARRIER='roaming plmn celllock netmode lteband_mode lteband_list nrband_mode nrband_list'
 
 iface() { uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='x28_mipc'$/\1/p" | head -n 1; }
@@ -30,11 +30,9 @@ candidates() {
 		awk -F'\t' '{ printf "4G band %s\tauto\tallow\t%s\n", $2, $2 }'
 }
 
-# Best line of the results: highest Mbit/s, then lowest ping; nothing when no configuration moved any data.
+# Label of the highest Mbit/s (the first on a tie: automatic is listed first); nothing when no configuration moved any data.
 best() {
-	awk -F'\t' '$1 != "best" && $2 + 0 > 0 { p = ($3 == "-") ? 99999 : $3 + 0
-		if (!n++ || $2 + 0 > m || ($2 + 0 == m && p < bp)) { m = $2 + 0; bp = p; l = $1 } }
-		END { if (n) print l }'
+	awk -F'\t' '$1 != "best" && $2 + 0 > m { m = $2 + 0; l = $1 } END { if (l != "") print l }'
 }
 
 save() {
@@ -70,19 +68,13 @@ wait_up() {
 	sleep 5  # let the bearer and the routes settle before measuring
 }
 
-# "<Mbit/s><TAB><ping ms or ->": the best download of the servers (one slow or blocked server does not decide), then the
-# lowest average ping of the probes.
+# Download bandwidth in Mbit/s: every server at once for up to 8 s, the streams' rates summed, so the link is the limit rather
+# than one server (a slow or blocked one only adds 0).
 measure() {
-	local u s best=0 h p ms=-
+	local u
 	for u in $URLS; do
-		s="$(curl -s -o /dev/null -m 8 -w '%{speed_download}' "$u" 2>/dev/null)"
-		best="$(awk -v a="$best" -v b="${s:-0}" 'BEGIN { print (b + 0 > a + 0) ? b + 0 : a + 0 }')"
-	done
-	for h in $PINGS; do
-		p="$(ping -c 3 -W 2 "$h" 2>/dev/null | sed -n 's/^round-trip.* = [0-9.]*\/\([0-9.]*\)\/.*/\1/p')"
-		[ -n "$p" ] && { [ "$ms" = - ] || awk -v a="$p" -v b="$ms" 'BEGIN { exit !(a + 0 < b + 0) }'; } && ms=$p
-	done
-	awk -v b="$best" -v ms="$ms" 'BEGIN { printf "%.1f\t%s\n", b * 8 / 1000000, ms }'
+		curl -s -o /dev/null -m 8 -w '%{speed_download}\n' "$u" 2>/dev/null &
+	done | awk '{ s += $1 } END { printf "%.1f\n", s * 8 / 1000000 }'
 }
 
 net() {
@@ -101,7 +93,7 @@ run() {
 	while IFS='	' read -r label mode lte bands; do
 		[ -n "$label" ] || continue
 		[ "$label" = automatic ] || apply "$mode" "$lte" "$bands"
-		if wait_up; then res="$(measure)"; else res="0.0	-"; fi
+		if wait_up; then res="$(measure)"; else res=0.0; fi
 		printf '%s\t%s\t%s\n' "$label" "$res" "$(net)" >> "$OUT"
 	done <<EOF
 $cands
@@ -129,9 +121,13 @@ selftest() {
 	got=$(printf 'rat\tlte_ca\nserving\t1500:496\t3\t-82.0\t-10.0\ncell\t1500:134\t3\t-89.0\t-17.5\ncell\t2850:105\t7\t-110.0\t-18.5\ncell\t300:1\t1\t-95.5\t-12\nnrcell\t650000:134\tn78\t?\t?\ncell\t9:9\t?\t?\t?\n' | candidates | tr '\t\n' '|;')
 	want='automatic|auto|none|;4G only|4g|none|;4G band 3|auto|allow|3;4G band 1|auto|allow|1;4G band 7|auto|allow|7;'
 	[ "$got" = "$want" ] || { echo "candidates got $got"; return 1; }
-	got=$(printf 'automatic\t12.5\t80\tlte\t-82\n4G only\t12.5\t60\tlte\t-82\n4G band 3\t3.1\t-\tlte\t-82\n' | best)
-	[ "$got" = '4G only' ] || { echo "best got $got"; return 1; }
-	[ -z "$(printf 'automatic\t0.0\t-\t-\t-\nbest\t\n' | best)" ] || { echo "best should be empty without data"; return 1; }
+	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n4G band 3\t31.0\tlte_ca\t-90\n' | best)
+	[ "$got" = '4G band 3' ] || { echo "best got $got"; return 1; }
+	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n' | best)
+	[ "$got" = automatic ] || { echo "best tie got $got"; return 1; }
+	[ -z "$(printf 'automatic\t0.0\t-\t-\nbest\t\n' | best)" ] || { echo "best should be empty without data"; return 1; }
+	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
+	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
 	echo "selftest ok"
 }
 
