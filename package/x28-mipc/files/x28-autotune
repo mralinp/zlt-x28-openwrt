@@ -1,11 +1,13 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 # Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
-# bands, no cell lock), then tries "automatic", "4G only" and 4G locks to pairs and single LTE bands the modem sees (a single
-# band rules out carrier aggregation across bands, a pair keeps it possible), measures each one's
+# bands, no cell lock). Stage 1 scans for networks and tries automatic and each LTE/NR network found (a virtual or roaming SIM
+# may be allowed on several; one that refuses the SIM fails fast). Stage 2, on the best network so far, tries "4G only" and 4G
+# locks to pairs and single LTE bands the modem sees (a single band rules out carrier aggregation across bands, a pair keeps
+# it possible). It measures each one's
 # download bandwidth (twice 8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
 # international paths can be throttled far below the radio's capacity) and keeps the one with the most. Ping is not scored (a latency
-# mode for gaming is a later option). The data connection drops at every step, for up to about 20 minutes in all. The
+# mode for gaming is a later option). The data connection drops at every step, for up to about 30 minutes in all (the scan alone takes a few). The
 # previous settings are saved first: `--restore` puts
 # them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
@@ -32,16 +34,25 @@ servers() {
 
 iface() { uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='x28_mipc'$/\1/p" | head -n 1; }
 
-# Candidates from x28-modem-status lines: "label<TAB>netmode<TAB>lteband_mode<TAB>bands". Automatic first (it is also the
-# fallback), 4G only, then of the 3 strongest LTE bands with a measured cell: each pair, then each band alone.
+# Candidates are "label<TAB>netmode<TAB>lteband_mode<TAB>bands<TAB>plmn", "-" for no bands or automatic operator (a tab
+# is IFS white space to read, so an empty field would shift the next one).
+# From x28-modem-status lines: automatic first (it is also the fallback), 4G only, then of the 3 strongest LTE bands with a
+# measured cell: each pair, then each band alone.
 candidates() {
-	printf 'automatic\tauto\tnone\t\n4G only\t4g\tnone\t\n'
+	printf 'automatic\tauto\tnone\t-\t-\n4G only\t4g\tnone\t-\t-\n'
 	awk -F'\t' '($1 == "serving" || $1 == "cell") && $3 ~ /^[0-9]+$/ && $4 ~ /^-?[0-9.]+$/ {
 		if (!($3 in best) || $4 + 0 > best[$3]) best[$3] = $4 + 0 }
 		END {  # strongest 3 by selection: busybox sort misorders negative decimals
 			for (n = 0; n < 3; n++) { k = ""; for (x in best) if (k == "" || best[x] > best[k]) k = x; if (k == "") break; b[n + 1] = k; delete best[k] }
-			for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\n", b[i], b[j], b[i], b[j]
-			for (i = 1; i <= n; i++) printf "4G band %s\tauto\tallow\t%s\n", b[i], b[i] }'
+			for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\t-\n", b[i], b[j], b[i], b[j]
+			for (i = 1; i <= n; i++) printf "4G band %s\tauto\tallow\t%s\t-\n", b[i], b[i] }'
+}
+
+# Networks from x28-plmn-scan lines ("plmn<TAB>name<TAB>act<TAB>status"): each LTE (7) or NR (12, 13) network once, except
+# forbidden ones (status 3), as candidates with the operator set manually.
+operators() {
+	awk -F'\t' '$1 ~ /^[0-9][0-9][0-9][0-9][0-9][0-9]?$/ && $4 != 3 && ($3 == 7 || $3 == 12 || $3 == 13) && !seen[$1]++ {
+		printf "network %s\tauto\tnone\t-\t%s\n", ($2 == "" || $2 == $1) ? $1 : $2 " (" $1 ")", $1 }'
 }
 
 # Label of the highest Mbit/s, but a lock or mode wins only with at least 15% more than automatic: a single cell's speed
@@ -64,13 +75,14 @@ save() {
 
 clear_carrier() { local o; for o in $CARRIER; do uci -q delete "network.$IF.$o"; done; }
 
-# apply <netmode> <lteband_mode> <bands>: roaming stays on, nothing else locked.
+# apply <netmode> <lteband_mode> <bands|-> <plmn|->: roaming stays on, nothing else locked.
 apply() {
 	local b
 	clear_carrier
 	uci set "network.$IF.roaming=1"; uci set "network.$IF.netmode=$1"
 	uci set "network.$IF.lteband_mode=$2"; uci set "network.$IF.nrband_mode=none"
-	for b in $3; do uci add_list "network.$IF.lteband_list=$b"; done
+	for b in $3; do [ "$b" = - ] || uci add_list "network.$IF.lteband_list=$b"; done
+	[ "${4:--}" = - ] || uci set "network.$IF.plmn=$4"
 	uci commit network
 	ifup "$IF"
 }
@@ -80,6 +92,8 @@ wait_up() {
 	sleep 5
 	until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ]; do
 		[ "$i" -ge 115 ] && return 1
+		# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
+		case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 1 ;; esac
 		sleep 1; i=$((i + 1))
 	done
 	sleep 5  # let the bearer and the routes settle before measuring
@@ -101,34 +115,58 @@ net() {
 		END { printf "%s\t%s\t%s\n", r ? r : "-", s ? s : "-", c ? c : "-" }'
 }
 
-run() {
-	local cands label mode lte bands res win line s r1 r2
-	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
-	[ -s "$BAK" ] || save > "$BAK"
-	: > "$OUT"
-	apply auto none ''
-	wait_up || true  # the cell list below needs registration only, not data
-	[ -n "$CUSTOM" ] || { s="$(curl -s -m 10 "$SERVERS" 2>/dev/null | servers)"; [ -n "$s" ] && URLS=$s; }
-	logger -t x28-autotune "measuring with: $(echo "$URLS" | sed 's|^[a-z]*://||; s|/.*||' | sort -u | tr '\n' ' ')"
-	cands="$(/sbin/x28-modem-status 2>/dev/null | candidates)"
-	while IFS='	' read -r label mode lte bands; do
+# try <candidate lines>: apply each, measure it twice, append its result line.
+try() {
+	local label mode lte bands plmn r1 r2 res
+	while IFS='	' read -r label mode lte bands plmn; do
 		[ -n "$label" ] || continue
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] || return 1  # stopped (--stop restores)
-		[ "$label" = automatic ] || apply "$mode" "$lte" "$bands"
+		apply "$mode" "$lte" "$bands" "$plmn"
 		# Two samples, scored by their average: one 8 s sample is too noisy to rank configurations.
 		if wait_up; then r1="$(measure)"; r2="$(measure)"; else r1=0.0 r2=0.0; fi
 		res="$(awk -v a="$r1" -v b="$r2" 'BEGIN { printf "%.1f", (a + b) / 2 }')"
 		printf '%s\t%s\t%s\t%s/%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" "$r1" "$r2" >> "$OUT"
 	done <<EOF
-$cands
+$1
 EOF
+}
+
+# pick <candidate lines>: sets label mode lte bands plmn to the best result's candidate (automatic when none moved data).
+pick() {
 	win="$(best < "$OUT")"
-	line="$(echo "$cands" | awk -F'\t' -v l="${win:-automatic}" '$1 == l')"
-	IFS='	' read -r label mode lte bands <<EOF
-$line
+	IFS='	' read -r label mode lte bands plmn <<EOF
+$(echo "$1" | awk -F'\t' -v l="${win:-automatic}" '$1 == l')
 EOF
-	apply "$mode" "$lte" "$bands"
-	wait_up || { label=automatic; apply auto none ''; }
+}
+
+run() {
+	local all stage label mode lte bands plmn win s pre
+	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
+	[ -s "$BAK" ] || save > "$BAK"
+	: > "$OUT"
+	apply auto none - -
+	wait_up || true
+	[ -n "$CUSTOM" ] || { s="$(curl -s -m 10 "$SERVERS" 2>/dev/null | servers)"; [ -n "$s" ] && URLS=$s; }
+	logger -t x28-autotune "measuring with: $(echo "$URLS" | sed 's|^[a-z]*://||; s|/.*||' | sort -u | tr '\n' ' ')"
+	# Stage 1, networks. The scan drops the connection for a few minutes; one network found is the one automatic picks.
+	s="$(/sbin/x28-plmn-scan 2>/dev/null | operators)"
+	[ "$(echo "$s" | grep -c .)" -gt 1 ] || s=""
+	all="$(printf 'automatic\tauto\tnone\t-\t-\n%s' "$s")"
+	logger -t x28-autotune "networks: $(echo "$s" | cut -f5 | tr '\n' ' ')"
+	try "$all" || return 1
+	# Stage 2, modes and bands on the best network so far (its cells decide the bands).
+	pick "$all"
+	apply auto none - "$plmn"
+	wait_up || true
+	[ "$plmn" = - ] && pre="" || pre="$label, "
+	stage="$(/sbin/x28-modem-status 2>/dev/null | candidates | awk -F'\t' -v p="$plmn" -v n="$pre" \
+		'$1 != "automatic" { printf "%s%s\t%s\t%s\t%s\t%s\n", n, $1, $2, $3, $4, p }')"
+	try "$stage" || return 1
+	all="$all
+$stage"
+	pick "$all"
+	apply "$mode" "$lte" "$bands" "$plmn"
+	wait_up || { label=automatic; apply auto none - -; }
 	printf 'best\t%s\n' "${win:+$label}" >> "$OUT"
 	[ -n "$win" ] && win="most bandwidth" || win="no configuration moved any data"
 	logger -t x28-autotune "kept $label ($win)"
@@ -144,8 +182,12 @@ restore() {
 
 selftest() {
 	got=$(printf 'rat\tlte_ca\nserving\t1500:496\t3\t-82.0\t-10.0\ncell\t1500:134\t3\t-89.0\t-17.5\ncell\t2850:105\t7\t-110.0\t-18.5\ncell\t300:1\t1\t-95.5\t-12\nnrcell\t650000:134\tn78\t?\t?\ncell\t9:9\t?\t?\t?\n' | candidates | tr '\t\n' '|;')
-	want='automatic|auto|none|;4G only|4g|none|;4G bands 3+1|auto|allow|3 1;4G bands 3+7|auto|allow|3 7;4G bands 1+7|auto|allow|1 7;4G band 3|auto|allow|3;4G band 1|auto|allow|1;4G band 7|auto|allow|7;'
+	want='automatic|auto|none|-|-;4G only|4g|none|-|-;4G bands 3+1|auto|allow|3 1|-;4G bands 3+7|auto|allow|3 7|-;4G bands 1+7|auto|allow|1 7|-;4G band 3|auto|allow|3|-;4G band 1|auto|allow|1|-;4G band 7|auto|allow|7|-;'
 	[ "$got" = "$want" ] || { echo "candidates got $got"; return 1; }
+	got=$(printf '43235\tIrancell\t7\t1\n43211\t43211\t7\t2\n43211\t43211\t7\t2\n43299\tX\t2\t1\n43298\tY\t7\t3\n' | operators | tr '\t\n' '|;')
+	[ "$got" = 'network Irancell (43235)|auto|none|-|43235;network 43211|auto|none|-|43211;' ] || { echo "operators got $got"; return 1; }
+	got=$(printf 'network B (2)\tauto\tnone\t-\t2\nnetwork B (2), 4G band 3\tauto\tallow\t3\t2\n' | { printf 'automatic\t10.0\nnetwork B (2)\t30.0\nnetwork B (2), 4G band 3\t40.0\n' > "$OUT.t"; OUT=$OUT.t; c=$(cat); pick "$c"; rm -f "$OUT"; echo "$label|$mode|$lte|$bands|$plmn"; })
+	[ "$got" = 'network B (2), 4G band 3|auto|allow|3|2' ] || { echo "pick got $got"; return 1; }
 	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n4G band 3\t31.0\tlte_ca\t-90\n' | best)
 	[ "$got" = '4G band 3' ] || { echo "best got $got"; return 1; }
 	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n' | best)
