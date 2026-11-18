@@ -8,8 +8,8 @@
 # download bandwidth (twice 8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
 # international paths can be throttled far below the radio's capacity) and keeps the one with the most. Ping is not scored (a latency
 # mode for gaming is a later option). The data connection drops at every step, for up to about 30 minutes in all (the scan alone takes a few). The
-# previous settings are saved first: `--restore` puts
-# them back. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
+# previous settings are saved first (on flash, see BAK): `--restore` puts them back, and at boot after a run that was cut
+# short the init script does. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
 # one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA<TAB>sample1/sample2" per configuration (Mbit/s: the average of
@@ -20,7 +20,10 @@
 OUT=${X28_AUTOTUNE_FILE:-/tmp/x28-autotune}
 STATE=$OUT.state
 PID=$OUT.pid
-BAK=$OUT.bak
+# The backup and the "a run is changing the config" marker live on flash: each candidate is committed, so a reboot or power
+# loss mid-run must still find the settings from before it (the x28-autotune init script restores them at boot).
+BAK=${X28_AUTOTUNE_BAK:-/etc/x28-autotune.bak}
+RUN=${X28_AUTOTUNE_RUN:-/etc/x28-autotune.running}
 URLS='https://speed.cloudflare.com/__down?bytes=25000000 http://speedtest.tele2.net/10MB.zip'
 CARRIER='roaming plmn celllock netmode lteband_mode lteband_list nrband_mode nrband_list'
 
@@ -87,14 +90,16 @@ apply() {
 	ifup "$IF"
 }
 
-# Up within 2 minutes, with a bearer the modem still has (1 otherwise, 2 when the network refuses the SIM). After a mode change the modem can drop the fresh bearer while it
+# Up within 2 minutes with an IPv4 address (unless the interface is IPv6 only), and with a bearer the modem still has (1
+# otherwise, 2 when the network refuses the SIM). netifd shows the interface up at the IPv6 link-local update, before IPv4. After a mode change the modem can drop the fresh bearer while it
 # settles (seen on a unit: netifd up on ccmni2, packets out and none back, --data_call_get empty); one more ifup brings it back.
 wait_up() {
 	local i try
 	for try in 1 2; do
 		i=0
 		sleep 5
-		until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ]; do
+		until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ] &&
+			{ [ "$(uci -q get "network.$IF.iptype")" = 2 ] || [ -n "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address')" ]; }; do
 			[ "$i" -ge 115 ] && return 1
 			# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
 			case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 2 ;; esac
@@ -156,7 +161,12 @@ EOF
 run() {
 	local all stage label mode lte bands plmn win s pre
 	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
-	[ -s "$BAK" ] || save > "$BAK"
+	stopped() { [ "$(cat "$STATE" 2>/dev/null)" != running ]; }
+	stopped && return 1
+	# An empty backup is valid: nothing was set, so restoring clears everything.
+	[ -f "$BAK" ] || save > "$BAK"
+	: > "$RUN"
+	stopped && return 1
 	: > "$OUT"
 	apply auto none - -
 	wait_up || true
@@ -184,14 +194,47 @@ $stage"
 	printf 'best\t%s\n' "${win:+$label}" >> "$OUT"
 	[ -n "$win" ] && win="most bandwidth" || win="no configuration moved any data"
 	logger -t x28-autotune "kept $label ($win)"
+	rm -f "$RUN"
+}
+
+# Staged network changes would be committed along with ours, and ifup reloads the whole network config (a staged LAN address
+# among them): refuse instead.
+uncommitted() {
+	[ -z "$(uci changes network 2>/dev/null)" ] && return 1
+	echo 'the network config has uncommitted changes; save or revert them first' >&2
 }
 
 restore() {
-	[ -s "$BAK" ] || return 0
+	[ -f "$BAK" ] || { echo 'no settings saved by auto-tune' >&2; return 1; }
+	uncommitted && return 1
 	clear_carrier
 	uci -q batch < "$BAK"
 	uci commit network
+	rm -f "$RUN"
 	ifup "$IF"
+}
+
+# Stops a running job and its children (a scan holds the modem for minutes), then restores.
+stop() {
+	local p c d n m
+	echo failed > "$STATE"
+	p="$(cat "$PID" 2>/dev/null)"
+	# Only our own job: a stale PID file may name another process by now.
+	if [ -n "$p" ] && grep -q x28-autotune "/proc/$p/cmdline" 2>/dev/null; then
+		# All its descendants too (a scan runs in a command substitution and holds the modem for minutes; busybox here has no
+		# pkill or setsid), found before the job dies and they move to init: field 4 of /proc/<pid>/stat is the parent (our
+		# processes' names have no spaces to shift it).
+		c= n=$p
+		while [ -n "$n" ]; do
+			m=
+			for d in /proc/[0-9]*; do
+				case " $n " in *" $(cut -d' ' -f4 "$d/stat" 2>/dev/null) "*) m="$m ${d#/proc/}" ;; esac
+			done
+			c="$c$m"; n=${m# }
+		done
+		kill "$p" $c 2>/dev/null
+	fi
+	restore
 }
 
 selftest() {
@@ -218,10 +261,18 @@ selftest() {
 	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
 	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
 	# wait_up: the bearer is gone after the first up, back after one ifup.
-	got=$(c=$OUT.calls; rm -f "$c"; sleep() { :; }; logger() { :; }; ifstatus() { echo; }; jsonfilter() { echo true; }
+	got=$(c=$OUT.calls; rm -f "$c"; sleep() { :; }; logger() { :; }; uci() { :; }; ifstatus() { echo; }; jsonfilter() { echo true; }
 		ifup() { echo ifup; }; mipc_wan_cli() { echo >> "$c"; [ "$(wc -l < "$c")" -gt 1 ] && echo '{ "CID": 0 }'; }
 		IF=wan; wait_up && echo up; rm -f "$c")
 	[ "$got" = "$(printf 'ifup\nup')" ] || { echo "wait_up got $got"; return 1; }
+	# restore: an empty backup (nothing was set) clears and reconnects; no backup or staged changes refuse.
+	got=$(BAK=$OUT.bak.t RUN=$OUT.run.t; : > "$BAK"; : > "$RUN"; IF=wan; ch=
+		uci() { case "$1 $2" in ('changes network') echo "$ch" ;; ('-q batch') echo batch ;; ('commit network') echo commit ;; esac; }
+		ifup() { echo "ifup $1"; }
+		restore | tr '\n' ' '; [ -e "$RUN" ] && echo marker-left
+		ch="network.lan.ipaddr='10.0.0.1'"; restore 2>/dev/null || echo staged-refused
+		rm -f "$BAK"; ch=; restore 2>/dev/null || echo no-backup-refused)
+	[ "$got" = "$(printf 'batch commit ifup wan staged-refused\nno-backup-refused')" ] || { echo "restore got $got"; return 1; }
 	echo "selftest ok"
 }
 
@@ -235,18 +286,18 @@ case "$1" in
 	--state) cat "$STATE" 2>/dev/null || echo idle ;;
 	--start)
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] && exit 0
+		uncommitted && exit 1
 		echo running > "$STATE"
-		rm -f "$BAK" "$PID"; : > "$OUT"
+		# A run cut short by a reboot left the marker: its backup still holds the settings from before it, keep that one.
+		[ -e "$RUN" ] || rm -f "$BAK"
+		rm -f "$PID"; : > "$OUT"
 		( r=failed; "$0" run >/dev/null 2>&1 && r=done; [ "$(cat "$STATE")" = running ] && echo "$r" > "$STATE" ) >/dev/null 2>&1 &
 		;;
-	--stop)
-		[ "$(cat "$STATE" 2>/dev/null)" = running ] || exit 0
-		echo failed > "$STATE"
-		p="$(cat "$PID" 2>/dev/null)"
-		# Only our own job: a stale PID file may name another process by now.
-		[ -n "$p" ] && grep -q x28-autotune "/proc/$p/cmdline" 2>/dev/null && kill "$p"
-		restore ;;
-	--restore) restore ;;
+	--stop) [ "$(cat "$STATE" 2>/dev/null)" = running ] || exit 0; stop ;;
+	# A restore during a run would be overwritten by the job's next step: stop it first.
+	--restore) if [ "$(cat "$STATE" 2>/dev/null)" = running ]; then stop; else restore; fi ;;
+	# At boot (init script): a run that never finished left a committed candidate.
+	--boot) [ -e "$RUN" ] || exit 0; logger -t x28-autotune "a run was cut short; restoring the settings from before it"; restore ;;
 	run) echo $$ > "$PID"; run ;;
-	*) echo "usage: $0 --start|--state|--last|--stop|--restore|selftest" >&2; exit 1 ;;
+	*) echo "usage: $0 --start|--state|--last|--stop|--restore|--boot|selftest" >&2; exit 1 ;;
 esac

@@ -1,12 +1,13 @@
 {
 	"luci-proto-x28-mipc": {
-		"description": "Read the X28 modem state, list the SIM's APNs and found networks, start a network search or an auto-tune",
+		"description": "Read the X28 modem state, list the SIM's APNs and found networks and read auto-tune results; start a network search or an auto-tune",
 		"read": {
 			"file": {
 				"/sbin/x28-apn": [ "exec" ],
-				"/sbin/x28-autotune": [ "exec" ],
 				"/sbin/x28-modem-status": [ "exec" ],
-				"/sbin/x28-plmn-scan": [ "exec" ]
+				"/sbin/x28-plmn-scan": [ "exec" ],
+				"/tmp/x28-autotune": [ "read" ],
+				"/tmp/x28-autotune.state": [ "read" ]
 			}
 		},
 		"write": {

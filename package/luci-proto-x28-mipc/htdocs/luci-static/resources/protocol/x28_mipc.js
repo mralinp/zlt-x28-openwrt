@@ -103,6 +103,17 @@ return network.registerProtocol('x28_mipc', {
   };
   option.cfgvalue = function() { return this.status; };
   // Auto-tune (x28-autotune): resets the settings below, tries automatic, 4G only and each seen 4G band, keeps the most bandwidth.
+  // Results and state are read as files: read-only users may see them, only writers may run x28-autotune (ACL).
+  var tuneRead = function(file) {
+   return fs.read(file).catch(function() { return ''; }).then(function(text) { return { stdout: text || '' }; });
+  };
+  // fs.exec resolves on a non-zero exit too; x28-autotune says why on stderr (e.g. uncommitted network changes).
+  var tuneExec = function(arg) {
+   return fs.exec('/sbin/x28-autotune', [arg]).then(function(res) {
+    if (res.code) throw new Error((res.stderr || '').trim() || 'exit code %d'.format(res.code));
+    return res;
+   });
+  };
   var tuneRows = function(res, full) {
    return (res.stdout || '').split('\n').filter(function(l) { return l; }).map(function(l) {
     var f = l.split('\t');
@@ -120,9 +131,9 @@ return network.registerProtocol('x28_mipc', {
    var log = E('pre', {}, _('Resetting and waiting for the first connection...'));
    var stopped = false;
    var poll = function() {
-    return fs.exec('/sbin/x28-autotune', ['--last']).then(function(res) {
+    return tuneRead('/tmp/x28-autotune').then(function(res) {
      log.textContent = tuneRows(res, true) || _('Resetting and waiting for the first connection...');
-     return fs.exec('/sbin/x28-autotune', ['--state']);
+     return tuneRead('/tmp/x28-autotune.state');
     }).then(function(res) {
      if (stopped) return;
      if ((res.stdout || '').trim() !== 'running') { window.location.reload(); return; }
@@ -137,9 +148,9 @@ return network.registerProtocol('x28_mipc', {
       E('button', { 'class': 'btn cbi-button-apply', 'click': function() {
        ui.showModal(_('Auto-tune running'), [log, E('div', { 'class': 'right' }, E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
         stopped = true;
-        fs.exec('/sbin/x28-autotune', ['--stop']).finally(function() { window.location.reload(); });
+        tuneExec('--stop').catch(function(e) { window.alert(_('Could not restore: %s').format(e.message || e)); }).finally(function() { window.location.reload(); });
        } }, _('Stop and restore')))]);
-       fs.exec('/sbin/x28-autotune', ['--start']).then(poll).catch(function(e) {
+       tuneExec('--start').then(poll).catch(function(e) {
         ui.hideModal();
         ui.addNotification(null, E('p', _('Auto-tune could not be started: %s').format(e.message || e)), 'danger');
        }).then(resolve);
@@ -152,13 +163,13 @@ return network.registerProtocol('x28_mipc', {
    _('Puts back the Carrier settings that were in place before the last auto-tune.'));
   option.inputtitle = _('Restore');
   option.load = function() {
-   return fs.exec('/sbin/x28-autotune', ['--last']).then(L.bind(function(res) {
+   return tuneRead('/tmp/x28-autotune').then(L.bind(function(res) {
     var rows = tuneRows(res, false);
     if (rows) this.description = _('Puts back the Carrier settings that were in place before the last auto-tune. Its results:') + '\n' + rows;
    }, this)).catch(function() {});
   };
   option.onclick = function() {
-   return fs.exec('/sbin/x28-autotune', ['--restore']).then(function() { window.location.reload(); }).catch(function(e) {
+   return tuneExec('--restore').then(function() { window.location.reload(); }).catch(function(e) {
     ui.addNotification(null, E('p', _('Could not restore: %s').format(e.message || e)), 'danger');
    });
   };

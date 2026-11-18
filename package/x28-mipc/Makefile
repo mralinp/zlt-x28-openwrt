@@ -34,6 +34,8 @@ define Package/x28-mipc/install
 	$(INSTALL_BIN) ./files/x28-plmn-scan $(1)/sbin/x28-plmn-scan
 	$(INSTALL_BIN) ./files/x28-modem-status $(1)/sbin/x28-modem-status
 	$(INSTALL_BIN) ./files/x28-autotune $(1)/sbin/x28-autotune
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/x28-autotune.init $(1)/etc/init.d/x28-autotune
 endef
 
 $(eval $(call BuildPackage,x28-mipc))

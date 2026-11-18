@@ -103,6 +103,9 @@ def cases():
         case("bearer-lost-after-netmode", config={"netmode": "4g"}, bearer_lost=1, error="CONNECT_FAILED", one_rat_set=True,
              expect_cmds=["--nw_set_rat 3", "--data_call_act", "--data_call_get"]),
         case("bearer-lost-unchanged-not-checked", bearer_lost=1, no_rat_set=True),
+        # IPv4v6 with a link-local reply: the check must run before the early update, so netifd still retries.
+        case("bearer-lost-ipv4v6", config={"netmode": "4g", "iptype": 3}, reply=V6, bearer_lost=1, error="CONNECT_FAILED",
+             one_rat_set=True, expect_cmds=["--nw_set_rat 3", "--data_call_act", "--data_call_get"]),
         case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("nr-allow", config={"nrband_mode": "allow", "nrband_list": [78]},

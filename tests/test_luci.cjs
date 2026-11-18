@@ -91,6 +91,10 @@ assert(!script.includes('vendorbridge') && !script.includes('http.cgi') && !scri
 const acl = JSON.parse(fs.readFileSync(path.join(__dirname, '../package/luci-proto-x28-mipc/root/usr/share/rpcd/acl.d/luci-proto-x28-mipc.json'), 'utf8'))['luci-proto-x28-mipc'];
 const used = [...script.matchAll(/fs\.exec\('([^']+)'/g)].map(m => m[1]);
 assert(used.length >= 3, 'expected the status, scan and apn commands');
-for (const cmd of used) assert.deepEqual(acl.read.file[cmd], ['exec'], cmd + ' missing from the ACL read section');
+// Auto-tune changes the config: write access only; read-only users get its result files.
+const writeOnly = ['/sbin/x28-autotune'];
+for (const cmd of used) assert.deepEqual((writeOnly.includes(cmd) ? acl.write : acl.read).file[cmd], ['exec'], cmd + ' missing from the ACL');
+for (const cmd of writeOnly) assert(!acl.read.file[cmd], cmd + ' must not be executable with read access');
+for (const file of [...script.matchAll(/tuneRead\('([^']+)'/g)].map(m => m[1])) assert.deepEqual(acl.read.file[file], ['read'], file + ' not readable');
 assert.deepEqual(acl.write.file['/sbin/x28-plmn-scan'], ['exec'], 'starting a scan needs write access');
 console.log('PASS: native LuCI protocol registration, dynamic device, APN (auto/list/manual) and IP type, routing/DNS fields and error messages');

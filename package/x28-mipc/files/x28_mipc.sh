@@ -496,6 +496,18 @@ x28_mipc_setup() {
  if [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
+ # After a change that made the modem re-register, it can drop the fresh bearer moments later while netifd would keep the
+ # interface up (seen on a unit after a switch to 4G only: packets out, none back, --data_call_get empty, no event). Check
+ # once it settled, before anything is reported to netifd: returning here while setup is still pending makes netifd tear
+ # down and retry (after an IPv6 link-local update it would not). The bearer is gone, so there is nothing to deactivate;
+ # the retry changes nothing on the modem and keeps its bearer.
+ if [ -n "$x28_mipc_moved" ]; then
+  sleep "${X28_MIPC_SETTLE:-10}"
+  if ! mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"'; then
+   logger -t x28_mipc "the modem dropped the new bearer after re-registering; reconnecting"
+   proto_notify_error "$interface" CONNECT_FAILED; return 1
+  fi
+ fi
  # The kernel leaves ccmni DOWN after a data call (observed on hardware); $ifname was validated as ccmniN above.
  ip link set dev "$ifname" up >/dev/null 2>&1
  if [ -z "$(ip link show dev "$ifname" up 2>/dev/null)" ]; then
@@ -538,18 +550,6 @@ x28_mipc_setup() {
   else
    v6_global=
    [ -n "$v4_addr" ] || { x28_mipc_fail_owned "$interface" "$cid" NO_IPV6; return 1; }
-  fi
- fi
- # After a change that made the modem re-register, it can drop the fresh bearer moments later while netifd would keep the
- # interface up (seen on a unit after a switch to 4G only: packets out, none back, --data_call_get empty, no event). Check
- # once it settled; the bearer is gone, so there is nothing to tear down, and netifd's retry changes nothing and keeps it.
- if [ -n "$x28_mipc_moved" ]; then
-  sleep "${X28_MIPC_SETTLE:-10}"
-  if ! mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"'; then
-   logger -t x28_mipc "the modem dropped the new bearer after re-registering; reconnecting"
-   proto_init_update "*" 0
-   proto_send_update "$interface" >/dev/null 2>&1
-   proto_notify_error "$interface" CONNECT_FAILED; return 1
   fi
  fi
  x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }

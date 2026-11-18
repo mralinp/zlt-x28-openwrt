@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Auto-tune commits each configuration it tries; after a reboot or power loss during a run, put back the Carrier settings
+# from before it (x28-autotune --boot does nothing when no run was cut short).
+START=99
+
+start() {
+	/sbin/x28-autotune --boot
+}
