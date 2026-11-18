@@ -107,6 +107,8 @@ return network.registerProtocol('x28_mipc', {
    return (res.stdout || '').split('\n').filter(function(l) { return l; }).map(function(l) {
     var f = l.split('\t');
     if (f[0] == 'best') return _('Kept: %s').format(f[1] || _('automatic (no configuration reached the speed-test servers)'));
+    // The last field is "<sample>/<sample>", or why there are none: refused (the network refused the SIM), no connection.
+    if (f[5] && f[5].indexOf('/') < 0) return '%s: %s'.format(f[0], f[5] == 'refused' ? _('refused this SIM') : _('no connection'));
     return full ? '%s: %s Mbit/s (samples %s), %s, RSRP %s, CA %s'.format(f[0], f[1], f[5] || '-', f[2], f[3], f[4] || '-') : '%s: %s Mbit/s, CA %s'.format(f[0], f[1], f[4] || '-');
    }).join('\n');
   };

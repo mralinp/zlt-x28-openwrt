@@ -13,7 +13,7 @@
 # is applied.
 # `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
 # one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA<TAB>sample1/sample2" per configuration (Mbit/s: the average of
-# the two samples; CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
+# the two samples; instead of the samples "refused" when the network refused the SIM, "no connection" when it did not come up; CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
 # `--stop` stops a run and restores. Speed-test URLs: `list autotune_url` on the interface overrides the server lookup; the
 # fallback when the lookup fails is $URLS.
 
@@ -87,16 +87,25 @@ apply() {
 	ifup "$IF"
 }
 
+# Up within 2 minutes, with a bearer the modem still has (1 otherwise, 2 when the network refuses the SIM). After a mode change the modem can drop the fresh bearer while it
+# settles (seen on a unit: netifd up on ccmni2, packets out and none back, --data_call_get empty); one more ifup brings it back.
 wait_up() {
-	local i=0
-	sleep 5
-	until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ]; do
-		[ "$i" -ge 115 ] && return 1
-		# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
-		case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 1 ;; esac
-		sleep 1; i=$((i + 1))
+	local i try
+	for try in 1 2; do
+		i=0
+		sleep 5
+		until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ]; do
+			[ "$i" -ge 115 ] && return 1
+			# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
+			case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 2 ;; esac
+			sleep 1; i=$((i + 1))
+		done
+		sleep 5  # let the bearer and the routes settle before measuring
+		mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"' && return 0
+		logger -t x28-autotune "no bearer on the modem although $IF is up; reconnecting"
+		ifup "$IF"
 	done
-	sleep 5  # let the bearer and the routes settle before measuring
+	return 1
 }
 
 # Download bandwidth in Mbit/s: every URL at once for up to 8 s, the streams' rates summed, so the link is the limit rather
@@ -117,15 +126,20 @@ net() {
 
 # try <candidate lines>: apply each, measure it twice, append its result line.
 try() {
-	local label mode lte bands plmn r1 r2 res
+	local label mode lte bands plmn r1 r2 res note
 	while IFS='	' read -r label mode lte bands plmn; do
 		[ -n "$label" ] || continue
 		[ "$(cat "$STATE" 2>/dev/null)" = running ] || return 1  # stopped (--stop restores)
 		apply "$mode" "$lte" "$bands" "$plmn"
 		# Two samples, scored by their average: one 8 s sample is too noisy to rank configurations.
-		if wait_up; then r1="$(measure)"; r2="$(measure)"; else r1=0.0 r2=0.0; fi
+		wait_up
+		case $? in
+			0) r1="$(measure)"; r2="$(measure)"; note="$r1/$r2" ;;
+			2) r1=0 r2=0 note=refused ;;
+			*) r1=0 r2=0 note='no connection' ;;
+		esac
 		res="$(awk -v a="$r1" -v b="$r2" 'BEGIN { printf "%.1f", (a + b) / 2 }')"
-		printf '%s\t%s\t%s\t%s/%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" "$r1" "$r2" >> "$OUT"
+		printf '%s\t%s\t%s\t%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" "$note" >> "$OUT"
 	done <<EOF
 $1
 EOF
@@ -166,7 +180,7 @@ run() {
 $stage"
 	pick "$all"
 	apply "$mode" "$lte" "$bands" "$plmn"
-	wait_up || { label=automatic; apply auto none - -; }
+	wait_up || { label=automatic; apply auto none - -; }  # not up (or refused) after all: automatic
 	printf 'best\t%s\n' "${win:+$label}" >> "$OUT"
 	[ -n "$win" ] && win="most bandwidth" || win="no configuration moved any data"
 	logger -t x28-autotune "kept $label ($win)"
@@ -203,6 +217,11 @@ selftest() {
 	[ "$got" = 'http://a.example:8080/download?size=100000000 http://a.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 ' ] || { echo "servers got $got"; return 1; }
 	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
 	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
+	# wait_up: the bearer is gone after the first up, back after one ifup.
+	got=$(c=$OUT.calls; rm -f "$c"; sleep() { :; }; logger() { :; }; ifstatus() { echo; }; jsonfilter() { echo true; }
+		ifup() { echo ifup; }; mipc_wan_cli() { echo >> "$c"; [ "$(wc -l < "$c")" -gt 1 ] && echo '{ "CID": 0 }'; }
+		IF=wan; wait_up && echo up; rm -f "$c")
+	[ "$got" = "$(printf 'ifup\nup')" ] || { echo "wait_up got $got"; return 1; }
 	echo "selftest ok"
 }
 

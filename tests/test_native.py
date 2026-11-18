@@ -99,6 +99,10 @@ def cases():
         case("netmode-not-applied", config={"netmode": "4g"}, rat_noop=1, error="NETMODE_FAILED", no_activate_call=True, one_rat_set=True),
         case("netmode-auto-not-applied-keeps-wan", config={"netmode": "auto"}, rat="3", rat_noop=1, one_rat_set=True, expect_cmds=["--data_call_act"]),
         case("netmode-bad", config={"netmode": "sa"}, error="INVALID_CONFIG", no_cli=True),
+        # The modem dropped the bearer after re-registering: no teardown (nothing left), netifd retries.
+        case("bearer-lost-after-netmode", config={"netmode": "4g"}, bearer_lost=1, error="CONNECT_FAILED", one_rat_set=True,
+             expect_cmds=["--nw_set_rat 3", "--data_call_act", "--data_call_get"]),
+        case("bearer-lost-unchanged-not-checked", bearer_lost=1, no_rat_set=True),
         case("band-bad-mode", config={"lteband_mode": "x"}, error="INVALID_CONFIG", no_cli=True),
         case("band-unsupported", config={"lteband_mode": "allow", "lteband_list": [2]}, error="INVALID_CONFIG", no_cli=True),
         case("nr-allow", config={"nrband_mode": "allow", "nrband_list": [78]},
@@ -338,6 +342,7 @@ def main():
             (d / "act_hang").write_text(str(item.get("act_hang", 0)))
             (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")
+            (d / "bearer_lost").write_text(str(item.get("bearer_lost", 0)))
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:
                 (d / field).write_text(str(item[field]))
         archive = tmp / "inputs.tgz"
