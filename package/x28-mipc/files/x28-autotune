@@ -1,0 +1,303 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Auto-tune (#599): resets the Carrier settings of the x28_mipc interface (roaming on, automatic operator, network mode and
+# bands, no cell lock). Stage 1 scans for networks and tries automatic and each LTE/NR network found (a virtual or roaming SIM
+# may be allowed on several; one that refuses the SIM fails fast). Stage 2, on the best network so far, tries "4G only" and 4G
+# locks to pairs and single LTE bands the modem sees (a single band rules out carrier aggregation across bands, a pair keeps
+# it possible). It measures each one's
+# download bandwidth (twice 8 s, 8 streams at once to the 4 nearest speedtest.net servers, which for a local SIM are in-country:
+# international paths can be throttled far below the radio's capacity) and keeps the one with the most. Ping is not scored (a latency
+# mode for gaming is a later option). The data connection drops at every step, for up to about 30 minutes in all (the scan alone takes a few). The
+# previous settings are saved first (on flash, see BAK): `--restore` puts them back, and at boot after a run that was cut
+# short the init script does. A configuration that does not come up within 2 minutes scores 0; if the winner does not come back, automatic
+# is applied.
+# `--start` runs in the background (for LuCI), `--state` prints idle|running|done|failed, `--last` prints the results so far,
+# one "label<TAB>Mbit/s<TAB>network<TAB>serving RSRP<TAB>CA<TAB>sample1/sample2" per configuration (Mbit/s: the average of
+# the two samples; instead of the samples "refused" when the network refused the SIM, "no connection" when it did not come up; CA: "<carriers>x <MHz> MHz" or "-") and "best<TAB>label" at the end,
+# `--stop` stops a run and restores. Speed-test URLs: `list autotune_url` on the interface overrides the server lookup; the
+# fallback when the lookup fails is $URLS.
+
+OUT=${X28_AUTOTUNE_FILE:-/tmp/x28-autotune}
+STATE=$OUT.state
+PID=$OUT.pid
+# The backup and the "a run is changing the config" marker live on flash: each candidate is committed, so a reboot or power
+# loss mid-run must still find the settings from before it (the x28-autotune init script restores them at boot).
+BAK=${X28_AUTOTUNE_BAK:-/etc/x28-autotune.bak}
+RUN=${X28_AUTOTUNE_RUN:-/etc/x28-autotune.running}
+URLS='https://speed.cloudflare.com/__down?bytes=25000000 http://speedtest.tele2.net/10MB.zip'
+CARRIER='roaming plmn celllock netmode lteband_mode lteband_list nrband_mode nrband_list'
+
+# Nearest speedtest.net servers for this connection (the list API orders them by distance to the caller's IP): two download
+# URLs per host, 4 hosts, so 8 streams. Reads the API's JSON with sed: one "host":"name:port" per server.
+SERVERS='https://www.speedtest.net/api/js/servers?engine=js&limit=4'
+servers() {
+	tr ',' '\n' | sed -n 's/.*"host": *"\([A-Za-z0-9.-]*:[0-9]*\)".*/\1/p' | head -n 4 |
+		awk '{ u = "http://" $1 "/download?size=100000000"; print u; print u }'
+}
+
+iface() { uci -q show network | sed -n "s/^network\.\([^.]*\)\.proto='x28_mipc'$/\1/p" | head -n 1; }
+
+# Candidates are "label<TAB>netmode<TAB>lteband_mode<TAB>bands<TAB>plmn", "-" for no bands or automatic operator (a tab
+# is IFS white space to read, so an empty field would shift the next one).
+# From x28-modem-status lines: automatic first (it is also the fallback), 4G only, then of the 3 strongest LTE bands with a
+# measured cell: each pair, then each band alone.
+candidates() {
+	printf 'automatic\tauto\tnone\t-\t-\n4G only\t4g\tnone\t-\t-\n'
+	awk -F'\t' '($1 == "serving" || $1 == "cell") && $3 ~ /^[0-9]+$/ && $4 ~ /^-?[0-9.]+$/ {
+		if (!($3 in best) || $4 + 0 > best[$3]) best[$3] = $4 + 0 }
+		END {  # strongest 3 by selection: busybox sort misorders negative decimals
+			for (n = 0; n < 3; n++) { k = ""; for (x in best) if (k == "" || best[x] > best[k]) k = x; if (k == "") break; b[n + 1] = k; delete best[k] }
+			for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) printf "4G bands %s+%s\tauto\tallow\t%s %s\t-\n", b[i], b[j], b[i], b[j]
+			for (i = 1; i <= n; i++) printf "4G band %s\tauto\tallow\t%s\t-\n", b[i], b[i] }'
+}
+
+# Networks from x28-plmn-scan lines ("plmn<TAB>name<TAB>act<TAB>status"): each LTE (7) or NR (12, 13) network once, except
+# forbidden ones (status 3), as candidates with the operator set manually.
+operators() {
+	awk -F'\t' '$1 ~ /^[0-9][0-9][0-9][0-9][0-9][0-9]?$/ && $4 != 3 && ($3 == 7 || $3 == 12 || $3 == 13) && !seen[$1]++ {
+		printf "network %s\tauto\tnone\t-\t%s\n", ($2 == "" || $2 == $1) ? $1 : $2 " (" $1 ")", $1 }'
+}
+
+# Label of the highest Mbit/s, but a lock or mode wins only with at least 15% more than automatic: a single cell's speed
+# swings by more than that between samples (27 to 98 Mbit/s seen on one SIM), and automatic adapts when the cell changes.
+# Nothing when no configuration moved any data.
+best() {
+	awk -F'\t' '$1 == "best" { next } $1 == "automatic" { a = $2 + 0 } $2 + 0 > m { m = $2 + 0; l = $1 }
+		END { if (l == "") exit; if (l != "automatic" && m < a * 1.15) l = "automatic"; print l }'
+}
+
+save() {
+	local o v
+	for o in $CARRIER; do
+		case "$o" in
+			*_list) for v in $(uci -q get "network.$IF.$o"); do echo "add_list network.$IF.$o=$v"; done ;;
+			*) v="$(uci -q get "network.$IF.$o")" && echo "set network.$IF.$o=$v" ;;
+		esac
+	done
+}
+
+clear_carrier() { local o; for o in $CARRIER; do uci -q delete "network.$IF.$o"; done; }
+
+# apply <netmode> <lteband_mode> <bands|-> <plmn|->: roaming stays on, nothing else locked.
+apply() {
+	local b
+	clear_carrier
+	uci set "network.$IF.roaming=1"; uci set "network.$IF.netmode=$1"
+	uci set "network.$IF.lteband_mode=$2"; uci set "network.$IF.nrband_mode=none"
+	for b in $3; do [ "$b" = - ] || uci add_list "network.$IF.lteband_list=$b"; done
+	[ "${4:--}" = - ] || uci set "network.$IF.plmn=$4"
+	uci commit network
+	ifup "$IF"
+}
+
+# Up within 2 minutes with an IPv4 address (unless the interface is IPv6 only), and with a bearer the modem still has (1
+# otherwise, 2 when the network refuses the SIM). netifd shows the interface up at the IPv6 link-local update, before IPv4. After a mode change the modem can drop the fresh bearer while it
+# settles (seen on a unit: netifd up on ccmni2, packets out and none back, --data_call_get empty); one more ifup brings it back.
+wait_up() {
+	local i try
+	for try in 1 2; do
+		i=0
+		sleep 5
+		until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ] &&
+			{ [ "$(uci -q get "network.$IF.iptype")" = 2 ] || [ -n "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address')" ]; }; do
+			[ "$i" -ge 115 ] && return 1
+			# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
+			case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 2 ;; esac
+			sleep 1; i=$((i + 1))
+		done
+		sleep 5  # let the bearer and the routes settle before measuring
+		mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"' && return 0
+		logger -t x28-autotune "no bearer on the modem although $IF is up; reconnecting"
+		ifup "$IF"
+	done
+	return 1
+}
+
+# Download bandwidth in Mbit/s: every URL at once for up to 8 s, the streams' rates summed, so the link is the limit rather
+# than one server or stream (a slow or blocked one only adds 0).
+measure() {
+	local u
+	for u in $URLS; do
+		curl -s -o /dev/null -m 8 -w '%{speed_download}\n' "$u" 2>/dev/null &
+	done | awk '{ s += $1 } END { printf "%.1f\n", s * 8 / 1000000 }'
+}
+
+# "<network><TAB><serving RSRP><TAB><CA>" from x28-modem-status lines.
+net() {
+	awk -F'\t' '$1 == "rat" { r = $2 } $1 == "serving" && !s { s = $4 }
+		$1 == "ca" && split($2, a, " ") { c = a[1] "x " substr(a[4], 2) " MHz" }
+		END { printf "%s\t%s\t%s\n", r ? r : "-", s ? s : "-", c ? c : "-" }'
+}
+
+# try <candidate lines>: apply each, measure it twice, append its result line.
+try() {
+	local label mode lte bands plmn r1 r2 res note
+	while IFS='	' read -r label mode lte bands plmn; do
+		[ -n "$label" ] || continue
+		[ "$(cat "$STATE" 2>/dev/null)" = running ] || return 1  # stopped (--stop restores)
+		apply "$mode" "$lte" "$bands" "$plmn"
+		# Two samples, scored by their average: one 8 s sample is too noisy to rank configurations.
+		wait_up
+		case $? in
+			0) r1="$(measure)"; r2="$(measure)"; note="$r1/$r2" ;;
+			2) r1=0 r2=0 note=refused ;;
+			*) r1=0 r2=0 note='no connection' ;;
+		esac
+		res="$(awk -v a="$r1" -v b="$r2" 'BEGIN { printf "%.1f", (a + b) / 2 }')"
+		printf '%s\t%s\t%s\t%s\n' "$label" "$res" "$(/sbin/x28-modem-status 2>/dev/null | net)" "$note" >> "$OUT"
+	done <<EOF
+$1
+EOF
+}
+
+# pick <candidate lines>: sets label mode lte bands plmn to the best result's candidate (automatic when none moved data).
+pick() {
+	win="$(best < "$OUT")"
+	IFS='	' read -r label mode lte bands plmn <<EOF
+$(echo "$1" | awk -F'\t' -v l="${win:-automatic}" '$1 == l')
+EOF
+}
+
+run() {
+	local all stage label mode lte bands plmn win s pre
+	[ "$(cat /tmp/x28-plmn-scan.state 2>/dev/null)" = running ] && { echo 'a network search is running' >&2; return 1; }
+	stopped() { [ "$(cat "$STATE" 2>/dev/null)" != running ]; }
+	stopped && return 1
+	# An empty backup is valid: nothing was set, so restoring clears everything.
+	[ -f "$BAK" ] || save > "$BAK"
+	: > "$RUN"
+	stopped && return 1
+	: > "$OUT"
+	apply auto none - -
+	wait_up || true
+	[ -n "$CUSTOM" ] || { s="$(curl -s -m 10 "$SERVERS" 2>/dev/null | servers)"; [ -n "$s" ] && URLS=$s; }
+	logger -t x28-autotune "measuring with: $(echo "$URLS" | sed 's|^[a-z]*://||; s|/.*||' | sort -u | tr '\n' ' ')"
+	# Stage 1, networks. The scan drops the connection for a few minutes; one network found is the one automatic picks.
+	s="$(/sbin/x28-plmn-scan 2>/dev/null | operators)"
+	[ "$(echo "$s" | grep -c .)" -gt 1 ] || s=""
+	all="$(printf 'automatic\tauto\tnone\t-\t-\n%s' "$s")"
+	logger -t x28-autotune "networks: $(echo "$s" | cut -f5 | tr '\n' ' ')"
+	try "$all" || return 1
+	# Stage 2, modes and bands on the best network so far (its cells decide the bands).
+	pick "$all"
+	apply auto none - "$plmn"
+	wait_up || true
+	[ "$plmn" = - ] && pre="" || pre="$label, "
+	stage="$(/sbin/x28-modem-status 2>/dev/null | candidates | awk -F'\t' -v p="$plmn" -v n="$pre" \
+		'$1 != "automatic" { printf "%s%s\t%s\t%s\t%s\t%s\n", n, $1, $2, $3, $4, p }')"
+	try "$stage" || return 1
+	all="$all
+$stage"
+	pick "$all"
+	apply "$mode" "$lte" "$bands" "$plmn"
+	wait_up || { label=automatic; apply auto none - -; }  # not up (or refused) after all: automatic
+	printf 'best\t%s\n' "${win:+$label}" >> "$OUT"
+	[ -n "$win" ] && win="most bandwidth" || win="no configuration moved any data"
+	logger -t x28-autotune "kept $label ($win)"
+	rm -f "$RUN"
+}
+
+# Staged network changes would be committed along with ours, and ifup reloads the whole network config (a staged LAN address
+# among them): refuse instead.
+uncommitted() {
+	[ -z "$(uci changes network 2>/dev/null)" ] && return 1
+	echo 'the network config has uncommitted changes; save or revert them first' >&2
+}
+
+restore() {
+	[ -f "$BAK" ] || { echo 'no settings saved by auto-tune' >&2; return 1; }
+	uncommitted && return 1
+	clear_carrier
+	uci -q batch < "$BAK"
+	uci commit network
+	rm -f "$RUN"
+	ifup "$IF"
+}
+
+# Stops a running job and its children (a scan holds the modem for minutes), then restores.
+stop() {
+	local p c d n m
+	echo failed > "$STATE"
+	p="$(cat "$PID" 2>/dev/null)"
+	# Only our own job: a stale PID file may name another process by now.
+	if [ -n "$p" ] && grep -q x28-autotune "/proc/$p/cmdline" 2>/dev/null; then
+		# All its descendants too (a scan runs in a command substitution and holds the modem for minutes; busybox here has no
+		# pkill or setsid), found before the job dies and they move to init: field 4 of /proc/<pid>/stat is the parent (our
+		# processes' names have no spaces to shift it).
+		c= n=$p
+		while [ -n "$n" ]; do
+			m=
+			for d in /proc/[0-9]*; do
+				case " $n " in *" $(cut -d' ' -f4 "$d/stat" 2>/dev/null) "*) m="$m ${d#/proc/}" ;; esac
+			done
+			c="$c$m"; n=${m# }
+		done
+		kill "$p" $c 2>/dev/null
+	fi
+	restore
+}
+
+selftest() {
+	got=$(printf 'rat\tlte_ca\nserving\t1500:496\t3\t-82.0\t-10.0\ncell\t1500:134\t3\t-89.0\t-17.5\ncell\t2850:105\t7\t-110.0\t-18.5\ncell\t300:1\t1\t-95.5\t-12\nnrcell\t650000:134\tn78\t?\t?\ncell\t9:9\t?\t?\t?\n' | candidates | tr '\t\n' '|;')
+	want='automatic|auto|none|-|-;4G only|4g|none|-|-;4G bands 3+1|auto|allow|3 1|-;4G bands 3+7|auto|allow|3 7|-;4G bands 1+7|auto|allow|1 7|-;4G band 3|auto|allow|3|-;4G band 1|auto|allow|1|-;4G band 7|auto|allow|7|-;'
+	[ "$got" = "$want" ] || { echo "candidates got $got"; return 1; }
+	got=$(printf '43235\tIrancell\t7\t1\n43211\t43211\t7\t2\n43211\t43211\t7\t2\n43299\tX\t2\t1\n43298\tY\t7\t3\n' | operators | tr '\t\n' '|;')
+	[ "$got" = 'network Irancell (43235)|auto|none|-|43235;network 43211|auto|none|-|43211;' ] || { echo "operators got $got"; return 1; }
+	got=$(printf 'network B (2)\tauto\tnone\t-\t2\nnetwork B (2), 4G band 3\tauto\tallow\t3\t2\n' | { printf 'automatic\t10.0\nnetwork B (2)\t30.0\nnetwork B (2), 4G band 3\t40.0\n' > "$OUT.t"; OUT=$OUT.t; c=$(cat); pick "$c"; rm -f "$OUT"; echo "$label|$mode|$lte|$bands|$plmn"; })
+	[ "$got" = 'network B (2), 4G band 3|auto|allow|3|2' ] || { echo "pick got $got"; return 1; }
+	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n4G band 3\t31.0\tlte_ca\t-90\n' | best)
+	[ "$got" = '4G band 3' ] || { echo "best got $got"; return 1; }
+	got=$(printf 'automatic\t12.5\tlte\t-82\n4G only\t12.5\tlte\t-82\n' | best)
+	[ "$got" = automatic ] || { echo "best tie got $got"; return 1; }
+	[ "$(printf 'automatic\t50.0\n4G only\t55.0\n' | best)" = automatic ] || { echo "best under the margin"; return 1; }
+	[ "$(printf 'automatic\t50.0\n4G only\t60.0\n4G band 3\t58.0\n' | best)" = '4G only' ] || { echo "best over the margin"; return 1; }
+	[ "$(printf 'automatic\t0.0\n4G only\t3.0\n' | best)" = '4G only' ] || { echo "best with automatic at 0"; return 1; }
+	[ -z "$(printf 'automatic\t0.0\t-\t-\nbest\t\n' | best)" ] || { echo "best should be empty without data"; return 1; }
+	got=$(printf 'rat\tlte_ca\nca\t4 carriers: 15+20+20+15 (70 MHz)\nserving\t1500:496\t3\t-82.0\t-10.0\n' | net | tr '\t' '|')
+	[ "$got" = 'lte_ca|-82.0|4x 70 MHz' ] || { echo "net got $got"; return 1; }
+	[ "$(printf 'rat\tlte\n' | net | tr '\t' '|')" = 'lte|-|-' ] || { echo "net without CA"; return 1; }
+	got=$(printf '[{"url":"http://a.example:8080/speedtest/upload.php","host":"a.example:8080","id":"1"},{"host": "b.example:8080"},{"host":"bad host"}]' | servers | tr '\n' ' ')
+	[ "$got" = 'http://a.example:8080/download?size=100000000 http://a.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 http://b.example:8080/download?size=100000000 ' ] || { echo "servers got $got"; return 1; }
+	got=$(curl() { printf '%s\n' 1250000; }; URLS='a b'; measure)
+	[ "$got" = 20.0 ] || { echo "measure got $got"; return 1; }
+	# wait_up: the bearer is gone after the first up, back after one ifup.
+	got=$(c=$OUT.calls; rm -f "$c"; sleep() { :; }; logger() { :; }; uci() { :; }; ifstatus() { echo; }; jsonfilter() { echo true; }
+		ifup() { echo ifup; }; mipc_wan_cli() { echo >> "$c"; [ "$(wc -l < "$c")" -gt 1 ] && echo '{ "CID": 0 }'; }
+		IF=wan; wait_up && echo up; rm -f "$c")
+	[ "$got" = "$(printf 'ifup\nup')" ] || { echo "wait_up got $got"; return 1; }
+	# restore: an empty backup (nothing was set) clears and reconnects; no backup or staged changes refuse.
+	got=$(BAK=$OUT.bak.t RUN=$OUT.run.t; : > "$BAK"; : > "$RUN"; IF=wan; ch=
+		uci() { case "$1 $2" in ('changes network') echo "$ch" ;; ('-q batch') echo batch ;; ('commit network') echo commit ;; esac; }
+		ifup() { echo "ifup $1"; }
+		restore | tr '\n' ' '; [ -e "$RUN" ] && echo marker-left
+		ch="network.lan.ipaddr='10.0.0.1'"; restore 2>/dev/null || echo staged-refused
+		rm -f "$BAK"; ch=; restore 2>/dev/null || echo no-backup-refused)
+	[ "$got" = "$(printf 'batch commit ifup wan staged-refused\nno-backup-refused')" ] || { echo "restore got $got"; return 1; }
+	echo "selftest ok"
+}
+
+[ "$1" = selftest ] && { selftest; exit; }
+IF=$(iface)
+[ -n "$IF" ] || { echo 'no x28_mipc interface' >&2; exit 1; }
+u="$(uci -q get "network.$IF.autotune_url")" && URLS=$u CUSTOM=1
+
+case "$1" in
+	--last) cat "$OUT" 2>/dev/null ;;
+	--state) cat "$STATE" 2>/dev/null || echo idle ;;
+	--start)
+		[ "$(cat "$STATE" 2>/dev/null)" = running ] && exit 0
+		uncommitted && exit 1
+		echo running > "$STATE"
+		# A run cut short by a reboot left the marker: its backup still holds the settings from before it, keep that one.
+		[ -e "$RUN" ] || rm -f "$BAK"
+		rm -f "$PID"; : > "$OUT"
+		( r=failed; "$0" run >/dev/null 2>&1 && r=done; [ "$(cat "$STATE")" = running ] && echo "$r" > "$STATE" ) >/dev/null 2>&1 &
+		;;
+	--stop) [ "$(cat "$STATE" 2>/dev/null)" = running ] || exit 0; stop ;;
+	# A restore during a run would be overwritten by the job's next step: stop it first.
+	--restore) if [ "$(cat "$STATE" 2>/dev/null)" = running ]; then stop; else restore; fi ;;
+	# At boot (init script): a run that never finished left a committed candidate.
+	--boot) [ -e "$RUN" ] || exit 0; logger -t x28-autotune "a run was cut short; restoring the settings from before it"; restore ;;
+	run) echo $$ > "$PID"; run ;;
+	*) echo "usage: $0 --start|--state|--last|--stop|--restore|--boot|selftest" >&2; exit 1 ;;
+esac

@@ -97,8 +97,10 @@ x28_mipc_operator() {
  [ "$(x28_mipc_cops)" = "$want_mode${want:+ $want}" ] && return 0
  [ -n "$want" ] || [ "$(x28_mipc_cops | cut -d' ' -f1)" != 0 ] || return 0
  if [ -n "$want" ]; then
+  x28_mipc_moved=1
   mipc_wan_cli --at_cmd "at+cops=1,2,\"$want\"" >/dev/null 2>&1
  else
+  x28_mipc_moved=1
   mipc_wan_cli --at_cmd 'at+cops=0' >/dev/null 2>&1
  fi
  until [ "$(x28_mipc_cops | cut -d' ' -f1)" = "$want_mode" ] && { [ -z "$want" ] || [ "$(x28_mipc_cops | cut -d' ' -f2)" = "$want" ]; } && x28_mipc_reg >/dev/null; do
@@ -137,6 +139,7 @@ x28_mipc_bandlock() {
  [ $((lo | hi)) -ne 0 ] || return 1
  want="$(echo "$cur" | cut -d, -f1,2),$lo,$hi,$(echo "$cur" | cut -d, -f5-)"
  [ "$cur" = "$want" ] && return 0
+ x28_mipc_moved=1
  mipc_wan_cli --at_cmd "at+epbse=$want" >/dev/null 2>&1
  while [ "$i" -le 10 ]; do
   [ "$(x28_mipc_epbse 'at+epbse?')" = "$want" ] && {
@@ -176,6 +179,7 @@ x28_mipc_nrband() {
  [ $((w0 | w1 | w2)) -ne 0 ] || { [ "$mode" = none ]; return; }
  want="$(printf '%08x %08x %08x' "$w0" "$w1" "$w2")"
  [ "$cur" = "$want" ] && return 0
+ x28_mipc_moved=1
  timeout 30 "$tool" set $want >/dev/null 2>&1
  while [ "$i" -le 10 ]; do
   [ "$(timeout 20 "$tool" get 2>/dev/null | sed -n 's/^current=//p')" = "$want" ] && {
@@ -204,6 +208,7 @@ x28_mipc_netmode() {
  cur="$(mipc_wan_cli --nw_get_rat 2>/dev/null | sed -n 's/^Current: //p' | head -n 1)"
  [ "$cur" = "$label" ] && return 0
  [ -n "$cur" ] || { [ "$mode" = auto ]; return; }
+ x28_mipc_moved=1
  mipc_wan_cli --nw_set_rat "$rat" >/dev/null 2>&1
  while [ "$i" -le 10 ]; do
   [ "$(mipc_wan_cli --nw_get_rat 2>/dev/null | sed -n 's/^Current: //p' | head -n 1)" = "$label" ] && {
@@ -250,6 +255,7 @@ x28_mipc_celllock() {
  }
  if [ -z "$want" ]; then
   [ "$(x28_mipc_lockread)" = off ] && return 0
+  x28_mipc_moved=1
   mipc_wan_cli --at_cmd 'at+emmchlck=0' >/dev/null 2>&1
   until [ "$(x28_mipc_lockread)" = off ]; do
    [ "$i" -ge 10 ] && return 1
@@ -258,6 +264,7 @@ x28_mipc_celllock() {
   return 0
  fi
  if [ "$(x28_mipc_lockread)" != "$want" ]; then
+  x28_mipc_moved=1
   mipc_wan_cli --at_cmd "at+emmchlck=1,7,0,${want%:*},${want#*:}" >/dev/null 2>&1
   held=0
   while [ "$i" -le 10 ]; do
@@ -374,7 +381,7 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
+ local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
  json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric
  local bands="" b
@@ -488,6 +495,18 @@ x28_mipc_setup() {
  fi
  if [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
+ fi
+ # After a change that made the modem re-register, it can drop the fresh bearer moments later while netifd would keep the
+ # interface up (seen on a unit after a switch to 4G only: packets out, none back, --data_call_get empty, no event). Check
+ # once it settled, before anything is reported to netifd: returning here while setup is still pending makes netifd tear
+ # down and retry (after an IPv6 link-local update it would not). The bearer is gone, so there is nothing to deactivate;
+ # the retry changes nothing on the modem and keeps its bearer.
+ if [ -n "$x28_mipc_moved" ]; then
+  sleep "${X28_MIPC_SETTLE:-10}"
+  if ! mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"'; then
+   logger -t x28_mipc "the modem dropped the new bearer after re-registering; reconnecting"
+   proto_notify_error "$interface" CONNECT_FAILED; return 1
+  fi
  fi
  # The kernel leaves ccmni DOWN after a data call (observed on hardware); $ifname was validated as ccmniN above.
  ip link set dev "$ifname" up >/dev/null 2>&1
