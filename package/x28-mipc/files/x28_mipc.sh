@@ -22,6 +22,7 @@ proto_x28_mipc_init_config() {
  proto_config_add_string nrband_mode
  proto_config_add_array 'nrband_list:uinteger'
  proto_config_add_string netmode
+ proto_config_add_string passthrough_mac
  proto_config_add_defaults
 }
 
@@ -381,9 +382,9 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
+ local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname passthrough_mac
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
- json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric passthrough_mac
  local bands="" b
  json_get_values bands lteband_list
  local nrbands=""
@@ -404,7 +405,8 @@ x28_mipc_setup() {
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
-    { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; }; then
+    { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; } ||
+    { [ -n "$passthrough_mac" ] && { [ "$iptype" = 2 ] || ! echo "$passthrough_mac" | grep -Eqx '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'; }; }; then
   proto_notify_error "$interface" INVALID_CONFIG
   proto_block_restart "$interface"
   return 1
@@ -553,14 +555,25 @@ x28_mipc_setup() {
   fi
  fi
  x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
+ # IPv4 passthrough (#581): the cellular address goes to one LAN host; without it nothing would SNAT, so it is a failure.
+ if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ]; then
+  ${X28_MIPC_PASSTHROUGH:-x28-passthrough} up "$ifname" "$v4_addr" "$passthrough_mac" \
+   "$([ "$v4_dns1" = 0.0.0.0 ] || echo "$v4_dns1")" "$([ "$v4_dns2" = 0.0.0.0 ] || [ "$v4_dns2" = "$v4_dns1" ] || echo "$v4_dns2")" ||
+   { ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down; x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED; return 1; }
+ fi
 }
 
 # Sends the caller's (x28_mipc_setup) current addresses, routes and DNS to netifd.
 x28_mipc_send() {
  proto_init_update "$ifname" 1
  if [ -n "$v4_addr" ]; then
-  proto_add_ipv4_address "$v4_addr" "$prefix"
-  [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "$v4_gw" "$v4_addr" "$metric"
+  if [ -n "$passthrough_mac" ]; then
+   # Passthrough: the address belongs to the LAN host, so ccmni gets none and the route needs no gateway (raw IP link).
+   [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "" "" "$metric"
+  else
+   proto_add_ipv4_address "$v4_addr" "$prefix"
+   [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "$v4_gw" "$v4_addr" "$metric"
+  fi
   if [ "$peerdns" = 1 ]; then
    [ -z "$v4_dns1" ] || [ "$v4_dns1" = 0.0.0.0 ] || proto_add_dns_server "$v4_dns1"
    [ -z "$v4_dns2" ] || [ "$v4_dns2" = 0.0.0.0 ] || [ "$v4_dns2" = "$v4_dns1" ] || proto_add_dns_server "$v4_dns2"
@@ -579,12 +592,15 @@ x28_mipc_send() {
  proto_add_data
  json_add_int x28_mipc_cid "$cid"
  json_add_string x28_mipc_owner "$1"
+ [ -z "$passthrough_mac" ] || [ -z "$v4_addr" ] || json_add_string x28_passthrough_ip "$v4_addr"
  proto_close_data
  proto_send_update "$1"
 }
 
 x28_mipc_teardown() {
  local interface="$1" snapshot x28_mipc_cid x28_mipc_owner
+ # Passthrough state goes first: with no bearer the SNAT and the LAN routes would point at nothing.
+ ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
  snapshot="$(ubus call "network.interface.$interface" status)" || { proto_notify_error "$interface" STATUS_UNAVAILABLE; return 1; }
  json_load "$snapshot" || { proto_notify_error "$interface" STATUS_UNAVAILABLE; return 1; }
  if json_select data; then

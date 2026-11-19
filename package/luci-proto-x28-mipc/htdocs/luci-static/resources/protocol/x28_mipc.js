@@ -30,7 +30,8 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['CLEANUP_FAILED', 'The new bearer could not be cleaned up; inspect the modem before retrying'],
  ['OWNERSHIP_MISMATCH', 'Bearer ownership could not be verified'],
  ['STATUS_UNAVAILABLE', 'The interface status could not be read'],
- ['DEACTIVATE_FAILED', 'The modem did not confirm bearer teardown']
+ ['DEACTIVATE_FAILED', 'The modem did not confirm bearer teardown'],
+ ['PASSTHROUGH_FAILED', 'IPv4 passthrough could not be set up (address on the LAN, or DHCP/firewall failed); see the system log']
 ].forEach(function(error) { network.registerErrorCode(error[0], _(error[1])); });
 
 return network.registerProtocol('x28_mipc', {
@@ -319,5 +320,17 @@ return network.registerProtocol('x28_mipc', {
   option = section.taboption('advanced', form.Value, 'metric', _('Gateway metric'));
   option.datatype = 'range(0,65535)';
   option.placeholder = '0';
+  option = section.taboption('advanced', form.Value, 'passthrough_mac', _('IPv4 passthrough to'),
+   _('Gives this LAN device the cellular IPv4 address by DHCP, like the stock bridge mode: the X28 keeps no public IPv4 address, ' +
+     'the device gets all incoming IPv4 traffic and needs its own firewall. Renew its DHCP lease after saving. Empty = off.'));
+  option.datatype = 'macaddr';
+  option.placeholder = _('Off');
+  option.depends('iptype', '3');
+  option.depends('iptype', '1');
+  option.load = function(section_id) {
+   return network.getHostHints().then(L.bind(function(hints) {
+    hints.getMACHints().forEach(L.bind(function(h) { this.value(h[0], h[1] ? '%s (%s)'.format(h[0], h[1]) : h[0]); }, this));
+   }, this)).catch(function() {}).then(L.bind(form.Value.prototype.load, this, section_id));
+  };
  }
 });
