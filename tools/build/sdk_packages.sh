@@ -30,8 +30,8 @@ P=feeds/base/package/network/utils/iwinfo
 grep -q "^PKG_SOURCE_VERSION:=$IWINFO_COMMIT" $P/Makefile || { echo "iwinfo in the 23.05 feed moved off $IWINFO_COMMIT" >&2; exit 1; }
 mkdir -p $P/patches
 cp "$ROOT/package/iwinfo-mtwifi/100-mtwifi-backend.patch" $P/patches/
-sed -i -e 's/^PKG_RELEASE:=1$/PKG_RELEASE:=3/' -e 's/BACKENDS="nl80211"/BACKENDS="nl80211 mtwifi"/' $P/Makefile
-grep -q '^PKG_RELEASE:=3$' $P/Makefile && grep -q 'BACKENDS="nl80211 mtwifi"' $P/Makefile
+sed -i -e 's/^PKG_RELEASE:=1$/PKG_RELEASE:=4/' -e 's/BACKENDS="nl80211"/BACKENDS="nl80211 mtwifi"/' $P/Makefile
+grep -q '^PKG_RELEASE:=4$' $P/Makefile && grep -q 'BACKENDS="nl80211 mtwifi"' $P/Makefile
 M=feeds/base/package/utils/mtd-utils/Makefile
 grep -q '@NAND_SUPPORT' $M && sed -i 's/@NAND_SUPPORT *//' $M
 D=feeds/base/package/network/services/dnsmasq/Makefile
@@ -49,5 +49,5 @@ CONFIG
 echo CONFIG_PACKAGE_ubi-utils=m >> .config
 make defconfig >/dev/null
 make package/iwinfo/compile package/mtd-utils/compile package/dnsmasq/compile -j1 >"$OUT/sdk-build.log" 2>&1 || { tail -40 "$OUT/sdk-build.log" >&2; exit 1; }
-find bin \( -name '*iwinfo*_2023-07-01-ca79f641-3_*.ipk' -o -name 'ubi-utils_*.ipk' -o -name 'dnsmasq-full_*-x28_*.ipk' \) -exec cp {} "$OUT/" \;
-ls "$OUT"/libiwinfo20230701_2023-07-01-ca79f641-3_*.ipk "$OUT"/ubi-utils_*.ipk "$OUT"/dnsmasq-full_*-x28_*.ipk
+find bin \( -name '*iwinfo*_2023-07-01-ca79f641-4_*.ipk' -o -name 'ubi-utils_*.ipk' -o -name 'dnsmasq-full_*-x28_*.ipk' \) -exec cp {} "$OUT/" \;
+ls "$OUT"/libiwinfo20230701_2023-07-01-ca79f641-4_*.ipk "$OUT"/ubi-utils_*.ipk "$OUT"/dnsmasq-full_*-x28_*.ipk
