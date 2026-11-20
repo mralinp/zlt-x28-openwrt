@@ -413,7 +413,7 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   updated handler regenerates profiles; restart `rpcd` after manually replacing libiwinfo so it unloads the old library.
   See [TESTING §57](TESTING.md#57-native-wi-fi-clients-on-both-bands-631635-2026-11-20).
   **Not verified:** a fresh packaged image, open clients, browser rendering after the library update
-  and integrated bridged forwarding. IPv6 forwarding through a bridged client remains unverified; the MAT workaround
+  and the automatic bridge-helper startup/reload path on a fresh image. The helper was exercised on an isolated DHCP bridge: forwarding counters changed from 0/3 to 3/3 with its rules enabled. IPv6 forwarding through a bridged client remains unverified; the MAT workaround
   covers IPv4 only. Automatic following of an upstream channel change, enterprise
   authentication, mesh and Ad-Hoc are not implemented. This is netifd/UCI/LuCI integration on the vendor driver,
   which still has no nl80211 support.
