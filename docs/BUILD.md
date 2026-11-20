@@ -387,10 +387,36 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   switched off on its own (`RadioOn=0` turned the whole card's flag off and `ra0` beaconed an open `HT_AP0`): `rai0` goes
   down; `ra0` goes down too unless it has to carry `rai0`, and then it gets a hidden WPA2 network with a random key.
   The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an
-  `mtwifi` radio count as having them, and drops the Client and Ad-Hoc modes for it until client mode exists (#175).
+  `mtwifi` radio count as having them. Client mode is available with the client-capable handler (#631); Ad-Hoc stays hidden.
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
   LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
+- **Wi-Fi client mode (#631–#634):** use **Network > Wireless > Scan > Join Network**, or edit an interface and
+  choose **Client**. The regular LuCI dialog creates a DHCP network (normally `wwan`) and assigns its firewall zone;
+  network addressing, routing metrics and firewall policy remain standard OpenWrt settings. The image builder records
+  the scanned AP's channel because this driver does not choose it automatically. For a manually configured client,
+  set the radio to the upstream AP's channel. One AP and one client may coexist on each band, sharing its channel.
+  `mode 'sta'`, `ssid`, `encryption`, `key`, optional `bssid`, `ieee80211w` and `network` are read by netifd;
+  clients map to `apcli0` (2.4 GHz) and `apclii0` (5 GHz). Open, WPA2-PSK, WPA3-SAE and the existing mixed modes
+  are supported; encrypted networks use 8–63 character passphrases. SAE requires PMF. Unsupported modes and duplicate
+  AP/client sections fail explicitly before hardware is changed. Disable a section or remove it to undo client mode.
+  A 2.4 GHz client uses HT20 to avoid the driver's HT40 secondary-channel handshake failure (#633); an AP on that band
+  also uses 20 MHz. The two radio handlers serialize changes to the shared card and reapply the other band's active
+  client after reopening it. Active credentials are cached only in root-readable `/var/run/mtwifi`, removed on teardown.
+  Routed clients use the normal network/firewall path. For a client bridged into LAN, `x28-wifi-client` registers a fw3
+  include and refreshes ebtables rules on interface changes and firewall reloads: the driver's broadcast MAC translation
+  for unknown routed IPv4 destinations is redirected to the router (#634), with local subnets, multicast and broadcast
+  excluded. The image ships `ebtables-legacy`; no manual `opkg` installation is needed. Bridge only one uplink into an
+  upstream LAN: bridging both Ethernet and Wi-Fi to the same upstream segment can create a loop.
+  **Hardware evidence:** both bands have routed DHCP clients (WPA2 on 2.4 GHz, WPA3-SAE on 5 GHz), and both
+  reconnect after a full Wi-Fi down/up cycle and an owner-approved reboot. CLI and LuCI's iwinfo RPC report their encryption correctly after the
+  updated handler regenerates profiles; restart `rpcd` after manually replacing libiwinfo so it unloads the old library.
+  See [TESTING §57](TESTING.md#57-native-wi-fi-clients-on-both-bands-631635-2026-11-20).
+  **Not verified:** a fresh packaged image, open clients, browser rendering after the library update
+  and integrated bridged forwarding. IPv6 forwarding through a bridged client remains unverified; the MAT workaround
+  covers IPv4 only. Automatic following of an upstream channel change, enterprise
+  authentication, mesh and Ad-Hoc are not implemented. This is netifd/UCI/LuCI integration on the vendor driver,
+  which still has no nl80211 support.
 - **WPS push button (#262):** off unless a network has `wps_pushbutton '1'` (a checkbox on the Wireless Security tab, offered for
   WPA2-PSK and WPA2/WPA3 mixed mode; WPS cannot give out a WPA3-only key). `/sbin/x28-wps` (procd, `S97x28-wps`) reads the Tozed
   button driver `/dev/tz_gpio_keys` (`[event, key, ms]` words: event 1 is key-down and 2 key-up, key 2 is the WPS button and key 1 reset, `ms` is the hold time on key-up; event 3 repeats once a second while a key is held) and on a press

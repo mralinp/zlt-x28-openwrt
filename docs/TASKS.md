@@ -38,7 +38,17 @@ stand is in [STATUS.md](STATUS.md). Work items live in GitHub issues; this list 
 ## E. Wireless
 
 - [x] Native netifd handler for the vendor `mt_wifi` driver; both radios up with WPA2, default config at first boot.
-- [ ] Client tests, throughput, regulatory settings, bridge membership and reload.
+- [ ] Wi-Fi fixes and native client mode PR: track [#631](https://github.com/mralinp/zlt-x28-openwrt/issues/631)
+  (client mode), [#632](https://github.com/mralinp/zlt-x28-openwrt/issues/632) (unsupported modes),
+  [#633](https://github.com/mralinp/zlt-x28-openwrt/issues/633) (HT40 handshake) and
+  [#634](https://github.com/mralinp/zlt-x28-openwrt/issues/634) (MAT forwarding). Implementation and host checks are present;
+  hardware acceptance is recorded in [TESTING](TESTING.md), not implied by passing mocks.
+- [ ] Restart memory regression [#603](https://github.com/mralinp/zlt-x28-openwrt/issues/603): reproduce with completed
+  down/up cycles, compare MemAvailable and unreclaimable slab, then test the measured fix. Never declare a leak from MemFree alone.
+- [ ] Client tests, throughput, regulatory settings, bridge membership and reload ([#150](https://github.com/mralinp/zlt-x28-openwrt/issues/150)).
+- [ ] Remaining Wi-Fi parity [#583](https://github.com/mralinp/zlt-x28-openwrt/issues/583): distinguish already mapped
+  options from multi-SSID/scheduling work; [#168](https://github.com/mralinp/zlt-x28-openwrt/issues/168) still includes
+  802.11r after its client-mode portion is implemented in #631.
 - [ ] Evaluate upstream `mt76` against this board and kernel (the vendor driver is what runs today).
 
 ## F. Stable release (roadmap)
