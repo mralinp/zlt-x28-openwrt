@@ -47,6 +47,7 @@ jobs:
       - run: cc -o /tmp/x28-nrband package/x28-nrband/src/x28-nrband.c -Wl,--unresolved-symbols=ignore-all && /tmp/x28-nrband selftest
       - run: sh tests/test_wifi.sh
       - run: sh tests/test_wps.sh
+      - run: sh tests/test_switch.sh
       - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py

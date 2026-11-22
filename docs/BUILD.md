@@ -333,7 +333,12 @@ each untagged port's PVID equal to its VLAN), and `/etc/init.d/x28-switch` (`S18
 runs `swconfig dev switch0 load network`, then reads back the enable flag, every VLAN's ports and
 every PVID. A different `swconfig list` result, a failed load or any mismatch writes
 `/tmp/x28-switch.failed` and exits non-zero. No vendor initializer, PHY (`mii_mgr`) or GPIO 24
-write, no `lan_mgr`, modem or Wi-Fi start, and the generic `lib/network/switch.sh` is not shipped.
+write, no `lan_mgr`, modem or Wi-Fi start. **Since #639** the table is no longer pinned: `x28-switch` ships its own
+`/lib/network/switch.sh` (`setup_switch`, called by `/etc/init.d/network` on start and reload and by S18), which runs
+`swconfig dev switch0 load network` after checking the chip and that the `switch_vlan` table keeps a tagged CPU port and
+an untagged LAN port; otherwise it refuses, writes `/tmp/x28-switch.failed` and leaves the running table. Network >
+Switch in LuCI therefore applies on Save & Apply. The LAN IP/netmask is not part of this path. Rollback of a bad table:
+failsafe/serial, or edit `/etc/config/network` over another port and `/etc/init.d/network reload`.
 
 **Observed offline checks (2026-10-29):** nine synthetic tests pass (Python 3.9), including the init
 script run against a fake `swconfig` that rejects a wrong switch, a load failure and a drifted table.
