@@ -117,7 +117,7 @@ mode), which is not behind the switch.
 and the switch driver never reports a link for it (`swconfig` port 0 reads down while the PHY has link), so LuCI's Switch page cannot show it as plugged in.
 LuCI lists switch port 0 as LAN 1; how that port relates to the 2.5 G socket is not established. **LAN 2 is switch port 1** (cable plugged in:
 `mt753x Port 1 Link is Up - 1Gbps/Full`, the page showed LAN 2) and **LAN 4 is switch port 4**, both 1 Gb; LAN 3 is port 2 by elimination (not plugged yet).
-`x28-switch` ships the layout in `/etc/board.json` (#489) with LAN 1 to 4 = ports 0, 1, 2, 4. Software: `x28-switch` loads the observed VLAN table at boot with `swconfig`; netifd, `dnsmasq` and fw3 do the rest, with `x28-dhcp` as a
+`x28-switch` ships the layout in `/etc/board.json` (#489, corrected in #642): switch ports 1, 2 and 4 are the sockets LAN 2, LAN 3 and LAN 4 (roles `lan2`..`lan4`, so LuCI labels them like the case), port 0 has no socket and is no longer listed, and LAN 1 is `eth1` (RTL8226B), which the switch page cannot show. On the unit (2026-11-22) a Raspberry on LAN 1 gave PHY link and `eth1` carrier while every switch port 0 to 3 stayed down; removing the unused VLAN 4 (`0 6t`) left `eth1` receiving. Software: `x28-switch` loads the observed VLAN table at boot with `swconfig`; netifd, `dnsmasq` and fw3 do the rest, with `x28-dhcp` as a
 guard for the X28 PRO's slow bridge ([BUILD](BUILD.md#observed-socket-4-switch-profile-86)).
 
 ### USB-C and the console UART
