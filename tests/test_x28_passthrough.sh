@@ -21,6 +21,8 @@ EOF
 cat > "$t/bin/ip" <<'EOF'
 #!/bin/sh
 echo "ip $*" >> "$T/calls"
+[ -n "${X28_FAKE_ONCCMNI:-}" ] && [ "$*" = "-4 addr show dev ccmni2" ] && echo "    inet 100.127.201.42/29 scope global ccmni2"
+[ -n "${X28_FAKE_LOCAL:-}" ] && [ "$3" = get ] && { echo "local $4 dev lo src $4"; exit 0; }
 case "$*" in "-4 route get 192.168.70."*) echo "$4 dev br-lan src 192.168.70.1" ;; "-4 route get "*) echo "$4 dev ccmni2 src 192.168.70.1" ;; esac
 EOF
 printf '#!/bin/sh\necho "uci $*" >> "$T/calls"; cat >> "$T/calls"\n' > "$t/bin/uci"
@@ -28,16 +30,17 @@ printf '#!/bin/sh\n:\n' > "$t/bin/logger"
 printf '#!/bin/sh\n:\n' > "$t/bin/flock"
 printf '#!/bin/sh\necho "dnsmasq $*" >> "$T/calls"\n' > "$t/bin/dnsmasq-init"
 chmod 755 "$t/bin/"*
+echo "conf-dir=$t/dnsmasq.d,.bak" > "$t/dnsmasq.conf.cfg01411c"
+export X28_PT_DNSMASQ_CONF="$t/dnsmasq.conf.cfg01411c"
 export T="$t" PATH="$t/bin:$PATH" X28_PT_RUN="$t/run" X28_PT_SYSCTL="$t/sys" X28_PT_LOCK="$t/lock" X28_PT_DNSMASQ="$t/bin/dnsmasq-init"
 fail() { echo "FAIL: $*"; exit 1; }
 conf="$t/dnsmasq.d/x28-passthrough.conf"
-# pt_confdir looks in /tmp; point it at the test directory.
-sed "s#/tmp/dnsmasq.d /tmp/dnsmasq.\*.d#$t/dnsmasq.d#" "$pt" > "$t/pt"
+cp "$pt" "$t/pt"
 
-sh "$t/pt" up ccmni2 100.127.201.42 E8:DE:27:F6:DE:6F 10.0.0.53 || fail "up"
+sh "$t/pt" up ccmni2 100.127.201.42 02:00:00:AA:BB:01 10.0.0.53 || fail "up"
 grep -qxF -- "-o ccmni2 -j SNAT --to-source 100.127.201.42 -m comment --comment x28-passthrough" "$t/rules" || fail "no SNAT"
 grep -qxF -- "-i ccmni2 -d 100.127.201.42 -j ACCEPT -m comment --comment x28-passthrough" "$t/rules" || fail "no inbound accept"
-grep -qF -- "--mac-source e8:de:27:f6:de:6f" "$t/rules" || fail "no MAC guard"
+grep -qF -- "--mac-source 02:00:00:aa:bb:01" "$t/rules" || fail "no MAC guard"
 grep -qxF "ip -4 addr replace 100.127.201.43/32 dev br-lan" "$t/calls" || fail "no gateway on br-lan"
 grep -qxF "ip -4 route replace 100.127.201.42/32 dev br-lan" "$t/calls" || fail "no host route"
 [ "$(cat "$t/sys/br-lan/proxy_arp")" = 1 ] || fail "proxy_arp off"
@@ -54,9 +57,9 @@ sh "$t/pt" && sh "$t/pt" || fail "reapply"
 [ "$(grep -c '^dnsmasq restart' "$t/calls")" = 1 ] || fail "reapply restarted dnsmasq"
 
 # Same bearer again: no change. A new address: the old state is removed first.
-sh "$t/pt" up ccmni2 100.127.201.42 e8:de:27:f6:de:6f 10.0.0.53 || fail "repeat up"
+sh "$t/pt" up ccmni2 100.127.201.42 02:00:00:aa:bb:01 10.0.0.53 || fail "repeat up"
 [ "$(grep -c '^dnsmasq restart' "$t/calls")" = 1 ] || fail "repeat up restarted dnsmasq"
-sh "$t/pt" up ccmni3 10.9.8.47 e8:de:27:f6:de:6f || fail "new bearer"
+sh "$t/pt" up ccmni3 10.9.8.47 02:00:00:aa:bb:01 0.0.0.0 0.0.0.0 || fail "new bearer"
 grep -q "100.127.201.42" "$t/rules" && fail "old rules left"
 grep -qxF "ip -4 addr del 100.127.201.43/32 dev br-lan" "$t/calls" || fail "old gateway left"
 grep -qxF "dhcp-range=set:x28-passthrough,10.9.8.47,static,255.255.255.224,10m" "$conf" || fail "edge address not widened"
@@ -70,9 +73,11 @@ sh "$t/pt" down || fail "down"
 sh "$t/pt" down || fail "second down"
 
 # Refusals: a LAN address, a bad MAC, a bad device.
-sh "$t/pt" up ccmni2 192.168.70.5 e8:de:27:f6:de:6f && fail "LAN address accepted"
-sh "$t/pt" up ccmni2 100.127.201.42 e8:de:27:f6:de && fail "bad MAC accepted"
-sh "$t/pt" up 'br-lan' 100.127.201.42 e8:de:27:f6:de:6f && fail "bad device accepted"
+sh "$t/pt" up ccmni2 192.168.70.5 02:00:00:aa:bb:01 && fail "LAN address accepted"
+X28_FAKE_LOCAL=1 sh "$t/pt" up ccmni2 100.127.201.42 02:00:00:aa:bb:01 && fail "X28's own address accepted"
+X28_FAKE_ONCCMNI=1 sh "$t/pt" up ccmni2 100.127.201.42 02:00:00:aa:bb:01 && fail "address still on ccmni accepted"
+sh "$t/pt" up ccmni2 100.127.201.42 02:00:00:aa:bb && fail "bad MAC accepted"
+sh "$t/pt" up 'br-lan' 100.127.201.42 02:00:00:aa:bb:01 && fail "bad device accepted"
 [ -e "$t/run/x28-passthrough" ] && fail "state left after a refusal"
 sh "$pt" selftest >/dev/null || fail "selftest"
 echo "PASS: x28-passthrough up, reapply after a firewall flush, bearer change, down and refusals"

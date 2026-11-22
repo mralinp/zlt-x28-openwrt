@@ -417,6 +417,8 @@ x28_mipc_setup() {
   return 1
  fi
  command -v mipc_wan_cli >/dev/null 2>&1 || { proto_notify_error "$interface" MISSING_MODEM_CLI; return 1; }
+ # Passthrough off: drop what a bearer whose teardown never ran (netifd killed) left behind; nothing happens without it.
+ [ -n "$passthrough_mac" ] || ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
  sim="$(mipc_wan_cli --show_sim_status 2>/dev/null)" || { proto_notify_error "$interface" SIM_NOT_READY; return 1; }
  case "$sim" in
   MIPC_SIM_STATUS_COMPLETE_READY) ;;
@@ -516,6 +518,14 @@ x28_mipc_setup() {
   x28_mipc_fail_owned "$interface" "$cid" LINK_NOT_READY; return 1
  fi
  [ "$v4_gw" != 0.0.0.0 ] || v4_gw=
+ # IPv4 passthrough (#581) before the first update to netifd carries the default route: without the SNAT, traffic leaving a
+ # ccmni with no IPv4 address would go out with a LAN source. A refusal does not clear by retrying, so retries stop.
+ if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ] &&
+    ! ${X28_MIPC_PASSTHROUGH:-x28-passthrough} up "$ifname" "$v4_addr" "$passthrough_mac" "$v4_dns1" "$v4_dns2"; then
+  ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
+  x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED
+  proto_block_restart "$interface"; return 1
+ fi
  if [ "$iptype" != 1 ]; then
   # The modem reports only the interface ID (fe80::...); the global /64 arrives by RA on ccmni and the kernel
   # configures it (stock's check_global_ipv6_addr waits the same way). 3GPP routes that whole /64 to the UE.
@@ -555,12 +565,6 @@ x28_mipc_setup() {
   fi
  fi
  x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
- # IPv4 passthrough (#581): the cellular address goes to one LAN host; without it nothing would SNAT, so it is a failure.
- if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ]; then
-  ${X28_MIPC_PASSTHROUGH:-x28-passthrough} up "$ifname" "$v4_addr" "$passthrough_mac" \
-   "$([ "$v4_dns1" = 0.0.0.0 ] || echo "$v4_dns1")" "$([ "$v4_dns2" = 0.0.0.0 ] || [ "$v4_dns2" = "$v4_dns1" ] || echo "$v4_dns2")" ||
-   { ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down; x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED; return 1; }
- fi
 }
 
 # Sends the caller's (x28_mipc_setup) current addresses, routes and DNS to netifd.
@@ -599,8 +603,6 @@ x28_mipc_send() {
 
 x28_mipc_teardown() {
  local interface="$1" snapshot x28_mipc_cid x28_mipc_owner
- # Passthrough state goes first: with no bearer the SNAT and the LAN routes would point at nothing.
- ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
  snapshot="$(ubus call "network.interface.$interface" status)" || { proto_notify_error "$interface" STATUS_UNAVAILABLE; return 1; }
  json_load "$snapshot" || { proto_notify_error "$interface" STATUS_UNAVAILABLE; return 1; }
  if json_select data; then
@@ -617,6 +619,9 @@ x28_mipc_teardown() {
  fi
  proto_init_update "*" 0
  proto_send_update "$interface"
+ # After netifd dropped the default route, so nothing leaves ccmni unSNATed in between.
+ ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
+ return 0
 }
 
 proto_x28_mipc_setup() { x28_mipc_run_locked "$1" x28_mipc_setup; }

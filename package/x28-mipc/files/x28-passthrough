@@ -57,14 +57,17 @@ pt_ipt_del() {
 	while iptables -t "$t" -D "$c" "$@" -m comment --comment "$PT_TAG" 2>/dev/null; do :; done
 }
 
+# The conf-dir the running dnsmasq reads (23.05: /tmp/dnsmasq.<section>.d), from the config its init script wrote.
 pt_confdir() {
 	local d
-	for d in /tmp/dnsmasq.d /tmp/dnsmasq.*.d; do [ -d "$d" ] && { echo "$d"; return 0; }; done
-	return 1
+	d="$(sed -n 's/^conf-dir=\([^,]*\).*/\1/p' ${X28_PT_DNSMASQ_CONF:-/var/etc/dnsmasq.conf.*} 2>/dev/null | head -n 1)"
+	[ -n "$d" ] && [ -d "$d" ] && echo "$d"
 }
 
 # Everything but DHCP, idempotent: reapplied whenever fw3 reloads (it does on every interface change).
 pt_apply() {
+	# The address on ccmni would win over the route to br-lan (local table) and the host would get nothing back.
+	ip -4 addr show dev "$dev" 2>/dev/null | grep -q "inet $cell/" && { logger -t x28-passthrough "$cell is on $dev; not passing it through"; return 1; }
 	pt_ipt nat POSTROUTING -o "$dev" -j SNAT --to-source "$cell" &&
 	pt_ipt filter FORWARD -i "$dev" -d "$cell" -j ACCEPT &&
 	pt_ipt filter FORWARD -i br-lan -s "$cell" -m mac ! --mac-source "$mac" -j DROP &&
@@ -115,7 +118,10 @@ pt_down() {
 }
 
 pt_up() {
-	local dns1="$4" dns2="$5" calc mask conf
+	local dns1="$4" dns2="$5" calc mask conf a
+	[ "$dns1" != 0.0.0.0 ] || dns1=
+	[ "$dns2" != 0.0.0.0 ] && [ "$dns2" != "$dns1" ] || dns2=
+	[ -n "$dns1" ] || { dns1="$dns2"; dns2=; }
 	dev="$1"; cell="$2"; mac="$(echo "$3" | tr 'A-F' 'a-f')"
 	case "$dev" in ccmni[0-9]|ccmni[0-9][0-9]) ;; *) return 1 ;; esac
 	pt_ipv4 "$cell" || return 1
@@ -131,8 +137,11 @@ pt_up() {
 	fi
 	if [ ! -f "$PT_STATE" ]; then
 		# The cellular subnet must not overlap the LAN, or the LAN would lose those addresses.
-		ip -4 route get "$cell" 2>/dev/null | grep -q ' dev br-lan ' && { logger -t x28-passthrough "$cell is on the LAN; not passing it through"; return 1; }
-		ip -4 route get "$gw" 2>/dev/null | grep -q ' dev br-lan ' && { logger -t x28-passthrough "$gw is on the LAN; not passing $cell through"; return 1; }
+		for a in "$cell" "$gw"; do
+			case "$(ip -4 route get "$a" 2>/dev/null)" in
+				local*|broadcast*|*' dev br-lan '*) logger -t x28-passthrough "$a is on the LAN or the X28; not passing $cell through"; return 1 ;;
+			esac
+		done
 		proxy="$(cat "${X28_PT_SYSCTL:-/proc/sys/net/ipv4/conf}/br-lan/proxy_arp" 2>/dev/null)"
 		case "$proxy" in 0|1) ;; *) proxy=0 ;; esac
 		echo "$dev $cell $gw $prefix $mac $proxy" > "$PT_STATE" || return 1
@@ -177,7 +186,7 @@ pt_selftest() {
 pt_main() {
 	local dev cell gw prefix mac proxy lock="${X28_PT_LOCK:-/var/lock/x28-passthrough.lock}"
 	case "$1" in selftest) pt_selftest; return ;; esac
-	exec 8>"$lock" && flock 8 || return 1
+	exec 8>"$lock" && flock -w 30 8 || return 1
 	case "$1" in
 		up) shift; pt_up "$@" ;;
 		down) pt_down ;;

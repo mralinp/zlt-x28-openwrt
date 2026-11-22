@@ -7,6 +7,8 @@ entries; the sections for v0.79.2 to v1.2.3-rc.1 were added above the existing o
 
 ## Unreleased
 
+- IPv4 passthrough: the cellular IPv4 address goes to one LAN device by DHCP, like the stock bridge mode (#581).
+
 ## Milestones
 
 ### Stable releases: v1.0.0 – v1.2.2 (2026-11-10 → 2026-11-15)
