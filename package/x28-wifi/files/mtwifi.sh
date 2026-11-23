@@ -14,6 +14,8 @@ MTWIFI_DIR=${MTWIFI_DIR:-/etc/wireless/mediatek}
 MTWIFI_REGIONS=${MTWIFI_REGIONS:-/usr/share/x28-wifi/regions}
 MTWIFI_CHANNELS5=${MTWIFI_CHANNELS5:-/usr/share/x28-wifi/channels5}
 MTWIFI_L1=${MTWIFI_L1:-/etc/wireless/l1profile.dat}
+MTWIFI_RUN=${MTWIFI_RUN:-/var/run/mtwifi}
+MTWIFI_SCAN_DIR=${MTWIFI_SCAN_DIR:-/tmp}
 
 # mtwifi_band <band> <radio section>: prints the band's main interface and profile, e.g. "rai0 .../mt7915.dbdc.b1.dat".
 # LuCI's frequency widget needs iwinfo, which mt_wifi lacks, so saving a radio there deletes band, channel and htmode
@@ -145,12 +147,82 @@ drv_mtwifi_init_device_config() {
 drv_mtwifi_init_iface_config() {
 	config_add_boolean hidden isolate wmm
 	config_add_int dtim_period
-	config_add_string macfilter ieee80211w
+	config_add_string macfilter ieee80211w bssid
 	config_add_array maclist
 }
 
 drv_mtwifi_cleanup() {
 	:
+}
+
+# Validate all interfaces before closing the card; netifd's iterator does not propagate callback failures.
+mtwifi_check_vif() {
+	local mode ssid encryption key bssid auth
+	json_select config
+	json_get_vars mode ssid encryption key bssid
+	json_select ..
+	case "$mode" in
+		ap) [ -z "$checked_ap" ] || setup_error=TOO_MANY_APS; checked_ap=1 ;;
+		sta) [ -z "$checked_sta" ] || setup_error=TOO_MANY_CLIENTS; checked_sta=1 ;;
+		*) setup_error=UNSUPPORTED_MODE ;;
+	esac
+	[ -n "$ssid" ] && [ "${#ssid}" -le 32 ] || setup_error=INVALID_SSID
+	# A newline would inject another key into the driver's line-based profile.
+	case "$ssid$key" in *'
+'*|*"$(printf '\r')"*) setup_error=INVALID_CONFIG ;; esac
+	auth="$(mtwifi_auth "$encryption")" || setup_error=INVALID_ENCRYPTION
+	case "$auth" in OPEN*) ;; *)
+		[ "${#key}" -ge 8 ] && [ "${#key}" -le 63 ] || setup_error=INVALID_KEY ;;
+	esac
+	[ -z "$bssid" ] || printf '%s\n' "$bssid" | grep -Eq '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$' || setup_error=INVALID_BSSID
+}
+
+mtwifi_apcli() {
+	case "$1" in ra0) echo apcli0 ;; rai0) echo apclii0 ;; *) return 1 ;; esac
+}
+
+mtwifi_setup_sta() {
+	local encryption ieee80211w
+	json_select config
+	json_get_vars encryption ieee80211w
+	json_get_var sta_ssid ssid
+	json_get_var sta_key key
+	json_get_var sta_bssid bssid
+	json_select ..
+	sta_name="$1" sta_auth="$(mtwifi_auth "$encryption")"
+	case "$encryption" in
+		sae|sae+ccmp) sta_pmf="1 1" ;;
+		sae-mixed*) sta_pmf="1 0" ;;
+		*) sta_pmf="$(mtwifi_pmf "${ieee80211w:-0}")" ;;
+	esac
+}
+
+# Firmware handles authentication and reconnects; netifd owns the resulting interface and its network.
+mtwifi_connect() {
+	local ifn="$1" auth cipher mfpc mfpr
+	set -- $sta_auth $sta_pmf
+	auth="$1" cipher="$2" mfpc="$3" mfpr="$4"
+	ip link set dev "$ifn" up &&
+	iwpriv "$ifn" set ApCliEnable=0 &&
+	iwpriv "$ifn" set "ApCliAuthMode=$auth" &&
+	iwpriv "$ifn" set "ApCliEncrypType=$cipher" &&
+	iwpriv "$ifn" set "ApCliPMFMFPC=$mfpc" &&
+	iwpriv "$ifn" set "ApCliPMFMFPR=$mfpr" &&
+	iwpriv "$ifn" set "ApCliSsid=$sta_ssid" &&
+	{ [ "$auth" = OPEN ] || iwpriv "$ifn" set "ApCliWPAPSK=$sta_key"; } &&
+	iwpriv "$ifn" set "ApCliBssid=${sta_bssid:-00:00:00:00:00:00}" &&
+	iwpriv "$ifn" set ApCliEnable=1
+}
+
+# Reopening the DBDC card resets both clients. Keep only active credentials in root-only RAM, never source them as shell.
+mtwifi_reconnect() {
+	local sta_ssid sta_key sta_bssid sta_auth sta_pmf
+	[ -f "$MTWIFI_RUN/$1" ] || return 0
+	{
+		IFS= read -r sta_ssid && IFS= read -r sta_key && IFS= read -r sta_bssid &&
+		IFS= read -r sta_auth && IFS= read -r sta_pmf
+	} < "$MTWIFI_RUN/$1" || return 1
+	mtwifi_connect "$1"
 }
 
 # Called per AP interface; fills the caller's (drv_mtwifi_setup) vif_* from the first one.
@@ -168,10 +240,12 @@ mtwifi_setup_vif() {
 	vif_policy="$(mtwifi_policy "$macfilter")" vif_acl="$(echo $maclist | tr ' ' ';')"
 }
 
-drv_mtwifi_setup() {
+mtwifi_setup() {
 	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up cc
 	local vif_name= vif_auth="OPEN NONE" vif_ssid= vif_key= vif_hidden=0 vif_isolate=0 vif_wmm=1 vif_dtim=1
 	local vif_pmf="1 0" vif_policy=0 vif_acl=
+	local sta_name= sta_ssid= sta_key= sta_bssid= sta_auth="OPEN NONE" sta_pmf= apcli
+	local checked_ap= checked_sta= setup_error=
 	json_select config
 	json_get_vars channel htmode country band txpower_pct beacon_int whnat performance
 	json_select ..
@@ -179,7 +253,13 @@ drv_mtwifi_setup() {
 	[ "$#" = 2 ] || { wireless_setup_failed INVALID_BAND; return 1; }
 	ifname="$1" dat="$2"
 	[ -f "$dat" ] || [ -f "$dat.stock" ] || { wireless_setup_failed MISSING_PROFILE; return 1; }
+	for_each_interface "" mtwifi_check_vif
+	[ -z "$setup_error" ] || { wireless_setup_failed "$setup_error"; return 1; }
 	for_each_interface "ap" mtwifi_setup_vif
+	for_each_interface "sta" mtwifi_setup_sta
+	apcli="$(mtwifi_apcli "$ifname")"
+	# The vendor client stalls when HT40's secondary channel differs from the upstream AP (#633).
+	[ -z "$sta_name" ] || [ "$ifname" != ra0 ] || htmode=HT20
 	# Every network on this band disabled. RadioOn=0 does not switch one band of the DBDC card off (observed: ra0 then
 	# beaconed an open "HT_AP0"), and ra0 must stay up while rai0 is. So such a band gets a hidden WPA2 network with a
 	# random, never stored key, and its interface stays up only when ra0 has to carry rai0.
@@ -193,36 +273,78 @@ drv_mtwifi_setup() {
 	channel="$(mtwifi_channel "$ifname" "$channel" "$8" "$9")"
 	# The driver merges both profiles into DBDC_card0.dat and reads it only when the card opens, i.e. with ra0 and
 	# rai0 both down (observed: bouncing ra0 alone left 2.4 GHz on its old key). Close both, reopen what was up.
+	rm -f "$MTWIFI_RUN/$apcli"
 	rai0_up="$(ip link show dev rai0 up 2>/dev/null)"
 	ip link set dev rai0 down 2>/dev/null
 	ip link set dev ra0 down 2>/dev/null
+	# The survey table disappears with the card; its age marker must not suppress the next scan.
+	rm -f "$MTWIFI_SCAN_DIR/mtwifi-scan-ra0" "$MTWIFI_SCAN_DIR/mtwifi-scan-rai0"
 	mtwifi_render "$dat" "SSID1=$vif_ssid" "AuthMode=$1" "EncrypType=$2" "WPAPSK1=$vif_key" "HideSSID=$vif_hidden" \
 		"NoForwarding=$vif_isolate" "Channel=$channel" "CountryCode=$7" "CountryRegion=$8" "CountryRegionABand=$9" \
 		"HT_BW=$3" "VHT_BW=$4" "PMFMFPC=$5" "PMFMFPR=$6" "WmmCapable=$vif_wmm" "DtimPeriod=$vif_dtim" \
 		"AccessPolicy0=$vif_policy" "AccessControlList0=$vif_acl" "TxPower=${txpower_pct:-100}" \
-		"BeaconPeriod=${beacon_int:-100}" $(mtwifi_whnat "$whnat") $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
+		"ApCliEnable=0" "ApCliAuthMode=${sta_auth%% *}" "ApCliEncrypType=${sta_auth#* }" "BeaconPeriod=${beacon_int:-100}" $(mtwifi_whnat "$whnat") $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
 	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
 	# sets up both radios at once; with 2g disabled ra0 then carries the hidden, locked network above.
 	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
-	if [ -n "$vif_name" ] || { [ "$ifname" = ra0 ] && [ -n "$rai0_up" ]; }; then
+	if [ -n "$vif_name$sta_name" ] || { [ "$ifname" = ra0 ] && [ -n "$rai0_up" ]; }; then
 		ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	fi
 	[ "$ifname" = rai0 ] || [ -z "$rai0_up" ] || ip link set dev rai0 up 2>/dev/null
+	case "$apcli" in
+		apcli0) [ -z "$rai0_up" ] || mtwifi_reconnect apclii0 || { wireless_setup_failed CLIENT_RECONNECT_FAILED; return 1; } ;;
+		apclii0) mtwifi_reconnect apcli0 || { wireless_setup_failed CLIENT_RECONNECT_FAILED; return 1; } ;;
+	esac
 	# Performance mode needs the interface up; a failure is logged, never fatal (Wi-Fi works without it).
 	if [ "$performance" = 1 ]; then
 		mtwifi_perf "$ifname" >/dev/null 2>&1 || logger -t mtwifi "performance mode not applied on $ifname"
+	fi
+	if [ -n "$sta_name" ]; then
+		mtwifi_connect "$apcli" || {
+			iwpriv "$apcli" set ApCliEnable=0 2>/dev/null
+			ip link set dev "$apcli" down 2>/dev/null
+			wireless_setup_failed CLIENT_SETUP_FAILED
+			return 1
+		}
+		(umask 077; mkdir -p "$MTWIFI_RUN" && chmod 700 "$MTWIFI_RUN" &&
+			printf '%s\n' "$sta_ssid" "$sta_key" "$sta_bssid" "$sta_auth" "$sta_pmf" > "$MTWIFI_RUN/$apcli.new" &&
+			mv "$MTWIFI_RUN/$apcli.new" "$MTWIFI_RUN/$apcli") || {
+			iwpriv "$apcli" set ApCliEnable=0 2>/dev/null
+			ip link set dev "$apcli" down 2>/dev/null
+			wireless_setup_failed CLIENT_STATE_FAILED; return 1
+		}
+		wireless_add_vif "$sta_name" "$apcli"
+	else
+		rm -f "$MTWIFI_RUN/$apcli"
+		ip link set dev "$apcli" down 2>/dev/null
 	fi
 	[ -z "$vif_name" ] || wireless_add_vif "$vif_name" "$ifname"
 	wireless_set_up
 }
 
-drv_mtwifi_teardown() {
-	local band
+mtwifi_teardown() {
+	local band apcli
 	json_select config
 	json_get_vars band
 	json_select ..
 	set -- $(mtwifi_band "$band" "$interface")
-	[ "$#" = 2 ] && ip link set dev "$1" down 2>/dev/null
+	[ "$#" = 2 ] || return 0
+	apcli="$(mtwifi_apcli "$1")"
+	rm -f "$MTWIFI_RUN/$apcli"
+	iwpriv "$apcli" set ApCliEnable=0 2>/dev/null
+	ip link set dev "$apcli" down 2>/dev/null
+	ip link set dev "$1" down 2>/dev/null
 }
+
+# netifd starts the two radios separately, but profile reloads close the same card.
+drv_mtwifi_setup() (
+	flock -x 9 || { wireless_setup_failed RADIO_BUSY; exit 1; }
+	mtwifi_setup
+) 9>"${MTWIFI_LOCK:-/var/lock/mtwifi.lock}"
+
+drv_mtwifi_teardown() (
+	flock -x 9 || return 1
+	mtwifi_teardown
+) 9>"${MTWIFI_LOCK:-/var/lock/mtwifi.lock}"
 
 [ -n "$INCLUDE_ONLY" ] || add_driver mtwifi

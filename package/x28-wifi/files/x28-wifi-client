@@ -1,0 +1,24 @@
+#!/bin/sh
+# MAT delivers unknown IPv4 destinations as Ethernet broadcasts; ip_forward drops them (#634).
+# Redirect only routed unicast IP destinations; keep each bridge's subnets and multicast/broadcast intact.
+set -e
+exec 9>"${X28_WIFI_LOCK:-/var/lock/x28-wifi-client.lock}"
+flock -x 9
+chain=X28_CLIENT
+while ebtables -t nat -D PREROUTING -j "$chain" 2>/dev/null; do :; done
+ebtables -t nat -N "$chain" 2>/dev/null || ebtables -t nat -F "$chain"
+active=
+for client in apcli0 apclii0; do
+    master=$(readlink "${X28_WIFI_SYS:-/sys/class/net}/$client/master") || continue
+    bridge=${master##*/}
+    routes=$(ip -4 route show dev "$bridge" scope link)
+    [ -n "$routes" ] || continue
+    for prefix in 224.0.0.0/4 255.255.255.255 $(printf '%s\n' "$routes" | awk '{print $1}'); do
+        ebtables -t nat -A "$chain" -i "$client" -p IPv4 --ip-dst "$prefix" -j RETURN
+    done
+    ebtables -t nat -A "$chain" -i "$client" -p IPv4 --pkttype-type broadcast -j redirect --redirect-target ACCEPT
+    active=1
+done
+# New ebtables chains default to ACCEPT; unmatched frames must continue through the caller.
+ebtables -t nat -A "$chain" -j RETURN
+[ -z "$active" ] || ebtables -t nat -A PREROUTING -j "$chain"

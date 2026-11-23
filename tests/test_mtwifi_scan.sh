@@ -4,6 +4,9 @@
 set -e
 dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
 patch="$(dirname "$0")/../package/iwinfo-mtwifi/100-mtwifi-backend.patch"
+sed -n '/^+\/\* begin mtwifi_names/,/^+\/\* end mtwifi_names/s/^+//p' "$patch" > "$dir/names.c"
+sed -n '/^+\/\* begin mtwifi_crypto/,/^+\/\* end mtwifi_crypto/s/^+//p' "$patch" > "$dir/crypto.c"
+sed -n '/^+\/\* begin mtwifi_signal/,/^+\/\* end mtwifi_signal/s/^+//p' "$patch" > "$dir/signal.c"
 sed -n '/^+\/\* begin mtwifi_scan_line/,/^+\/\* end mtwifi_scan_line/s/^+//p' "$patch" > "$dir/line.c"
 cat > "$dir/t.c" <<'EOF'
 #include <assert.h>
@@ -14,12 +17,20 @@ cat > "$dir/t.c" <<'EOF'
 enum { IWINFO_ESSID_MAX_SIZE = 32, IWINFO_OPMODE_MASTER = 1, IWINFO_OPMODE_ADHOC = 2, IWINFO_BAND_24 = 1, IWINFO_BAND_5 = 4 };
 enum { IWINFO_KMGMT_8021x = 2, IWINFO_KMGMT_PSK = 4, IWINFO_KMGMT_SAE = 8, IWINFO_KMGMT_OWE = 16, IWINFO_AUTH_OPEN = 1, IWINFO_AUTH_SHARED = 2 };
 enum { IWINFO_CIPHER_WEP40 = 1, IWINFO_CIPHER_TKIP = 2, IWINFO_CIPHER_CCMP = 4, IWINFO_CIPHER_WEP104 = 8, IWINFO_CIPHER_GCMP = 16, IWINFO_CIPHER_GCMP256 = 32, IWINFO_CIPHER_CCMP256 = 64 };
+struct iwinfo_crypto_entry { uint8_t enabled, wpa_version; uint16_t group_ciphers, pair_ciphers; uint8_t auth_suites, auth_algs; };
 struct iwinfo_scanlist_entry {
 	uint8_t mac[6]; char ssid[33]; int mode; uint8_t band, channel; uint32_t mhz; uint8_t signal, quality, quality_max;
-	struct { uint8_t enabled, wpa_version; uint16_t group_ciphers, pair_ciphers; uint8_t auth_suites, auth_algs; } crypto;
+	struct iwinfo_crypto_entry crypto;
 	struct { uint8_t primary_chan, secondary_chan_off, chan_width; } ht_chan_info;
 };
 static int mtwifi_ch2mhz(int ch, int five) { return five ? 5000 + ch * 5 : 2407 + ch * 5; }
+#include "names.c"
+#define IFN(name) const char *ifn = mtwifi_ifname(name); if (!ifn) return -1
+static int signal_value, signal_error;
+static int fake_signal(const char *n, int *b) { *b = signal_value; return signal_error; }
+static const struct { int (*signal)(const char *, int *); } wext_ops = { fake_signal };
+#include "signal.c"
+#include "crypto.c"
 #include "line.c"
 /* The driver's own formats: %-4d%-4d%-33s then BSSID, %-23s, %-9d, %-11s, %-7s, %-3s, " %-8d". */
 static const char *row(char *b, int ch, const char *ssid, const char *sec, int pct, const char *ext, int slen)
@@ -30,7 +41,33 @@ static const char *row(char *b, int ch, const char *ssid, const char *sec, int p
 int main(void)
 {
 	struct iwinfo_scanlist_entry e;
+	struct iwinfo_crypto_entry crypto;
+	int signal;
+	signal_value = -32;
+	assert(!mtwifi_signal("apcli0", &signal) && signal == -32);
+	signal_value = -256;
+	assert(mtwifi_signal("ra0", &signal) == -1);
+	signal_value = 0;
+	assert(mtwifi_signal("ra0", &signal) == -1);
+	signal_value = 10;
+	assert(mtwifi_signal("ra0", &signal) == -1);
+	signal_error = -1;
+	assert(mtwifi_signal("apcli0", &signal) == -1);
+	assert(mtwifi_signal("apcli1", &signal) == -1);
+	assert(!mtwifi_crypto("WPA2PSKWPA3PSK", "AES", &crypto));
+	assert(crypto.enabled && crypto.wpa_version == 6 && crypto.auth_suites == (IWINFO_KMGMT_PSK | IWINFO_KMGMT_SAE));
+	assert(crypto.pair_ciphers == IWINFO_CIPHER_CCMP);
+	assert(!mtwifi_crypto("WPA2PSK", "AES", &crypto));
+	assert(crypto.enabled && crypto.wpa_version == 2 && crypto.auth_suites == IWINFO_KMGMT_PSK);
+	assert(!mtwifi_crypto("WPA3PSK", "AES", &crypto));
+	assert(crypto.enabled && crypto.wpa_version == 4 && crypto.auth_suites == IWINFO_KMGMT_SAE);
+	assert(!mtwifi_crypto("OPEN", "NONE", &crypto) && !crypto.enabled && !crypto.auth_suites && !crypto.pair_ciphers);
+	assert(mtwifi_crypto("unknown", "AES", &crypto) == -1);
 	char b[256];
+	assert(!strcmp(mtwifi_ifname("apcli0"), "apcli0"));
+	assert(!strcmp(mtwifi_ifname("apclii0"), "apclii0"));
+	assert(mtwifi_is_5g("apclii0") && !mtwifi_is_5g("apcli0"));
+	assert(!mtwifi_ifname("apcli1"));
 	assert(!mtwifi_scan_line("", 0, &e) && !mtwifi_scan_line("Total=3   ", 0, &e));
 	assert(!mtwifi_scan_line("No  Ch  SSID                             BSSID               Security               Siganl(%)W-Mode      ExtCH NT SSID_Len", 0, &e));
 	assert(mtwifi_scan_line(row(b, 6, "My Home Net", "WPA2PSK/AES", 76, " ABOVE", 11), 0, &e));
@@ -54,7 +91,7 @@ int main(void)
 	assert(!strcmp(e.ssid, "0xABCD") && e.crypto.enabled && !e.crypto.wpa_version && e.crypto.auth_algs == IWINFO_AUTH_SHARED);
 	assert(mtwifi_scan_line(row(b, 1, "33-char-ssid-filling-the-column-", "OWE/AES", 50, " NONE", 32), 0, &e));
 	assert(!strcmp(e.ssid, "33-char-ssid-filling-the-column-") && e.crypto.auth_suites == IWINFO_KMGMT_OWE);
-	puts("PASS: mtwifi site-survey line parser");
+	puts("PASS: mtwifi interface names, signal validation, encryption status and site-survey line parser");
 	return 0;
 }
 EOF
