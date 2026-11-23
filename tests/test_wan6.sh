@@ -5,7 +5,7 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-calls=$t/calls; X28_MIPC_RUN=$t/run; export X28_MIPC_RUN
+calls=$t/calls; X28_MIPC_RUN=$t/run; X28_MIPC6_WAIT=0; export X28_MIPC_RUN X28_MIPC6_WAIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 # Config the fake uci answers from: "<section> <proto> <device>" per interface.
 cfg=$t/cfg
@@ -56,4 +56,9 @@ rm -f "$X28_MIPC_RUN/wan.v6"
 proto_x28_mipc6_setup wan6 ccmni1 && fail 'wan6 came up without any IPv6 result'
 grep -q 'proto_notify_error wan6 NO_IPV6' "$calls" || fail 'missing result not reported as NO_IPV6'
 proto_x28_mipc6_teardown wan6; grep -q 'proto_init_update \* 0' "$calls" && grep -q 'proto_send_update wan6' "$calls" || fail 'teardown'
+# The file appearing while wan6 waits (wan's first update comes before the IPv6 result).
+rm -f "$X28_MIPC_RUN/wan.v6"; : > "$calls"; X28_MIPC6_WAIT=5
+( sleep 1; x28_mipc_publish6 wan ) &
+proto_x28_mipc6_setup wan6 ccmni1 || fail 'wan6 did not wait for the state file'
+wait; grep -q 'proto_add_ipv6_address 2001:db8:1:2::5 128' "$calls" || fail 'wan6 update after waiting'
 echo 'PASS: wan6 companion: detection, state file, split reporting, install, options and teardown'
