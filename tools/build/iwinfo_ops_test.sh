@@ -5,7 +5,8 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 COMMIT=$(sed -n 's/^IWINFO_COMMIT=\([0-9a-f]*\).*/\1/p' "$ROOT/tools/build/sdk_packages.sh")
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-curl -fsL "https://github.com/openwrt/iwinfo/archive/$COMMIT.tar.gz" | tar -C "$T" -xz --strip-components=1
+curl -fsL "https://github.com/openwrt/iwinfo/archive/$COMMIT.tar.gz" -o "$T/source.tar.gz"
+tar -C "$T" -xzf "$T/source.tar.gz" --strip-components=1
 git -C "$T" init -q && git -C "$T" apply "$ROOT/package/iwinfo-mtwifi/100-mtwifi-backend.patch"
 fail=0
 for op in $(sed -n '/^static void print_info/,/^}/p' "$T/iwinfo_cli.c" | grep -o 'print_[a-z_0-9]*(iw' | sed 's/print_//; s/(iw//' | sort -u); do

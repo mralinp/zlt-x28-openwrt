@@ -7,6 +7,8 @@ entries; the sections for v0.79.2 to v1.2.3-rc.1 were added above the existing o
 
 ## Unreleased
 
+- Native Wi-Fi client interfaces in UCI/netifd and LuCI, with AP coexistence, a 2.4 GHz HT20 safeguard and bridged IPv4 forwarding rules (#631–#634). Dual-band clients, reconnect, reboot persistence, encryption status and bridged IPv4 forwarding verified on the test unit; packaged-image validation pending.
+
 - IPv4 passthrough: the cellular IPv4 address goes to one LAN device by DHCP, like the stock bridge mode (#581).
 
 ## Milestones
