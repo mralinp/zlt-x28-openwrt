@@ -50,7 +50,11 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock 
   on the stock-firmware overlay only as far as the SIM allowed.
 - One SIM, one carrier. Differences between X28 and X28 PRO hardware are only known where [TESTING](TESTING.md) 42 to 44 record them.
 - Recovery is the flasher over DL mode, not a recovery slot: it needs a computer, USB and your own download agent. DL cannot write `misc`, so it cannot reset the A/B state ([slot-b-reuse](research/slot-b-reuse.md)).
-- Since v0.76.0 `sysupgrade` always writes the slot that is not running; that rule, the image built in CI, `x28-upgrade` and the LuCI update notice have no test record on a unit yet. Also unproven: `sysupgrade -k` (settings are not kept, [#477](https://github.com/mralinp/zlt-x28-openwrt/issues/477)), LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
+- Since v0.76.0 `sysupgrade` always writes the slot that is not running. Tested on a unit on 2026-11-23: `x28-upgrade -y` from v1.2.2 (slot A) to
+  v1.3.0 wrote and booted slot B, `x28-bootok` reset B's tries, and the settings came back (`/etc/config`, the SSH keys). What an update
+  does not keep: `/root`, and packages the owner added (only their configs and the list in `/etc/backup/installed_packages.txt`);
+  since x28-update release 8, `x28-packages-restore` reinstalls those from the feed after the first boot, once per update
+  ([#654](https://github.com/mralinp/zlt-x28-openwrt/issues/654)). Still unproven: LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
 - Nothing upgrades on its own (no OTA). L2TP and PPTP are not tested against a server.
 
 ## Known limits of the base
