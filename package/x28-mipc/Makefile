@@ -29,6 +29,7 @@ endef
 define Package/x28-mipc/install
 	$(INSTALL_DIR) $(1)/lib/netifd/proto
 	$(INSTALL_BIN) ./files/x28_mipc.sh $(1)/lib/netifd/proto/x28_mipc.sh
+	$(INSTALL_BIN) ./files/x28_mipc6.sh $(1)/lib/netifd/proto/x28_mipc6.sh
 	$(INSTALL_DIR) $(1)/sbin
 	$(INSTALL_BIN) ./files/x28-apn $(1)/sbin/x28-apn
 	$(INSTALL_BIN) ./files/x28-plmn-scan $(1)/sbin/x28-plmn-scan

@@ -34,6 +34,24 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['PASSTHROUGH_FAILED', 'IPv4 passthrough could not be set up (address on the LAN, or DHCP/firewall failed); see the system log']
 ].forEach(function(error) { network.registerErrorCode(error[0], _(error[1])); });
 
+// wan6 of the cellular WAN (#648): IPv6 of the bearer that the x28_mipc interface named in its device ('@wan') owns; no options of its own.
+network.registerProtocol('x28_mipc6', {
+ getI18n: function() { return _('X28 5G modem IPv6 (companion of the MIPC interface)'); },
+ getIfname: function() { return this._ubus('l3_device') || null; },
+ getOpkgPackage: function() { return 'x28-mipc'; },
+ isFloating: function() { return false; },
+ isVirtual: function() { return false; },
+ renderFormOptions: function(section) {
+  var option = section.taboption('advanced', form.Flag, 'defaultroute', _('Use default gateway'));
+  option.default = '1';
+  option = section.taboption('advanced', form.Flag, 'peerdns', _('Use DNS servers advertised by peer'));
+  option.default = '1';
+  option = section.taboption('advanced', form.Value, 'metric', _('Gateway metric'));
+  option.datatype = 'range(0,65535)';
+  option.placeholder = '0';
+ }
+});
+
 return network.registerProtocol('x28_mipc', {
  getI18n: function() { return _('X28 5G modem (MIPC)'); },
  getIfname: function() { return this._ubus('l3_device') || null; },

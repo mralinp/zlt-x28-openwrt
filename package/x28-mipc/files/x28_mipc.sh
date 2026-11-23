@@ -370,6 +370,7 @@ x28_mipc_run_locked() {
 
 x28_mipc_fail_owned() {
  local interface="$1" cid="$2" error="$3"
+ rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"
  if ! mipc_wan_cli --data_call_deact "$cid" >/dev/null 2>&1; then
   proto_notify_error "$interface" CLEANUP_FAILED
   proto_block_restart "$interface"
@@ -383,8 +384,9 @@ x28_mipc_fail_owned() {
 
 x28_mipc_setup() {
  local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname passthrough_mac
- local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll
+ local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll split6=
  json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric passthrough_mac
+ rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"  # a wan6 must never read a previous bearer's result
  local bands="" b
  json_get_values bands lteband_list
  local nrbands=""
@@ -564,7 +566,29 @@ x28_mipc_setup() {
    [ -n "$v4_addr" ] || { x28_mipc_fail_owned "$interface" "$cid" NO_IPV6; return 1; }
   fi
  fi
+ rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"
+ if [ -n "$v6_global" ] && x28_mipc_has_wan6 "$interface"; then
+  x28_mipc_publish6 "$interface" && split6=1
+ fi
  x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
+}
+
+# The IPv6 result goes to a `wan6` interface (proto x28_mipc6, device '@<this interface>') when one exists, like a standard
+# wan + wan6 pair (#648): this interface then reports IPv4 only and publishes IPv6 in a state file the companion reads.
+x28_mipc_has_wan6() {
+ local s
+ for s in $(uci -q show network | sed -n 's/^network\.\([^.=]*\)=interface$/\1/p'); do
+  [ "$(uci -q get "network.$s.proto")" = x28_mipc6 ] && [ "$(uci -q get "network.$s.device")" = "@$1" ] &&
+   [ "$(uci -q get "network.$s.disabled")" != 1 ] && [ "$(uci -q get "network.$s.auto")" != 0 ] && return 0
+ done
+ return 1
+}
+
+# One value per line: global address, /64 network, gateway, DNS 1, DNS 2 (the caller's v6_*, net64).
+x28_mipc_publish6() {
+ local dir="${X28_MIPC_RUN:-/var/run/x28_mipc}"
+ mkdir -p "$dir" && printf '%s\n%s\n%s\n%s\n%s\n' "$v6_global" "$net64" "$v6_gw" "$v6_dns1" "$v6_dns2" > "$dir/$1.v6.new" &&
+  mv "$dir/$1.v6.new" "$dir/$1.v6"
 }
 
 # Sends the caller's (x28_mipc_setup) current addresses, routes and DNS to netifd.
@@ -584,7 +608,7 @@ x28_mipc_send() {
   fi
  fi
  [ -z "$ll" ] || proto_add_ipv6_address "$ll" 64
- if [ -n "$v6_global" ]; then
+ if [ -n "$v6_global" ] && [ -z "$split6" ]; then
   proto_add_ipv6_address "$v6_global" 128
   proto_add_ipv6_prefix "${net64}/64"
   [ "$defaultroute" = 0 ] || proto_add_ipv6_route :: 0 "$v6_gw" "$metric"
@@ -617,6 +641,7 @@ x28_mipc_teardown() {
    proto_block_restart "$interface"; return 1
   fi
  fi
+ rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"
  proto_init_update "*" 0
  proto_send_update "$interface"
  # After netifd dropped the default route, so nothing leaves ccmni unSNATed in between.

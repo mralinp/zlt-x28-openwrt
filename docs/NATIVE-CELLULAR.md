@@ -105,6 +105,25 @@ boot of the previous image looped on `NO_SIM_APN` because the APN database `/etc
 the image; it is now copied from the stock rootfs (`v0.21.2`). Still unverified: a long reconnect soak, throughput, and
 other operators or SIMs.
 
+## `wan` and `wan6` (#648)
+
+`x28_mipc` owns the data call (APN, IP type) on `wan`. For the standard OpenWrt pair add an interface `wan6` with `proto x28_mipc6` and `device '@wan'`:
+
+```
+config interface 'wan6'
+	option proto 'x28_mipc6'
+	option device '@wan'
+```
+
+When such an interface exists, `wan` reports only IPv4 (and the link-local the kernel needs for the router solicitation) and publishes the bearer's IPv6 in
+`/var/run/x28_mipc/wan.v6` (global address, /64 network, gateway, DNS 1, DNS 2); `wan6` waits up to 30 s for it and installs the address, default route, LAN
+prefix and DNS as its own state, goes down with `wan`, and comes back after a re-dial. Without a `wan6` interface nothing changes: `wan` stays dual-stack.
+`defaultroute`, `peerdns` and `metric` work on `wan6` as on `wan`; there is no APN there. netifd learns a new protocol only when it starts, so after
+installing `x28_mipc6.sh` run `/etc/init.d/network restart` once. The modem sends no DHCPv6, so `proto dhcpv6` cannot be used here.
+**Verified on a unit (2026-11-23, image 1.2.2 plus these files):** `wan6` up with the /128, the /64 handed to the LAN, a default route and `ping6`; `wan6` down while `wan`
+is down and up by itself after `ifup wan`; LAN IPv4 unchanged; mocked tests (`tests/test_wan6.sh`). **Not verified:** a reboot, an IPv4-only bearer on a unit,
+mwan3 with the pair, and the image default (the builder still ships no `wan6`).
+
 ## License
 
 Original package sources and tests: GPL-2.0-only. See https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt . No vendor executables, firmware, credentials, calibration or private backups are included.
