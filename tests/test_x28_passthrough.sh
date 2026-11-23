@@ -25,7 +25,7 @@ echo "ip $*" >> "$T/calls"
 [ -n "${X28_FAKE_LOCAL:-}" ] && [ "$3" = get ] && { echo "local $4 dev lo src $4"; exit 0; }
 case "$*" in "-4 route get 192.168.70."*) echo "$4 dev br-lan src 192.168.70.1" ;; "-4 route get "*) echo "$4 dev ccmni2 src 192.168.70.1" ;; esac
 EOF
-printf '#!/bin/sh\necho "uci $*" >> "$T/calls"; cat >> "$T/calls"\n' > "$t/bin/uci"
+printf '#!/bin/sh\necho "uci $*" >> "$T/calls"; case "$*" in *batch*) cat >> "$T/calls" ;; esac\n' > "$t/bin/uci"
 printf '#!/bin/sh\n:\n' > "$t/bin/logger"
 printf '#!/bin/sh\n:\n' > "$t/bin/flock"
 printf '#!/bin/sh\necho "dnsmasq $*" >> "$T/calls"\n' > "$t/bin/dnsmasq-init"
