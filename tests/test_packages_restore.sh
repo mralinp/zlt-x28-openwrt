@@ -17,7 +17,7 @@ esac
 EOF
 chmod +x "$t/opkg"
 export T="$t" X28_PR_LIST="$t/list" X28_PR_DONE="$t/done" X28_PR_OPKG="$t/opkg" X28_PR_TRIES=2 X28_PR_WAIT=0 X28_PR_LOCK="$t/lock" X28_PR_KREL=4.19.205
-logger() { :; }; export -f logger 2>/dev/null || :
+printf '#!/bin/sh\n' > "$t/logger"; chmod +x "$t/logger"
 run() { : > "$t/calls"; PATH="$t:$PATH" sh "$S" >/dev/null 2>&1; }
 printf 'base-files\trom\nmwan3\toverlay\nluci-app-mwan3\toverlay\n-oinject\toverlay\nkept\toverlay\n' > "$t/list"
 printf 'base-files\nkept\n' > "$t/have"
