@@ -595,7 +595,7 @@ x28_mipc_publish6() {
 x28_mipc_send() {
  proto_init_update "$ifname" 1
  if [ -n "$v4_addr" ]; then
-  if [ -n "$passthrough_mac" ]; then
+  if [ -n "${passthrough_mac:-}" ]; then
    # Passthrough: the address belongs to the LAN host, so ccmni gets none and the route needs no gateway (raw IP link).
    [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "" "" "$metric"
   else
@@ -620,7 +620,7 @@ x28_mipc_send() {
  proto_add_data
  json_add_int x28_mipc_cid "$cid"
  json_add_string x28_mipc_owner "$1"
- [ -z "$passthrough_mac" ] || [ -z "$v4_addr" ] || json_add_string x28_passthrough_ip "$v4_addr"
+ [ -z "${passthrough_mac:-}" ] || [ -z "$v4_addr" ] || json_add_string x28_passthrough_ip "$v4_addr"
  proto_close_data
  proto_send_update "$1"
 }
