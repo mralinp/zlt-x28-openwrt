@@ -16,6 +16,9 @@ MTWIFI_CHANNELS5=${MTWIFI_CHANNELS5:-/usr/share/x28-wifi/channels5}
 MTWIFI_L1=${MTWIFI_L1:-/etc/wireless/l1profile.dat}
 MTWIFI_RUN=${MTWIFI_RUN:-/var/run/mtwifi}
 MTWIFI_SCAN_DIR=${MTWIFI_SCAN_DIR:-/tmp}
+# Networks per band. mt_wifi creates ra1..ra3 / rai1..rai3 only when it loads, from BssidNum in the profile, so x28-wifi-l1 sets this
+# value in the stock profiles at boot; keep the two in step.
+MTWIFI_MAXBSS=${MTWIFI_MAXBSS:-4}
 
 # mtwifi_band <band> <radio section>: prints the band's main interface and profile, e.g. "rai0 .../mt7915.dbdc.b1.dat".
 # LuCI's frequency widget needs iwinfo, which mt_wifi lacks, so saving a radio there deletes band, channel and htmode
@@ -162,7 +165,7 @@ mtwifi_check_vif() {
 	json_get_vars mode ssid encryption key bssid
 	json_select ..
 	case "$mode" in
-		ap) [ -z "$checked_ap" ] || setup_error=TOO_MANY_APS; checked_ap=1 ;;
+		ap) checked_ap=$((${checked_ap:-0} + 1)); [ "$checked_ap" -le "$MTWIFI_MAXBSS" ] || setup_error=TOO_MANY_APS ;;
 		sta) [ -z "$checked_sta" ] || setup_error=TOO_MANY_CLIENTS; checked_sta=1 ;;
 		*) setup_error=UNSUPPORTED_MODE ;;
 	esac
@@ -225,25 +228,26 @@ mtwifi_reconnect() {
 	mtwifi_connect "$1"
 }
 
-# Called per AP interface; fills the caller's (drv_mtwifi_setup) vif_* from the first one.
+# Called per AP interface: records network number vif_n as vif_<field>_<n> (up to MTWIFI_MAXBSS per band).
 mtwifi_setup_vif() {
-	local ssid encryption key hidden isolate wmm dtim_period macfilter ieee80211w maclist
-	[ -z "$vif_name" ] || return 0  # one network per band
+	local ssid encryption key hidden isolate wmm dtim_period macfilter ieee80211w maclist auth pmf policy acl i
 	json_select config
 	json_get_vars ssid encryption key hidden isolate wmm dtim_period macfilter ieee80211w
 	json_get_values maclist maclist
 	json_select ..
-	vif_auth="$(mtwifi_auth "$encryption")" || { wireless_setup_failed INVALID_ENCRYPTION; return 1; }
-	case "$vif_auth" in OPEN*) key= ;; *) [ "${#key}" -ge 8 ] && [ "${#key}" -le 63 ] || { wireless_setup_failed INVALID_KEY; return 1; } ;; esac
-	vif_name="$1" vif_ssid="$ssid" vif_key="$key" vif_hidden="${hidden:-0}" vif_isolate="${isolate:-0}"
-	vif_wmm="${wmm:-1}" vif_dtim="${dtim_period:-1}" vif_pmf="$(mtwifi_pmf "$ieee80211w")"
-	vif_policy="$(mtwifi_policy "$macfilter")" vif_acl="$(echo $maclist | tr ' ' ';')"
+	auth="$(mtwifi_auth "$encryption")" || { wireless_setup_failed INVALID_ENCRYPTION; return 1; }
+	case "$auth" in OPEN*) key= ;; *) [ "${#key}" -ge 8 ] && [ "${#key}" -le 63 ] || { wireless_setup_failed INVALID_KEY; return 1; } ;; esac
+	pmf="$(mtwifi_pmf "$ieee80211w")" policy="$(mtwifi_policy "$macfilter")" acl="$(echo $maclist | tr ' ' ';')"
+	i=$vif_n; vif_n=$((vif_n + 1))
+	[ "$i" != 0 ] || vif_dtim="${dtim_period:-1}"
+	eval "vif_name_$i=\$1 vif_ssid_$i=\$ssid vif_key_$i=\$key vif_auth_$i=\$auth vif_hide_$i=\${hidden:-0} vif_iso_$i=\${isolate:-0}" \
+		"vif_wmm_$i=\${wmm:-1} vif_pmf_$i=\$pmf vif_pol_$i=\$policy vif_acl_$i=\$acl"
 }
 
 mtwifi_setup() {
-	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up cc
-	local vif_name= vif_auth="OPEN NONE" vif_ssid= vif_key= vif_hidden=0 vif_isolate=0 vif_wmm=1 vif_dtim=1
-	local vif_pmf="1 0" vif_policy=0 vif_acl=
+	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up obase oup cc base k ap_n htbw vhtbw ccode creg cab
+	local ssid key auth hide iso wmm pmf pol acl lauth= lenc= lhide= liso= lwmm= lpmfc= lpmfr=
+	local vif_n=0 vif_dtim=1
 	local sta_name= sta_ssid= sta_key= sta_bssid= sta_auth="OPEN NONE" sta_pmf= apcli
 	local checked_ap= checked_sta= setup_error=
 	json_select config
@@ -263,34 +267,69 @@ mtwifi_setup() {
 	# Every network on this band disabled. RadioOn=0 does not switch one band of the DBDC card off (observed: ra0 then
 	# beaconed an open "HT_AP0"), and ra0 must stay up while rai0 is. So such a band gets a hidden WPA2 network with a
 	# random, never stored key, and its interface stays up only when ra0 has to carry rai0.
-	[ -n "$vif_name" ] || {
-		vif_ssid="x28-off" vif_hidden=1 vif_auth="WPA2PSK AES"
-		vif_key="$(head -c 24 /dev/urandom | hexdump -ve '1/1 "%02x"')"
+	ap_n=$vif_n
+	[ "$ap_n" -gt 0 ] || {
+		vif_n=1 vif_name_0= vif_ssid_0="x28-off" vif_hide_0=1 vif_auth_0="WPA2PSK AES" vif_iso_0=0 vif_wmm_0=1 vif_pmf_0="1 0" vif_pol_0=0 vif_acl_0=
+		vif_key_0="$(head -c 24 /dev/urandom | hexdump -ve '1/1 "%02x"')"
 	}
 	# The merged profile takes CountryCode and CountryRegion from the 5 GHz one (multi_profile.c), so LuCI sets both radios.
 	cc="$(mtwifi_country "$country")"
-	set -- $vif_auth $(mtwifi_bw "$htmode") $vif_pmf $cc
-	channel="$(mtwifi_channel "$ifname" "$channel" "$8" "$9")"
+	set -- $(mtwifi_bw "$htmode") $cc
+	htbw=$1 vhtbw=$2 ccode=$3 creg=$4 cab=$5
+	channel="$(mtwifi_channel "$ifname" "$channel" "$creg" "$cab")"
+	base="${ifname%0}"
 	# The driver merges both profiles into DBDC_card0.dat and reads it only when the card opens, i.e. with ra0 and
 	# rai0 both down (observed: bouncing ra0 alone left 2.4 GHz on its old key). Close both, reopen what was up.
+	# Any other interface of the card left up (a client link, a second SSID) keeps it open too (observed: an up apcli0
+	# kept the old SSIDs), so close them all; the other band's networks come back below, its client by mtwifi_reconnect.
 	rm -f "$MTWIFI_RUN/$apcli"
 	rai0_up="$(ip link show dev rai0 up 2>/dev/null)"
+	case "$base" in ra) obase=rai ;; *) obase=ra ;; esac
+	oup= k=1
+	while [ "$k" -lt "$MTWIFI_MAXBSS" ]; do
+		[ -z "$(ip link show dev "$obase$k" up 2>/dev/null)" ] || oup="$oup $obase$k"
+		ip link set dev "$obase$k" down 2>/dev/null
+		ip link set dev "$base$k" down 2>/dev/null
+		k=$((k + 1))
+	done
+	ip link set dev apcli0 down 2>/dev/null
+	ip link set dev apclii0 down 2>/dev/null
 	ip link set dev rai0 down 2>/dev/null
 	ip link set dev ra0 down 2>/dev/null
 	# The survey table disappears with the card; its age marker must not suppress the next scan.
 	rm -f "$MTWIFI_SCAN_DIR/mtwifi-scan-ra0" "$MTWIFI_SCAN_DIR/mtwifi-scan-rai0"
-	mtwifi_render "$dat" "SSID1=$vif_ssid" "AuthMode=$1" "EncrypType=$2" "WPAPSK1=$vif_key" "HideSSID=$vif_hidden" \
-		"NoForwarding=$vif_isolate" "Channel=$channel" "CountryCode=$7" "CountryRegion=$8" "CountryRegionABand=$9" \
-		"HT_BW=$3" "VHT_BW=$4" "PMFMFPC=$5" "PMFMFPR=$6" "WmmCapable=$vif_wmm" "DtimPeriod=$vif_dtim" \
-		"AccessPolicy0=$vif_policy" "AccessControlList0=$vif_acl" "TxPower=${txpower_pct:-100}" \
-		"ApCliEnable=0" "ApCliAuthMode=${sta_auth%% *}" "ApCliEncrypType=${sta_auth#* }" "BeaconPeriod=${beacon_int:-100}" $(mtwifi_whnat "$whnat") $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
+	set -- "HT_BW=$htbw" "VHT_BW=$vhtbw" "Channel=$channel" "CountryCode=$ccode" "CountryRegion=$creg" "CountryRegionABand=$cab" \
+		"DtimPeriod=$vif_dtim" "TxPower=${txpower_pct:-100}" "ApCliEnable=0" "ApCliAuthMode=${sta_auth%% *}" \
+		"ApCliEncrypType=${sta_auth#* }" "BeaconPeriod=${beacon_int:-100}"
+	# Per-network keys: one SSID<n>/WPAPSK<n>/AccessPolicy<n-1> each, and ';' lists (one entry per network) for the rest.
+	k=0
+	while [ "$k" -lt "$vif_n" ]; do
+		eval "ssid=\$vif_ssid_$k key=\$vif_key_$k auth=\$vif_auth_$k hide=\$vif_hide_$k iso=\$vif_iso_$k wmm=\$vif_wmm_$k pmf=\$vif_pmf_$k pol=\$vif_pol_$k acl=\$vif_acl_$k"
+		set -- "$@" "SSID$((k + 1))=$ssid" "WPAPSK$((k + 1))=$key" "AccessPolicy$k=$pol" "AccessControlList$k=$acl"
+		lauth="$lauth${lauth:+;}${auth%% *}" lenc="$lenc${lenc:+;}${auth#* }" lhide="$lhide${lhide:+;}$hide" liso="$liso${liso:+;}$iso"
+		lwmm="$lwmm${lwmm:+;}$wmm" lpmfc="$lpmfc${lpmfc:+;}${pmf%% *}" lpmfr="$lpmfr${lpmfr:+;}${pmf#* }"
+		k=$((k + 1))
+	done
+	mtwifi_render "$dat" "$@" "AuthMode=$lauth" "EncrypType=$lenc" "HideSSID=$lhide" "NoForwarding=$liso" "WmmCapable=$lwmm" \
+		"PMFMFPC=$lpmfc" "PMFMFPR=$lpmfr" $(mtwifi_whnat "$whnat") $(mtwifi_caps) || { wireless_setup_failed PROFILE_WRITE; return 1; }
 	# The driver registers rai0 as a virtual interface of ra0: it only opens while ra0 is up (observed), and netifd
 	# sets up both radios at once; with 2g disabled ra0 then carries the hidden, locked network above.
 	[ "$ifname" = ra0 ] || ip link set dev ra0 up 2>/dev/null
-	if [ -n "$vif_name$sta_name" ] || { [ "$ifname" = ra0 ] && [ -n "$rai0_up" ]; }; then
+	if [ "$ap_n" -gt 0 ] || [ -n "$sta_name" ] || { [ "$ifname" = ra0 ] && [ -n "$rai0_up" ]; }; then
 		ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	fi
 	[ "$ifname" = rai0 ] || [ -z "$rai0_up" ] || ip link set dev rai0 up 2>/dev/null
+	for k in $oup; do ip link set dev "$k" up 2>/dev/null; done
+	# Networks 2..n are ra1.. / rai1..; the rest of the driver's fixed slots stay down.
+	k=1
+	while [ "$k" -lt "$MTWIFI_MAXBSS" ]; do
+		if [ "$k" -lt "$ap_n" ]; then
+			ip link set dev "$base$k" up || { wireless_setup_failed MULTI_SSID_UNAVAILABLE; return 1; }
+		else
+			ip link set dev "$base$k" down 2>/dev/null
+		fi
+		k=$((k + 1))
+	done
 	case "$apcli" in
 		apcli0) [ -z "$rai0_up" ] || mtwifi_reconnect apclii0 || { wireless_setup_failed CLIENT_RECONNECT_FAILED; return 1; } ;;
 		apclii0) mtwifi_reconnect apcli0 || { wireless_setup_failed CLIENT_RECONNECT_FAILED; return 1; } ;;
@@ -318,12 +357,17 @@ mtwifi_setup() {
 		rm -f "$MTWIFI_RUN/$apcli"
 		ip link set dev "$apcli" down 2>/dev/null
 	fi
-	[ -z "$vif_name" ] || wireless_add_vif "$vif_name" "$ifname"
+	k=0
+	while [ "$k" -lt "$ap_n" ]; do
+		eval "ssid=\$vif_name_$k"
+		wireless_add_vif "$ssid" "$base$k"
+		k=$((k + 1))
+	done
 	wireless_set_up
 }
 
 mtwifi_teardown() {
-	local band apcli
+	local band apcli k
 	json_select config
 	json_get_vars band
 	json_select ..
@@ -333,6 +377,8 @@ mtwifi_teardown() {
 	rm -f "$MTWIFI_RUN/$apcli"
 	iwpriv "$apcli" set ApCliEnable=0 2>/dev/null
 	ip link set dev "$apcli" down 2>/dev/null
+	k=$((MTWIFI_MAXBSS - 1))
+	while [ "$k" -ge 1 ]; do ip link set dev "${1%0}$k" down 2>/dev/null; k=$((k - 1)); done
 	ip link set dev "$1" down 2>/dev/null
 }
 

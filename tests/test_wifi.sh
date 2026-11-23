@@ -52,6 +52,10 @@ cp "$dir/l1.one" "$dir/l1.run"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/n
 grep -q '^INDEX0_EEPROM_name=e2p-5g$' "$dir/l1.run" && grep -q '^INDEX1_pcie_slot=0001$' "$dir/l1.run" || { cat "$dir/l1.run"; exit 1; }
 cp "$dir/l1.run" "$dir/l1.pro"; L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null; cmp -s "$dir/l1.pro" "$dir/l1.run" || exit 1
 [ "$(MTWIFI_L1=$dir/l1.run mtwifi_caps)" = "$(MTWIFI_L1=$dir/l1.two mtwifi_caps)" ] || exit 1
+# Boot sets the per-band network maximum in every profile and stock copy, once.
+mkdir "$dir/bss"; for b in b0 b1; do printf 'Default\nBssidNum=1\nSSID1=x\n' > "$dir/bss/mt7915.dbdc.$b.dat"; cp "$dir/bss/mt7915.dbdc.$b.dat" "$dir/bss/mt7915.dbdc.$b.dat.stock"; done
+MTWIFI_DIR=$dir/bss L1=$dir/l1.run PCI=$dir/pci sh "$x28l1" 2>/dev/null
+for f in "$dir"/bss/*; do grep -qx 'BssidNum=4' "$f" && grep -qx 'SSID1=x' "$f" || { echo "BssidNum not set in $f"; exit 1; }; done
 # Every 5 GHz region a country maps to has its channel list.
 for r in $(cut -d' ' -f3 "$MTWIFI_REGIONS" | sort -un); do grep -q "^$r " "$MTWIFI_CHANNELS5" || { echo "no channels for region $r"; exit 1; }; done
 echo "PASS: mtwifi profile rendering, encryption, bandwidth, band, PMF, MAC-policy, country mapping and two-chip capability keys"

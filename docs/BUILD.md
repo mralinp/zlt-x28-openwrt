@@ -400,6 +400,12 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
   LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
+- **Several networks per band (#640):** `mt_wifi` creates `ra1`..`ra3` / `rai1`..`rai3` only when the module loads, from `BssidNum` in the profile
+  (a card reopen reads the new value but adds no netdev; measured). `x28-wifi-l1` (S05) therefore sets `BssidNum=4` in both bands' profiles and their `.stock`
+  copies before the module loads, and the handler maps the 1st..4th AP `wifi-iface` of a radio to `ra0`..`ra3` (`rai0`..`rai3`), with `;` lists in the profile
+  (`AuthMode`, `EncrypType`, `HideSSID`, `NoForwarding`, `WmmCapable`, `PMFMFPC/R`) and `SSID<n>`, `WPAPSK<n>`, `AccessPolicy<n-1>`; unused slots stay down. A fifth network fails
+  with `TOO_MANY_APS`, and an image whose profile still has `BssidNum=1` fails the second network with `MULTI_SSID_UNAVAILABLE` instead of ignoring it. Beacon interval,
+  DTIM and channel are per radio (the first network's DTIM). Not verified: per-network MAC filters on the 2nd to 4th network and on the 5 GHz band, a fresh image.
 - **Wi-Fi client mode (#631–#634):** use **Network > Wireless > Scan > Join Network**, or edit an interface and
   choose **Client**. The regular LuCI dialog creates a DHCP network (normally `wwan`) and assigns its firewall zone;
   network addressing, routing metrics and firewall policy remain standard OpenWrt settings. The image builder records
