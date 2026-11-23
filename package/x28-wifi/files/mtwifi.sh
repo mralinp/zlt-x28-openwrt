@@ -245,7 +245,7 @@ mtwifi_setup_vif() {
 }
 
 mtwifi_setup() {
-	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up cc base k ap_n htbw vhtbw ccode creg cab
+	local channel htmode country band txpower_pct beacon_int whnat performance ifname dat rai0_up obase oup cc base k ap_n htbw vhtbw ccode creg cab
 	local ssid key auth hide iso wmm pmf pol acl lauth= lenc= lhide= liso= lwmm= lpmfc= lpmfr=
 	local vif_n=0 vif_dtim=1
 	local sta_name= sta_ssid= sta_key= sta_bssid= sta_auth="OPEN NONE" sta_pmf= apcli
@@ -280,8 +280,20 @@ mtwifi_setup() {
 	base="${ifname%0}"
 	# The driver merges both profiles into DBDC_card0.dat and reads it only when the card opens, i.e. with ra0 and
 	# rai0 both down (observed: bouncing ra0 alone left 2.4 GHz on its old key). Close both, reopen what was up.
+	# Any other interface of the card left up (a client link, a second SSID) keeps it open too (observed: an up apcli0
+	# kept the old SSIDs), so close them all; the other band's networks come back below, its client by mtwifi_reconnect.
 	rm -f "$MTWIFI_RUN/$apcli"
 	rai0_up="$(ip link show dev rai0 up 2>/dev/null)"
+	case "$base" in ra) obase=rai ;; *) obase=ra ;; esac
+	oup= k=1
+	while [ "$k" -lt "$MTWIFI_MAXBSS" ]; do
+		[ -z "$(ip link show dev "$obase$k" up 2>/dev/null)" ] || oup="$oup $obase$k"
+		ip link set dev "$obase$k" down 2>/dev/null
+		ip link set dev "$base$k" down 2>/dev/null
+		k=$((k + 1))
+	done
+	ip link set dev apcli0 down 2>/dev/null
+	ip link set dev apclii0 down 2>/dev/null
 	ip link set dev rai0 down 2>/dev/null
 	ip link set dev ra0 down 2>/dev/null
 	# The survey table disappears with the card; its age marker must not suppress the next scan.
@@ -307,6 +319,7 @@ mtwifi_setup() {
 		ip link set dev "$ifname" up || { wireless_setup_failed IFUP_FAILED; return 1; }
 	fi
 	[ "$ifname" = rai0 ] || [ -z "$rai0_up" ] || ip link set dev rai0 up 2>/dev/null
+	for k in $oup; do ip link set dev "$k" up 2>/dev/null; done
 	# Networks 2..n are ra1.. / rai1..; the rest of the driver's fixed slots stay down.
 	k=1
 	while [ "$k" -lt "$MTWIFI_MAXBSS" ]; do

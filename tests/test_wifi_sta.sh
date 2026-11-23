@@ -131,4 +131,14 @@ ip() { printf 'ip %s\n' "$*" >> "$calls"; case "$*" in 'link set dev ra1 up') re
 drv_mtwifi_setup && fail 'a missing ra1 (old profile) must fail, not be ignored'
 grep -qx MULTI_SSID_UNAVAILABLE "$t/errors" || fail "wrong error: $(cat "$t/errors")"
 ip() { printf 'ip %s\n' "$*" >> "$calls"; }
+# The card re-reads the profile only once every interface is down: both clients and the other band's networks
+# close first, and the other band's open networks come back.
+reset
+sections=a; a_mode=ap a_ssid=A a_encryption=none
+ip() { printf 'ip %s\n' "$*" >> "$calls"; case "$*" in 'link show dev rai1 up') echo up ;; esac; }
+drv_mtwifi_setup
+ip() { printf 'ip %s\n' "$*" >> "$calls"; }
+for i in apcli0 apclii0 rai1 rai2; do grep -qx "ip link set dev $i down" "$calls" || fail "$i left up while the card reopens"; done
+grep -qx 'ip link set dev rai1 up' "$calls" || fail 'other band network not restored'
+grep -qx 'ip link set dev rai2 up' "$calls" && fail 'other band slot opened that was down'
 echo 'PASS: mtwifi STA lifecycle, AP coexistence, validation, failure and teardown'
