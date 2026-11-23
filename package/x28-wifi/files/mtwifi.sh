@@ -148,7 +148,7 @@ drv_mtwifi_init_device_config() {
 }
 
 drv_mtwifi_init_iface_config() {
-	config_add_boolean hidden isolate wmm
+	config_add_boolean hidden isolate wmm wds
 	config_add_int dtim_period
 	config_add_string macfilter ieee80211w bssid
 	config_add_array maclist
@@ -160,10 +160,13 @@ drv_mtwifi_cleanup() {
 
 # Validate all interfaces before closing the card; netifd's iterator does not propagate callback failures.
 mtwifi_check_vif() {
-	local mode ssid encryption key bssid auth
+	local mode ssid encryption key bssid wds auth
 	json_select config
-	json_get_vars mode ssid encryption key bssid
+	json_get_vars mode ssid encryption key bssid wds
 	json_select ..
+	# This mt_wifi build has only peer-to-peer WDS links (WdsEnable/WdsList), no 4-address AP or client (no MWDS, A4);
+	# a standard OpenWrt WDS client associates but passes no traffic (#640), so refuse wds instead of running a plain AP.
+	[ "${wds:-0}" = 0 ] || setup_error=UNSUPPORTED_MODE
 	case "$mode" in
 		ap) checked_ap=$((${checked_ap:-0} + 1)); [ "$checked_ap" -le "$MTWIFI_MAXBSS" ] || setup_error=TOO_MANY_APS ;;
 		sta) [ -z "$checked_sta" ] || setup_error=TOO_MANY_CLIENTS; checked_sta=1 ;;

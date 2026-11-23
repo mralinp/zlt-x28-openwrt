@@ -141,4 +141,10 @@ ip() { printf 'ip %s\n' "$*" >> "$calls"; }
 for i in apcli0 apclii0 rai1 rai2; do grep -qx "ip link set dev $i down" "$calls" || fail "$i left up while the card reopens"; done
 grep -qx 'ip link set dev rai1 up' "$calls" || fail 'other band network not restored'
 grep -qx 'ip link set dev rai2 up' "$calls" && fail 'other band slot opened that was down'
+# WDS (4-address) is not in this driver build: refused, never run as a plain AP.
+reset
+sections=a; a_mode=ap a_ssid=A a_encryption=none a_wds=1
+drv_mtwifi_setup && fail 'wds accepted'
+grep -qx UNSUPPORTED_MODE "$t/errors" || fail "wrong wds error: $(cat "$t/errors")"
+unset a_wds
 echo 'PASS: mtwifi STA lifecycle, AP coexistence, validation, failure and teardown'
