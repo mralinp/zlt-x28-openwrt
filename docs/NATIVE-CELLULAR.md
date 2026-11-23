@@ -99,9 +99,12 @@ When such an interface exists, `wan` reports only IPv4 (and the link-local the k
 prefix and DNS as its own state, goes down with `wan`, and comes back after a re-dial. Without a `wan6` interface nothing changes: `wan` stays dual-stack.
 `defaultroute`, `peerdns` and `metric` work on `wan6` as on `wan`; there is no APN there. netifd learns a new protocol only when it starts, so after
 installing `x28_mipc6.sh` run `/etc/init.d/network restart` once. The modem sends no DHCPv6, so `proto dhcpv6` cannot be used here.
+**mwan3 with the pair (2026-11-23):** `mwan3` and `luci-app-mwan3` install from the official feed with our `kmod-ipt-ipopt` stub. Its default config tracks `wan` (IPv4) and `wan6` (IPv6) separately;
+with only the cellular WAN, set `mwan3.wan6.enabled=1` (the shipped default has it off) and enable the service. Without a real `wan6` interface mwan3's IPv6 policy is `unreachable`
+and it blackholes the router's and the LAN's IPv6, so never enable mwan3 on a config without `wan6`. On the unit: `wan` and `wan6` both online, IPv6 policy `balanced: wan6 (100%)`, `ping`/`ping6` and
+HTTPS from the router, and IPv4 and IPv6 from a router behind it. A second WAN and real failover between two WANs are not tested.
 **Verified on a unit (2026-11-23, image 1.2.2 plus these files):** `wan6` up with the /128, the /64 handed to the LAN, a default route and `ping6`; `wan6` down while `wan`
-is down and up by itself after `ifup wan`; LAN IPv4 unchanged; mocked tests (`tests/test_wan6.sh`). **Not verified:** a reboot, an IPv4-only bearer on a unit,
-mwan3 with the pair, and the image default (the builder still ships no `wan6`).
+is down and up by itself after `ifup wan`; LAN IPv4 unchanged; mocked tests (`tests/test_wan6.sh`). **Reboot: `wan6` came up by itself after a reboot with a new /64 and the boot counter reset. **Not verified:** an IPv4-only bearer on a unit, a slow RA, failover between two WANs; the image default is in x28-flasher#132.
 
 ## License
 
