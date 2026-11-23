@@ -51,7 +51,7 @@ new file mode 100644
 index 0000000..d6f8343
 --- /dev/null
 +++ b/iwinfo_mtwifi.c
-@@ -0,0 +1,541 @@
+@@ -0,0 +1,592 @@
 +/*
 + * iwinfo - Wireless Information Library - MediaTek mt_wifi backend (ZLT X28, MT7915 DBDC)
 + *
@@ -84,11 +84,14 @@ index 0000000..d6f8343
 +	return five ? 5000 + ch * 5 : (ch == 14 ? 2484 : 2407 + ch * 5);
 +}
 +
++/* begin mtwifi_names */
 +static const char *mtwifi_ifname(const char *name)
 +{
 +	size_t len = strlen(name);
 +
 +	if (!strcmp(name, "ra0") || !strcmp(name, "ra1") || !strcmp(name, "rai0") || !strcmp(name, "rai1"))
++		return name;
++	if (!strcmp(name, "apcli0") || !strcmp(name, "apclii0"))
 +		return name;
 +	if (len > 3 && !strcmp(name + len - 3, "_2g"))
 +		return "ra0";
@@ -96,6 +99,12 @@ index 0000000..d6f8343
 +		return "rai0";
 +	return NULL;
 +}
++
++static int mtwifi_is_5g(const char *ifn)
++{
++	return !strncmp(ifn, "rai", 3) || !strcmp(ifn, "apclii0");
++}
++/* end mtwifi_names */
 +
 +#define IFN(name) const char *ifn = mtwifi_ifname(name); if (!ifn) return -1
 +
@@ -110,10 +119,6 @@ index 0000000..d6f8343
 +	return iwinfo_ioctl(SIOCGIWNAME, &wrq) >= 0 && !strncmp(wrq.u.name, "RTWIFI", 6);
 +}
 +
-+static int mtwifi_is_5g(const char *ifn)
-+{
-+	return !strncmp(ifn, "rai", 3);
-+}
 +
 +static int mtwifi_mode(const char *n, int *b)    { IFN(n); return wext_ops.mode(ifn, b); }
 +static int mtwifi_channel(const char *n, int *b) { IFN(n); return wext_ops.channel(ifn, b); }
@@ -136,6 +141,17 @@ index 0000000..d6f8343
 +
 +static int mtwifi_ssid(const char *n, char *b)   { IFN(n); return wext_ops.ssid(ifn, b); }
 +static int mtwifi_bssid(const char *n, char *b)  { IFN(n); return wext_ops.bssid(ifn, b); }
++/* begin mtwifi_signal */
++static int mtwifi_signal(const char *n, int *b)
++{
++	IFN(n);
++	if (wext_ops.signal(ifn, b) || *b <= -256 || *b >= 0)
++		return -1;
++	return 0;
++}
++/* end mtwifi_signal */
++static int mtwifi_quality(const char *n, int *b) { IFN(n); return wext_ops.quality(ifn, b); }
++static int mtwifi_quality_max(const char *n, int *b) { IFN(n); return wext_ops.quality_max(ifn, b); }
 +
 +static int mtwifi_frequency(const char *n, int *b)
 +{
@@ -184,13 +200,14 @@ index 0000000..d6f8343
 +	return 0;
 +}
 +
-+/* Value of a key in the 5 GHz profile; the handler renders both profiles with the same country. */
-+static int mtwifi_profile(const char *key, char *val, size_t size)
++/* Read non-secret status keys from the profile for this band. */
++static int mtwifi_profile(const char *ifn, const char *key, char *val, size_t size)
 +{
 +	char line[128];
 +	size_t klen = strlen(key);
 +	int found = -1;
-+	FILE *f = fopen("/etc/wireless/mediatek/mt7915.dbdc.b1.dat", "r");
++	FILE *f = fopen(mtwifi_is_5g(ifn) ? "/etc/wireless/mediatek/mt7915.dbdc.b1.dat" :
++	                "/etc/wireless/mediatek/mt7915.dbdc.b0.dat", "r");
 +
 +	if (!f)
 +		return -1;
@@ -209,7 +226,7 @@ index 0000000..d6f8343
 +{
 +	char val[8];
 +
-+	if (mtwifi_profile("CountryCode", val, sizeof(val)) || strlen(val) != 2)
++	if (mtwifi_profile("rai0", "CountryCode", val, sizeof(val)) || strlen(val) != 2)
 +		return -1;
 +	strcpy(b, val);
 +	return 0;
@@ -250,7 +267,7 @@ index 0000000..d6f8343
 +	five = mtwifi_is_5g(ifn);
 +	if (five) {
 +		/* /usr/share/x28-wifi/channels5: "<CountryRegionABand> <channels...>", shared with the handler. */
-+		int region = mtwifi_profile("CountryRegionABand", val, sizeof(val)) ? 9 : atoi(val);
++		int region = mtwifi_profile("rai0", "CountryRegionABand", val, sizeof(val)) ? 9 : atoi(val);
 +		FILE *f = fopen("/usr/share/x28-wifi/channels5", "r");
 +
 +		if (!f)
@@ -271,7 +288,7 @@ index 0000000..d6f8343
 +			cnt++;
 +		}
 +	} else {
-+		int last = !mtwifi_profile("CountryRegion", val, sizeof(val)) && atoi(val) == 1 ? 13 : 11;
++		int last = !mtwifi_profile("rai0", "CountryRegion", val, sizeof(val)) && atoi(val) == 1 ? 13 : 11;
 +
 +		for (i = 1; i <= last; i++, e++, cnt++) {
 +			memset(e, 0, sizeof(*e));
@@ -552,7 +569,41 @@ index 0000000..d6f8343
 +	return 0;
 +}
 +
-+static int mtwifi_encryption(const char *n, char *b) { return -1; }
++/* begin mtwifi_crypto */
++static int mtwifi_crypto(const char *auth, const char *cipher, struct iwinfo_crypto_entry *c)
++{
++	memset(c, 0, sizeof(*c));
++	c->auth_algs = IWINFO_AUTH_OPEN;
++	if (!strcmp(auth, "OPEN") && !strcmp(cipher, "NONE"))
++		return 0;
++	if (strstr(auth, "WPAPSK")) c->wpa_version |= 1;
++	if (strstr(auth, "WPA2")) c->wpa_version |= 2;
++	if (strstr(auth, "WPA3")) c->wpa_version |= 4;
++	if (!c->wpa_version)
++		return -1;
++	c->enabled = 1;
++	if (c->wpa_version & 3)
++		c->auth_suites |= strstr(auth, "PSK") ? IWINFO_KMGMT_PSK : IWINFO_KMGMT_8021x;
++	if (c->wpa_version & 4)
++		c->auth_suites |= IWINFO_KMGMT_SAE;
++	if (strstr(cipher, "AES")) c->pair_ciphers |= IWINFO_CIPHER_CCMP;
++	if (strstr(cipher, "TKIP")) c->pair_ciphers |= IWINFO_CIPHER_TKIP;
++	c->group_ciphers = c->pair_ciphers;
++	return 0;
++}
++/* end mtwifi_crypto */
++
++static int mtwifi_encryption(const char *n, char *b)
++{
++	char auth[64], cipher[32];
++	int client;
++	IFN(n);
++	client = !strcmp(ifn, "apcli0") || !strcmp(ifn, "apclii0");
++	if (mtwifi_profile(ifn, client ? "ApCliAuthMode" : "AuthMode", auth, sizeof(auth)) ||
++	    mtwifi_profile(ifn, client ? "ApCliEncrypType" : "EncrypType", cipher, sizeof(cipher)))
++		return -1;
++	return mtwifi_crypto(auth, cipher, (struct iwinfo_crypto_entry *)b);
++}
 +
 +/* iwinfo_finish() calls every backend's close() unchecked. */
 +static void mtwifi_close(void) { }
@@ -569,10 +620,10 @@ index 0000000..d6f8343
 +	.txpower          = mtwifi_none,
 +	.txpower_offset   = mtwifi_zero,
 +	.bitrate          = mtwifi_bitrate,
-+	.signal           = mtwifi_none,
++	.signal           = mtwifi_signal,
 +	.noise            = mtwifi_none,
-+	.quality          = mtwifi_none,
-+	.quality_max      = mtwifi_none,
++	.quality          = mtwifi_quality,
++	.quality_max      = mtwifi_quality_max,
 +	.mbssid_support   = mtwifi_zero,
 +	.hwmodelist       = mtwifi_hwmodelist,
 +	.htmodelist       = mtwifi_htmodelist,

@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc.common
+# Register before fw3 starts; it reapplies the MAT workaround on each firewall reload.
+START=18
+start() {
+    [ "$(uci -q get firewall.x28_wifi_client.path)" = /usr/libexec/x28-wifi-client ] && return 0
+    uci -q batch <<'UCI'
+set firewall.x28_wifi_client=include
+set firewall.x28_wifi_client.path='/usr/libexec/x28-wifi-client'
+set firewall.x28_wifi_client.reload='1'
+commit firewall
+UCI
+}

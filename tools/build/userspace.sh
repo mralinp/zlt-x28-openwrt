@@ -14,7 +14,7 @@ URL=https://downloads.openwrt.org/releases/$VERSION/targets/armsr/armv8/$IB.tar.
 # The stock X28 kernel (4.19) has no nf_tables: use the iptables firewall (fw3) instead of
 # firewall4. luci-app-firewall only needs uci-firewall, which fw3 provides (#164).
 PACKAGES="-firewall4 -nftables -kmod-nft-offload
-  firewall iptables-legacy ip6tables-legacy
+  firewall iptables-legacy ip6tables-legacy ebtables-legacy
   luci-base luci-mod-admin-full luci-theme-bootstrap luci-app-opkg
   luci-app-firewall luci-proto-ipv6 luci-proto-ppp
   iwinfo rpcd-mod-iwinfo block-mount ubi-utils wireless-tools
@@ -48,9 +48,10 @@ make -C "$WORK/$IB" image PROFILE=generic PACKAGES="$(echo $PACKAGES)" FILES="$(
 
 # The rootfs carries armsr's 5.15 kernel modules from dependencies; the X28 assembly replaces them.
 ls -l "$OUT"
-grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-3$' "$OUT"/*.manifest ||
+grep -q '^libiwinfo20230701 - 2023-07-01-ca79f641-4$' "$OUT"/*.manifest ||
   { echo "the image did not take the mtwifi libiwinfo" >&2; exit 1; }
 # The preinit hook relies on this block's extroot behaviour (#183).
+grep -q '^ebtables-legacy - ' "$OUT"/*.manifest || { echo "the image lacks ebtables-legacy for bridged Wi-Fi clients" >&2; exit 1; }
 grep -q '^wireless-tools - ' "$OUT"/*.manifest || { echo "the image lacks iwpriv (wireless-tools), which the WPS button needs (#262)" >&2; exit 1; }
 grep -q '^ubi-utils - ' "$OUT"/*.manifest && grep -q '^block-mount - 2023-02-28-bfe882d5-' "$OUT"/*.manifest ||
   { echo "the image lacks ubi-utils or the expected block-mount" >&2; exit 1; }

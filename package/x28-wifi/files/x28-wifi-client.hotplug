@@ -1,0 +1,4 @@
+#!/bin/sh
+case "$ACTION" in
+    ifup|ifupdate|ifdown) /usr/libexec/x28-wifi-client || logger -t mtwifi 'client bridge rules failed' ;;
+esac

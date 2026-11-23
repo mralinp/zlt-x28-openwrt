@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=x28-wifi
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=1
+PKG_RELEASE:=7
 PKG_LICENSE:=GPL-2.0-only
 
 include $(INCLUDE_DIR)/package.mk
@@ -11,7 +11,7 @@ define Package/x28-wifi
   SECTION:=net
   CATEGORY:=Network
   TITLE:=netifd wireless handler for the X28 MT7915 (mt_wifi)
-  DEPENDS:=+netifd
+  DEPENDS:=+netifd +wireless-tools +ebtables-legacy
   PKGARCH:=all
 endef
 
@@ -29,6 +29,10 @@ define Package/x28-wifi/install
 	$(INSTALL_DIR) $(1)/lib/netifd/wireless $(1)/lib/wifi
 	$(INSTALL_BIN) ./files/mtwifi.sh $(1)/lib/netifd/wireless/mtwifi.sh
 	$(INSTALL_DATA) ./files/mtwifi.detect $(1)/lib/wifi/mtwifi.sh
+	$(INSTALL_DIR) $(1)/usr/libexec $(1)/etc/init.d $(1)/etc/hotplug.d/iface
+	$(INSTALL_BIN) ./files/x28-wifi-client $(1)/usr/libexec/x28-wifi-client
+	$(INSTALL_BIN) ./files/x28-wifi-client.init $(1)/etc/init.d/x28-wifi-client
+	$(INSTALL_DATA) ./files/x28-wifi-client.hotplug $(1)/etc/hotplug.d/iface/90-x28-wifi-client
 endef
 
 $(eval $(call BuildPackage,x28-wifi))

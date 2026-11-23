@@ -33,6 +33,24 @@ network.registerPatternVirtual(/^ccmni[0-9]+$/);
  ['DEACTIVATE_FAILED', 'The modem did not confirm bearer teardown']
 ].forEach(function(error) { network.registerErrorCode(error[0], _(error[1])); });
 
+// wan6 of the cellular WAN (#648): IPv6 of the bearer that the x28_mipc interface named in its device ('@wan') owns; no options of its own.
+network.registerProtocol('x28_mipc6', {
+ getI18n: function() { return _('X28 5G modem IPv6 (companion of the MIPC interface)'); },
+ getIfname: function() { return this._ubus('l3_device') || null; },
+ getOpkgPackage: function() { return 'x28-mipc'; },
+ isFloating: function() { return false; },
+ isVirtual: function() { return false; },
+ renderFormOptions: function(section) {
+  var option = section.taboption('advanced', form.Flag, 'defaultroute', _('Use default gateway'));
+  option.default = '1';
+  option = section.taboption('advanced', form.Flag, 'peerdns', _('Use DNS servers advertised by peer'));
+  option.default = '1';
+  option = section.taboption('advanced', form.Value, 'metric', _('Gateway metric'));
+  option.datatype = 'range(0,65535)';
+  option.placeholder = '0';
+ }
+});
+
 return network.registerProtocol('x28_mipc', {
  getI18n: function() { return _('X28 5G modem (MIPC)'); },
  getIfname: function() { return this._ubus('l3_device') || null; },
@@ -102,6 +120,77 @@ return network.registerProtocol('x28_mipc', {
    }, this));
   };
   option.cfgvalue = function() { return this.status; };
+  // Auto-tune (x28-autotune): resets the settings below, tries automatic, 4G only and each seen 4G band, keeps the most bandwidth.
+  // Results and state are read as files: read-only users may see them, only writers may run x28-autotune (ACL).
+  var tuneRead = function(file) {
+   return fs.read(file).catch(function() { return ''; }).then(function(text) { return { stdout: text || '' }; });
+  };
+  // fs.exec resolves on a non-zero exit too; x28-autotune says why on stderr (e.g. uncommitted network changes).
+  var tuneExec = function(arg) {
+   return fs.exec('/sbin/x28-autotune', [arg]).then(function(res) {
+    if (res.code) throw new Error((res.stderr || '').trim() || 'exit code %d'.format(res.code));
+    return res;
+   });
+  };
+  var tuneRows = function(res, full) {
+   return (res.stdout || '').split('\n').filter(function(l) { return l; }).map(function(l) {
+    var f = l.split('\t');
+    if (f[0] == 'best') return _('Kept: %s').format(f[1] || _('automatic (no configuration reached the speed-test servers)'));
+    // The last field is "<sample>/<sample>", or why there are none: refused (the network refused the SIM), no connection.
+    if (f[5] && f[5].indexOf('/') < 0) return '%s: %s'.format(f[0], f[5] == 'refused' ? _('refused this SIM') : _('no connection'));
+    return full ? '%s: %s Mbit/s (samples %s), %s, RSRP %s, CA %s'.format(f[0], f[1], f[5] || '-', f[2], f[3], f[4] || '-') : '%s: %s Mbit/s, CA %s'.format(f[0], f[1], f[4] || '-');
+   }).join('\n');
+  };
+  option = section.taboption('carrier', form.Button, 'autotune', _('Auto-tune'),
+   _('Resets the settings below (roaming on, automatic operator, mode and bands, no cell lock), then searches for networks and tries each one this SIM may use (a virtual or roaming SIM may be allowed on several), and on the best of them 4G only and locks to pairs and single 4G bands the modem sees (a pair keeps carrier aggregation possible, a single band does not). It measures the download bandwidth of each twice and keeps the one with the most; a network, lock or mode other than automatic is kept only when it beats automatic by 15% or more. Takes up to about 30 minutes; the connection drops at every step and each step downloads twice for 8 s from the nearest speedtest.net servers (on a fast link that is about 200 MB per step).'));
+  option.inputtitle = _('Auto-tune');
+  option.inputstyle = 'apply';
+  option.onclick = function() {
+   var log = E('pre', {}, _('Resetting and waiting for the first connection...'));
+   var stopped = false;
+   var poll = function() {
+    return tuneRead('/tmp/x28-autotune').then(function(res) {
+     log.textContent = tuneRows(res, true) || _('Resetting and waiting for the first connection...');
+     return tuneRead('/tmp/x28-autotune.state');
+    }).then(function(res) {
+     if (stopped) return;
+     if ((res.stdout || '').trim() !== 'running') { window.location.reload(); return; }
+     return new Promise(function(resolve) { window.setTimeout(resolve, 5000); }).then(poll);
+    });
+   };
+   return new Promise(function(resolve) {
+    ui.showModal(_('Auto-tune'), [
+     E('p', _('This resets your Carrier settings, turns roaming on (roaming may cost money) and drops the connection several times. The previous settings can be restored afterwards.')),
+     E('div', { 'class': 'right' }, [
+      E('button', { 'class': 'btn', 'click': function() { ui.hideModal(); resolve(); } }, _('Cancel')), ' ',
+      E('button', { 'class': 'btn cbi-button-apply', 'click': function() {
+       ui.showModal(_('Auto-tune running'), [log, E('div', { 'class': 'right' }, E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
+        stopped = true;
+        tuneExec('--stop').catch(function(e) { window.alert(_('Could not restore: %s').format(e.message || e)); }).finally(function() { window.location.reload(); });
+       } }, _('Stop and restore')))]);
+       tuneExec('--start').then(poll).catch(function(e) {
+        ui.hideModal();
+        ui.addNotification(null, E('p', _('Auto-tune could not be started: %s').format(e.message || e)), 'danger');
+       }).then(resolve);
+      } }, _('Start'))
+     ])
+    ]);
+   });
+  };
+  option = section.taboption('carrier', form.Button, 'autotune_restore', _('Before auto-tune'),
+   _('Puts back the Carrier settings that were in place before the last auto-tune.'));
+  option.inputtitle = _('Restore');
+  option.load = function() {
+   return tuneRead('/tmp/x28-autotune').then(L.bind(function(res) {
+    var rows = tuneRows(res, false);
+    if (rows) this.description = _('Puts back the Carrier settings that were in place before the last auto-tune. Its results:') + '\n' + rows;
+   }, this)).catch(function() {});
+  };
+  option.onclick = function() {
+   return tuneExec('--restore').then(function() { window.location.reload(); }).catch(function(e) {
+    ui.addNotification(null, E('p', _('Could not restore: %s').format(e.message || e)), 'danger');
+   });
+  };
   option = section.taboption('carrier', form.Flag, 'roaming', _('Allow roaming'),
    _('Connect while registered on a partner network. Off by default, like the vendor setting.'));
   option.default = '0';

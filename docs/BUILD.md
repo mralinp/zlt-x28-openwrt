@@ -333,7 +333,16 @@ each untagged port's PVID equal to its VLAN), and `/etc/init.d/x28-switch` (`S18
 runs `swconfig dev switch0 load network`, then reads back the enable flag, every VLAN's ports and
 every PVID. A different `swconfig list` result, a failed load or any mismatch writes
 `/tmp/x28-switch.failed` and exits non-zero. No vendor initializer, PHY (`mii_mgr`) or GPIO 24
-write, no `lan_mgr`, modem or Wi-Fi start, and the generic `lib/network/switch.sh` is not shipped.
+write, no `lan_mgr`, modem or Wi-Fi start. **Since #639** the table is no longer pinned: `x28-switch` ships its own
+`/lib/network/switch.sh` (`setup_switch`, called by `/etc/init.d/network` on start and reload and by S18), which runs
+`swconfig dev switch0 load network` after checking the chip and that every VLAN holding a LAN socket (0, 1, 2, 4) also
+carries a tagged CPU port (5t/6t); otherwise it refuses, writes `/tmp/x28-switch.failed` and leaves the running table.
+After `load` it reads each VLAN's ports back and flags a difference the same way. `load` resets the switch, so every network
+reload (a WAN edit too) briefly drops the LAN links, and a `load` that fails midway can leave a half-programmed table.
+Not checked: VLAN ids and PVIDs against the `eth0.N` devices of `br-lan`, so renumbering a VLAN can still empty the bridge.
+Network > Switch in LuCI applies on Save & Apply; its 90 s rollback restores the old config and the reload re-applies the
+old table, but "Apply unchecked" has no net. The LAN IP/netmask is not part of this path. Rollback of a bad table: failsafe
+or serial, or edit `/etc/config/network` over another port and `/etc/init.d/network reload`.
 
 **Observed offline checks (2026-10-29):** nine synthetic tests pass (Python 3.9), including the init
 script run against a fake `swconfig` that rejects a wrong switch, a load failure and a drifted table.
@@ -387,10 +396,53 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   switched off on its own (`RadioOn=0` turned the whole card's flag off and `ra0` beaconed an open `HT_AP0`): `rai0` goes
   down; `ra0` goes down too unless it has to carry `rai0`, and then it gets a hidden WPA2 network with a random key.
   The frequency widget offers "auto", AC and AX only when hostapd reports `acs`/`11ac`/`11ax`; the builder lets an
-  `mtwifi` radio count as having them, and drops the Client and Ad-Hoc modes for it until client mode exists (#175).
+  `mtwifi` radio count as having them. Client mode is available with the client-capable handler (#631); Ad-Hoc stays hidden.
   All LuCI edits are anchored string replacements in `first_boot.py` (`luci_edits()`), applied once each.
   LuCI bakes `?v=<revision>` into its header templates and uhttpd serves files dated 1970, so `first_boot.py` appends a hash
   of `www/` to those strings: a browser fetches LuCI's JS and CSS again after an image that changed them (#187).
+- **Several networks per band (#640):** `mt_wifi` creates `ra1`..`ra3` / `rai1`..`rai3` only when the module loads, from `BssidNum` in the profile
+  (a card reopen reads the new value but adds no netdev; measured). `x28-wifi-l1` (S05) therefore sets `BssidNum=4` in both bands' profiles and their `.stock`
+  copies before the module loads, and the handler maps the 1st..4th AP `wifi-iface` of a radio to `ra0`..`ra3` (`rai0`..`rai3`), with `;` lists in the profile
+  (`AuthMode`, `EncrypType`, `HideSSID`, `NoForwarding`, `WmmCapable`, `PMFMFPC/R`) and `SSID<n>`, `WPAPSK<n>`, `AccessPolicy<n-1>`; unused slots stay down. A fifth network fails
+  with `TOO_MANY_APS`, and an image whose profile still has `BssidNum=1` fails the second network with `MULTI_SSID_UNAVAILABLE` instead of ignoring it. Beacon interval,
+  DTIM and channel are per radio (the first network's DTIM). A WPA2 client (the Linksys) joined a second 5 GHz network and got a LAN lease. Not verified:
+  per-network MAC filters on the 2nd to 4th network and on the 5 GHz band, a fresh image.
+- **Wireless modes (#640):** Access Point (up to 4 per band) and Client (one per band). LuCI offers only these two for `mtwifi`, and the handler refuses
+  anything else with `UNSUPPORTED_MODE`, including `option wds 1`. Why the others are out:
+  - **WDS:** this `mt_wifi` build has only MediaTek's peer-to-peer WDS (`WdsEnable`, `WdsList`, links `wds0..`/`wdsi0..`), not the 4-address AP and client
+    that OpenWrt's "Access Point (WDS)" and "Client (WDS)" mean (no MWDS or A4 keys in the module). Measured: with lazy WDS (`WdsEnable=4`) the card
+    created `wdsi0..7`, and a Linksys MX5300 client in `wds 1` mode associated with WPA2 but passed no traffic (no lease, no ping); the same client without
+    `wds` got a lease at once. mac80211 dropped the peer-to-peer WDS mode, so no standard OpenWrt device can pair with it.
+  - **Monitor:** no monitor or sniffer interface or key is exposed (the module has the firmware command, not the ioctl); "Air Monitor" only tracks
+    the RSSI of listed MACs.
+  - **802.11s mesh and Ad-Hoc:** not tried. The module's `mesh`/`meshi` interfaces (l1profile) and `MAP_*` code are MediaTek EasyMesh, not 802.11s,
+    and EasyMesh needs the vendor's controller daemons, which the image does not ship.
+- **Wi-Fi client mode (#631–#634):** use **Network > Wireless > Scan > Join Network**, or edit an interface and
+  choose **Client**. The regular LuCI dialog creates a DHCP network (normally `wwan`) and assigns its firewall zone;
+  network addressing, routing metrics and firewall policy remain standard OpenWrt settings. The image builder records
+  the scanned AP's channel because this driver does not choose it automatically. For a manually configured client,
+  set the radio to the upstream AP's channel. One AP and one client may coexist on each band, sharing its channel.
+  `mode 'sta'`, `ssid`, `encryption`, `key`, optional `bssid`, `ieee80211w` and `network` are read by netifd;
+  clients map to `apcli0` (2.4 GHz) and `apclii0` (5 GHz). Open, WPA2-PSK, WPA3-SAE and the existing mixed modes
+  are supported; encrypted networks use 8–63 character passphrases. SAE requires PMF. Unsupported modes and duplicate
+  AP/client sections fail explicitly before hardware is changed. Disable a section or remove it to undo client mode.
+  A 2.4 GHz client uses HT20 to avoid the driver's HT40 secondary-channel handshake failure (#633); an AP on that band
+  also uses 20 MHz. The two radio handlers serialize changes to the shared card and reapply the other band's active
+  client after reopening it. Active credentials are cached only in root-readable `/var/run/mtwifi`, removed on teardown.
+  Routed clients use the normal network/firewall path. For a client bridged into LAN, `x28-wifi-client` registers a fw3
+  include and refreshes ebtables rules on interface changes and firewall reloads: the driver's broadcast MAC translation
+  for unknown routed IPv4 destinations is redirected to the router (#634), with local subnets, multicast and broadcast
+  excluded. The image ships `ebtables-legacy`; no manual `opkg` installation is needed. Bridge only one uplink into an
+  upstream LAN: bridging both Ethernet and Wi-Fi to the same upstream segment can create a loop.
+  **Hardware evidence:** both bands have routed DHCP clients (WPA2 on 2.4 GHz, WPA3-SAE on 5 GHz), and both
+  reconnect after a full Wi-Fi down/up cycle and an owner-approved reboot. CLI and LuCI's iwinfo RPC report their encryption correctly after the
+  updated handler regenerates profiles; restart `rpcd` after manually replacing libiwinfo so it unloads the old library.
+  See [TESTING §57](TESTING.md#57-native-wi-fi-clients-on-both-bands-631635-2026-11-20).
+  **Not verified:** a fresh packaged image, open clients, browser rendering after the library update
+  and the automatic bridge-helper startup/reload path on a fresh image. The helper was exercised on an isolated DHCP bridge: forwarding counters changed from 0/3 to 3/3 with its rules enabled. IPv6 forwarding through a bridged client remains unverified; the MAT workaround
+  covers IPv4 only. Automatic following of an upstream channel change, enterprise
+  authentication, mesh and Ad-Hoc are not implemented. This is netifd/UCI/LuCI integration on the vendor driver,
+  which still has no nl80211 support.
 - **WPS push button (#262):** off unless a network has `wps_pushbutton '1'` (a checkbox on the Wireless Security tab, offered for
   WPA2-PSK and WPA2/WPA3 mixed mode; WPS cannot give out a WPA3-only key). `/sbin/x28-wps` (procd, `S97x28-wps`) reads the Tozed
   button driver `/dev/tz_gpio_keys` (`[event, key, ms]` words: event 1 is key-down and 2 key-up, key 2 is the WPS button and key 1 reset, `ms` is the hold time on key-up; event 3 repeats once a second while a key is held) and on a press
