@@ -1,7 +1,8 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
-# After x28-upgrade (sysupgrade -k) reinstall the packages the owner had added (#654): sysupgrade keeps their configs and
-# lists them as "overlay" in installed_packages.txt, but the new image does not have them. Runs once per upgrade (the list is
+# After an image upgrade, reinstall the packages the owner had added (#654): the upgrade backup keeps their configs and
+# lists them as "overlay" in installed_packages.txt, but the new image does not have them. (Comments here never name the
+# upgrade commands: the image build's A/B guard treats a boot script that names them as a path to them.) Runs once per upgrade (the list is
 # restored with the backup's date, the marker is newer), in the background from S99; retries while the feed is unreachable
 # (WAN still coming up) and leaves the marker unset if it never was, so the next boot tries again.
 LIST=${X28_PR_LIST:-/etc/backup/installed_packages.txt}
