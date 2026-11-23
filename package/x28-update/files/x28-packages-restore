@@ -10,6 +10,7 @@ OPKG=${X28_PR_OPKG:-opkg}
 TRIES=${X28_PR_TRIES:-30}
 WAIT=${X28_PR_WAIT:-60}
 LOCK=${X28_PR_LOCK:-/tmp/x28-packages-restore.lock}
+KREL=${X28_PR_KREL:-$(uname -r)}
 
 log() { logger -t x28-packages-restore "$*"; echo "x28-packages-restore: $*"; }
 
@@ -31,12 +32,18 @@ while :; do
 	if $OPKG update >/dev/null 2>&1; then
 		# opkg exits 255 here even when it installed (the vendor kernel never satisfies a kmod's kernel (= hash) dependency),
 		# so the installed list decides.
-		for p in $pk; do $OPKG install "$p" >/dev/null 2>&1; done
+		for p in $pk; do
+			# A kernel module only from a build for this kernel (our stub feed, epoch 1 beats upstream); an upstream kmod
+			# for another kernel would load at every boot (x28-kmods) and could crash it.
+			case "$p" in kmod-*) $OPKG list "$p" 2>/dev/null | grep -q " - [0-9:]*$KREL-" ||
+				{ log "skipped $p: no build for kernel $KREL"; continue; } ;; esac
+			$OPKG install "$p" >/dev/null 2>&1
+		done
 		failed=$(missing)
 		for p in $pk; do echo "$failed" | grep -qx "$p" || log "reinstalled $p"; done
 		[ -z "$failed" ] && continue
-		# The feed answered: a package it does not have will not appear by waiting.
-		log "not reinstalled (not in the feed?):" $failed; touch "$DONE"; exit 1
+		# No marker: a download error or a busy opkg (LuCI) is retried at the next boot; the list stays in the log.
+		log "not reinstalled, will try again at the next boot:" $failed; exit 1
 	fi
 	i=$((i + 1))
 	[ "$i" -lt "$TRIES" ] || { log "package feed unreachable; will try again at the next boot"; exit 1; }
