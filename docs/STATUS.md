@@ -54,7 +54,9 @@ is flashed to slot A of two test units (an X28 and an X28 PRO) and boots. Stock 
   v1.3.0 wrote and booted slot B, `x28-bootok` reset B's tries, and the settings came back (`/etc/config`, the SSH keys). What an update
   does not keep: `/root`, and packages the owner added (only their configs and the list in `/etc/backup/installed_packages.txt`);
   since x28-update release 8, `x28-packages-restore` reinstalls those from the feed after the first boot, once per update
-  ([#654](https://github.com/mralinp/zlt-x28-openwrt/issues/654)). Still unproven: LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
+  ([#654](https://github.com/mralinp/zlt-x28-openwrt/issues/654)). The v1.3.1 image shipped it without its boot link (the flasher's
+  rc.d allowlist, [x28-flasher#134](https://github.com/mralinp/x28-flasher/issues/134)); images from v1.3.2 enable it. On a v1.3.1 unit:
+  `/etc/init.d/x28-packages-restore enable`, then `/usr/libexec/x28-packages-restore` (tested: mwan3 and its dependencies back in 47 s). Still unproven: LuCI's flash page ([#478](https://github.com/mralinp/zlt-x28-openwrt/issues/478)), an interrupted write and the tries-6 fall-back between two native slots ([#458](https://github.com/mralinp/zlt-x28-openwrt/issues/458)).
 - Nothing upgrades on its own (no OTA). L2TP and PPTP are not tested against a server.
 
 ## Known limits of the base
