@@ -50,6 +50,7 @@ jobs:
       - run: sh tests/test_wifi_client_bridge.sh
       - run: sh tests/test_wps.sh
       - run: sh tests/test_switch.sh
+      - run: sh tests/test_wan6.sh
       - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py
