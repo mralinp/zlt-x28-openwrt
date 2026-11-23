@@ -405,7 +405,18 @@ removed, and `x28-leds` copied from `package/x28-leds/files` with an `S99` link.
   copies before the module loads, and the handler maps the 1st..4th AP `wifi-iface` of a radio to `ra0`..`ra3` (`rai0`..`rai3`), with `;` lists in the profile
   (`AuthMode`, `EncrypType`, `HideSSID`, `NoForwarding`, `WmmCapable`, `PMFMFPC/R`) and `SSID<n>`, `WPAPSK<n>`, `AccessPolicy<n-1>`; unused slots stay down. A fifth network fails
   with `TOO_MANY_APS`, and an image whose profile still has `BssidNum=1` fails the second network with `MULTI_SSID_UNAVAILABLE` instead of ignoring it. Beacon interval,
-  DTIM and channel are per radio (the first network's DTIM). Not verified: per-network MAC filters on the 2nd to 4th network and on the 5 GHz band, a fresh image.
+  DTIM and channel are per radio (the first network's DTIM). A WPA2 client (the Linksys) joined a second 5 GHz network and got a LAN lease. Not verified:
+  per-network MAC filters on the 2nd to 4th network and on the 5 GHz band, a fresh image.
+- **Wireless modes (#640):** Access Point (up to 4 per band) and Client (one per band). LuCI offers only these two for `mtwifi`, and the handler refuses
+  anything else with `UNSUPPORTED_MODE`, including `option wds 1`. Why the others are out:
+  - **WDS:** this `mt_wifi` build has only MediaTek's peer-to-peer WDS (`WdsEnable`, `WdsList`, links `wds0..`/`wdsi0..`), not the 4-address AP and client
+    that OpenWrt's "Access Point (WDS)" and "Client (WDS)" mean (no MWDS or A4 keys in the module). Measured: with lazy WDS (`WdsEnable=4`) the card
+    created `wdsi0..7`, and a Linksys MX5300 client in `wds 1` mode associated with WPA2 but passed no traffic (no lease, no ping); the same client without
+    `wds` got a lease at once. mac80211 dropped the peer-to-peer WDS mode, so no standard OpenWrt device can pair with it.
+  - **Monitor:** no monitor or sniffer interface or key is exposed (the module has the firmware command, not the ioctl); "Air Monitor" only tracks
+    the RSSI of listed MACs.
+  - **802.11s mesh and Ad-Hoc:** not tried. The module's `mesh`/`meshi` interfaces (l1profile) and `MAP_*` code are MediaTek EasyMesh, not 802.11s,
+    and EasyMesh needs the vendor's controller daemons, which the image does not ship.
 - **Wi-Fi client mode (#631–#634):** use **Network > Wireless > Scan > Join Network**, or edit an interface and
   choose **Client**. The regular LuCI dialog creates a DHCP network (normally `wwan`) and assigns its firewall zone;
   network addressing, routing metrics and firewall policy remain standard OpenWrt settings. The image builder records
