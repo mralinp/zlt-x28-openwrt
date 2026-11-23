@@ -183,3 +183,11 @@ software today; smart fan control (#47) would need a modification. [THERMAL](THE
 
 Not recorded yet, add them when someone measures or reads the label: LAN 3's port, how switch port 0 relates to the 2.5 G socket, the X28 PRO's board name string, its Wi-Fi antenna
 count (4 or 8), and a USB host test with a self-powered device or hub.
+
+### LAN 1 as a WAN port, and multi-WAN (#642)
+
+`eth1` (LAN 1, 2.5 G) is a plain NIC: it can be a LAN port or a WAN port with stock OpenWrt config. LAN is the shipped default (`eth1` in the `br-lan` device `ports`).
+For WAN: `uci del_list network.@device[0].ports=eth1`, add `interface` `wanlan1` (`proto dhcp`, `device eth1`, a `metric` above the cellular default and above any Wi-Fi uplink on the same subnet),
+add it to the `wan` firewall zone, `uci commit`, `/etc/init.d/network reload`. Back up `/etc/config/network` and `firewall` first and keep a second path to the router (LAN 2 to 4 or Wi-Fi) while you do it.
+`mwan3` and `luci-app-mwan3` install from the official feed with our `kmod-ipt-ipopt` stub (`opkg install mwan3 luci-app-mwan3`, tried on 1.2.2: the kernel has the needed netfilter and ipset modules); they are not part of the image.
+**Verified on the unit (2026-11-23):** the `eth1` move and its rollback; `eth1` transmits and receives (a Mac on LAN 1 got its lease and SSH through it; a Linksys LAN port never saw `eth1`'s DHCP requests, cause not found). **Not verified:** an upstream DHCP lease on `eth1`, WAN failover with mwan3, reboot persistence.
