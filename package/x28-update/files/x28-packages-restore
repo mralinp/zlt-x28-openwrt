@@ -1,0 +1,51 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# After x28-upgrade (sysupgrade -k) reinstall the packages the owner had added (#654): sysupgrade keeps their configs and
+# lists them as "overlay" in installed_packages.txt, but the new image does not have them. Runs once per upgrade (the list is
+# restored with the backup's date, the marker is newer), in the background from S99; retries while the feed is unreachable
+# (WAN still coming up) and leaves the marker unset if it never was, so the next boot tries again.
+LIST=${X28_PR_LIST:-/etc/backup/installed_packages.txt}
+DONE=${X28_PR_DONE:-/etc/x28-packages-restored}
+OPKG=${X28_PR_OPKG:-opkg}
+TRIES=${X28_PR_TRIES:-30}
+WAIT=${X28_PR_WAIT:-60}
+LOCK=${X28_PR_LOCK:-/tmp/x28-packages-restore.lock}
+KREL=${X28_PR_KREL:-$(uname -r)}
+
+log() { logger -t x28-packages-restore "$*"; echo "x28-packages-restore: $*"; }
+
+[ -s "$LIST" ] || exit 0
+[ -e "$DONE" ] && [ "$DONE" -nt "$LIST" ] && exit 0
+mkdir "$LOCK" 2>/dev/null || exit 0
+trap 'rm -rf "$LOCK"' EXIT
+
+missing() {
+	$OPKG list-installed 2>/dev/null | cut -d' ' -f1 > "$LOCK/have"
+	# Names only: the list is restored data, never passed to opkg as options.
+	awk '$2 == "overlay" && $1 ~ /^[a-z0-9][a-z0-9._+-]*$/ { print $1 }' "$LIST" | grep -vxF -f "$LOCK/have"
+}
+
+i=0
+while :; do
+	pk=$(missing)
+	[ -n "$pk" ] || { log "all added packages present"; touch "$DONE"; exit 0; }
+	if $OPKG update >/dev/null 2>&1; then
+		# opkg exits 255 here even when it installed (the vendor kernel never satisfies a kmod's kernel (= hash) dependency),
+		# so the installed list decides.
+		for p in $pk; do
+			# A kernel module only from a build for this kernel (our stub feed, epoch 1 beats upstream); an upstream kmod
+			# for another kernel would load at every boot (x28-kmods) and could crash it.
+			case "$p" in kmod-*) $OPKG list "$p" 2>/dev/null | grep -q " - [0-9:]*$KREL-" ||
+				{ log "skipped $p: no build for kernel $KREL"; continue; } ;; esac
+			$OPKG install "$p" >/dev/null 2>&1
+		done
+		failed=$(missing)
+		for p in $pk; do echo "$failed" | grep -qx "$p" || log "reinstalled $p"; done
+		[ -z "$failed" ] && continue
+		# No marker: a download error or a busy opkg (LuCI) is retried at the next boot; the list stays in the log.
+		log "not reinstalled, will try again at the next boot:" $failed; exit 1
+	fi
+	i=$((i + 1))
+	[ "$i" -lt "$TRIES" ] || { log "package feed unreachable; will try again at the next boot"; exit 1; }
+	sleep "$WAIT"
+done

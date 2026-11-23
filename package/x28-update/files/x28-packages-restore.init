@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Reinstall the owner's added packages after an upgrade (#654), in the background so boot does not wait for the WAN.
+START=99
+
+start() {
+	( /usr/libexec/x28-packages-restore ) </dev/null >/dev/null 2>&1 &
+}
