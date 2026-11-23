@@ -385,6 +385,7 @@ x28_mipc_setup() {
  local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll split6=
  json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric
+ rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"  # a wan6 must never read a previous bearer's result
  local bands="" b
  json_get_values bands lteband_list
  local nrbands=""
@@ -565,7 +566,8 @@ x28_mipc_setup() {
 x28_mipc_has_wan6() {
  local s
  for s in $(uci -q show network | sed -n 's/^network\.\([^.=]*\)=interface$/\1/p'); do
-  [ "$(uci -q get "network.$s.proto")" = x28_mipc6 ] && [ "$(uci -q get "network.$s.device")" = "@$1" ] && return 0
+  [ "$(uci -q get "network.$s.proto")" = x28_mipc6 ] && [ "$(uci -q get "network.$s.device")" = "@$1" ] &&
+   [ "$(uci -q get "network.$s.disabled")" != 1 ] && [ "$(uci -q get "network.$s.auto")" != 0 ] && return 0
  done
  return 1
 }

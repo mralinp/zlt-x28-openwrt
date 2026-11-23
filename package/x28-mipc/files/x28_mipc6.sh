@@ -22,12 +22,12 @@ proto_x28_mipc6_setup() {
  parent="$(uci -q get "network.$interface.device")"; parent="${parent#@}"
  [ -n "$parent" ] || { proto_notify_error "$interface" NO_PARENT; proto_block_restart "$interface"; return 1; }
  f="${X28_MIPC_RUN:-/var/run/x28_mipc}/$parent.v6"
- # wan reports its link-local first and the global address after the RA wait (up to 10 s), so this can start before the file exists.
+ # wan reports its link-local first and the global address after the RA wait (up to 10 s after the settle), so this can start before the file exists.
  i=0
- while [ ! -r "$f" ] && [ "$i" -lt "${X28_MIPC6_WAIT:-30}" ]; do sleep 1; i=$((i + 1)); done
+ while [ ! -r "$f" ] && [ "$i" -lt "${X28_MIPC6_WAIT:-45}" ]; do sleep 1; i=$((i + 1)); done
  [ -r "$f" ] && {
   IFS= read -r g && IFS= read -r net64 && IFS= read -r gw && IFS= read -r d1 && IFS= read -r d2
- } < "$f" && [ -n "$g" ] && [ -n "$net64" ] ||
+ } < "$f" && case "$g" in *:*) [ -n "$net64" ] ;; *) false ;; esac ||
   { proto_notify_error "$interface" NO_IPV6; proto_block_restart "$interface"; return 1; }
  proto_init_update "$device" 1
  proto_add_ipv6_address "$g" 128
