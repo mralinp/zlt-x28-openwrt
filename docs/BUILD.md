@@ -611,6 +611,7 @@ X28 feed. `userspace.sh` fails if the image did not take this build.
   boot tries, then brings up any WireGuard interfaces. A marker in `/etc` stops a load that crashed the unit from being
   retried, so a crash cannot become a boot loop.
   The module loads with no symbol version check; see [#227](https://github.com/mralinp/zlt-x28-openwrt/issues/227).
+  Setting up a server and peers: [WIREGUARD.md](WIREGUARD.md).
 - **Publishing the modules (#352):** they cannot be built from public files: `build.sh` needs the configured SDK kernel
   tree (vendor patches, config, headers), and a vanilla 4.19.205 tree is not a substitute ([CRC research](research/kernel-module-crc.md)).
   The built `.ko` files are another matter: the owner accepted publishing built artifacts made with the SDK tree

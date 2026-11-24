@@ -14,6 +14,7 @@ Read in this order if you are new (or returning after a long break):
 10. [**WORKFLOW.md**](WORKFLOW.md): issues, branches, commits, PRs and automatic releases.
 11. [**TELEPHONY.md**](TELEPHONY.md): text messages, the phone book and the HTTP API with API keys; what is known about calls.
 12. [**PACKAGE-FEED.md**](PACKAGE-FEED.md): the signed `opkg` feed for this device line: what installs, what is refused, how to use it.
+13. [**WIREGUARD.md**](WIREGUARD.md): a WireGuard server on the X28 to reach it and its LAN from anywhere (needs a public WAN address).
 
 What changed and when: [../CHANGELOG.md](../CHANGELOG.md).
 
@@ -46,6 +47,7 @@ docs/
 ├── research/rust-flasher-design.md  dropped Rust flasher (#270), kept for protocol and DA findings
 ├── research/reset-wps-buttons.md  reset and WPS button pins, records and boot-time behaviour (no layer wipes flash)
 ├── PASSWALL2.md              Passwall2 on TPROXY modules for this kernel, unit state, tunnel speed results
+├── WIREGUARD.md              WireGuard server: setup in LuCI or uci, peers by QR code, checks, tested on a static public IPv4
 ├── FIRMWARE-INVENTORY.md     kernel config, modules, vendor packages, runtime deps, fw3 fit, ABI vs 23.05
 ├── FIRMWARE-EXTRACTION.md    offline extraction of the stock rootfs
 ├── RECOVERY-BACKUP.md        the verified partition backup and how it is stored

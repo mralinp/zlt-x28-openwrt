@@ -27,7 +27,7 @@ Tested on **X28 and X28 PRO**. A native OpenWrt userspace replaces the stock int
 | Web interface | Standard LuCI over HTTPS, UCI configuration and SSH |
 | Cellular | 5G data, APN settings, operator selection, band/cell locking and signal status in LuCI |
 | Networking | Dual-band Wi-Fi, LAN, DHCP/DNS, firewall, NAT and IPv6 on LAN |
-| VPN and proxy | WireGuard, OpenVPN and Passwall2 preinstalled |
+| VPN and proxy | WireGuard, OpenVPN and Passwall2 preinstalled ([WireGuard server guide](docs/WIREGUARD.md)) |
 | Text messages (SMS) | The `x28-telephony` package: send and receive in LuCI (Services > Telephony), a phone book, and an HTTP API with API keys for machines on the LAN |
 | Updates | Working signed firmware upgrades and a signed, kernel-compatible `opkg` package feed |
 | Hardware | Front-panel LEDs and boot-counter management; about 40 °C idle SoC temperature on the test unit |
