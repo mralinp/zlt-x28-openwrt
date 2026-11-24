@@ -22,6 +22,7 @@ proto_x28_mipc_init_config() {
  proto_config_add_string nrband_mode
  proto_config_add_array 'nrband_list:uinteger'
  proto_config_add_string netmode
+ proto_config_add_string passthrough_mac
  proto_config_add_defaults
 }
 
@@ -382,9 +383,9 @@ x28_mipc_fail_owned() {
 }
 
 x28_mipc_setup() {
- local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname
+ local x28_mipc_moved= interface="$1" apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric sim rc reply result cid ifname passthrough_mac
  local v4_addr v4_mask v4_gw v4_dns1 v4_dns2 prefix v6_addr v6_gw v6_dns1 v6_dns2 v6_global net64 i ll split6=
- json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric
+ json_get_vars apn mtu iptype roaming plmn celllock lteband_mode nrband_mode netmode defaultroute peerdns metric passthrough_mac
  rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"  # a wan6 must never read a previous bearer's result
  local bands="" b
  json_get_values bands lteband_list
@@ -406,7 +407,8 @@ x28_mipc_setup() {
     { [ "$roaming" != 0 ] && [ "$roaming" != 1 ]; } ||
     { [ -n "$plmn" ] && { [ "${#plmn}" -lt 5 ] || [ "${#plmn}" -gt 6 ] || case "$plmn" in *[!0-9]*) true ;; *) false ;; esac; }; } ||
     { [ "$defaultroute" != 0 ] && [ "$defaultroute" != 1 ]; } ||
-    { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; }; then
+    { [ "$peerdns" != 0 ] && [ "$peerdns" != 1 ]; } ||
+    { [ -n "$passthrough_mac" ] && { [ "$iptype" = 2 ] || ! echo "$passthrough_mac" | grep -Eqx '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'; }; }; then
   proto_notify_error "$interface" INVALID_CONFIG
   proto_block_restart "$interface"
   return 1
@@ -417,6 +419,8 @@ x28_mipc_setup() {
   return 1
  fi
  command -v mipc_wan_cli >/dev/null 2>&1 || { proto_notify_error "$interface" MISSING_MODEM_CLI; return 1; }
+ # Passthrough off: drop what a bearer whose teardown never ran (netifd killed) left behind; nothing happens without it.
+ [ -n "$passthrough_mac" ] || ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
  sim="$(mipc_wan_cli --show_sim_status 2>/dev/null)" || { proto_notify_error "$interface" SIM_NOT_READY; return 1; }
  case "$sim" in
   MIPC_SIM_STATUS_COMPLETE_READY) ;;
@@ -498,15 +502,12 @@ x28_mipc_setup() {
  if [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
- # After a change that made the modem re-register, it can drop the fresh bearer moments later while netifd would keep the
- # interface up (seen on a unit after a switch to 4G only: packets out, none back, --data_call_get empty, no event). Check
- # once it settled, before anything is reported to netifd: returning here while setup is still pending makes netifd tear
- # down and retry (after an IPv6 link-local update it would not). The bearer is gone, so there is nothing to deactivate;
- # the retry changes nothing on the modem and keeps its bearer.
- if [ -n "$x28_mipc_moved" ]; then
+ # The modem can drop a fresh bearer after re-registering or enabling passthrough, without a teardown event.
+ # Check before publishing any link-up so netifd retries; the lost bearer needs no deactivation.
+ if [ -n "$x28_mipc_moved" ] || [ -n "$passthrough_mac" ]; then
   sleep "${X28_MIPC_SETTLE:-10}"
   if ! mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"'; then
-   logger -t x28_mipc "the modem dropped the new bearer after re-registering; reconnecting"
+   logger -t x28_mipc "the modem dropped the new bearer; reconnecting"
    proto_notify_error "$interface" CONNECT_FAILED; return 1
   fi
  fi
@@ -516,6 +517,23 @@ x28_mipc_setup() {
   x28_mipc_fail_owned "$interface" "$cid" LINK_NOT_READY; return 1
  fi
  [ "$v4_gw" != 0.0.0.0 ] || v4_gw=
+ # The vendor stack can assign the bearer address before netifd does. It belongs to the
+ # downstream host in passthrough mode; remove only this validated bearer address.
+ if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ] &&
+    ip -4 addr show dev "$ifname" | grep -q "inet $v4_addr/$prefix "; then
+  ip -4 addr del "$v4_addr/$prefix" dev "$ifname" || {
+   x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED
+   proto_block_restart "$interface"; return 1
+  }
+ fi
+ # IPv4 passthrough (#581) before the first update to netifd carries the default route: without the SNAT, traffic leaving a
+ # ccmni with no IPv4 address would go out with a LAN source. A refusal does not clear by retrying, so retries stop.
+ if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ] &&
+    ! ${X28_MIPC_PASSTHROUGH:-x28-passthrough} up "$ifname" "$v4_addr" "$passthrough_mac" "$v4_dns1" "$v4_dns2"; then
+  ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
+  x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED
+  proto_block_restart "$interface"; return 1
+ fi
  if [ "$iptype" != 1 ]; then
   # The modem reports only the interface ID (fe80::...); the global /64 arrives by RA on ccmni and the kernel
   # configures it (stock's check_global_ipv6_addr waits the same way). 3GPP routes that whole /64 to the UE.
@@ -583,8 +601,13 @@ x28_mipc_publish6() {
 x28_mipc_send() {
  proto_init_update "$ifname" 1
  if [ -n "$v4_addr" ]; then
-  proto_add_ipv4_address "$v4_addr" "$prefix"
-  [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "$v4_gw" "$v4_addr" "$metric"
+  if [ -n "${passthrough_mac:-}" ]; then
+   # Passthrough: the address belongs to the LAN host, so ccmni gets none and the route needs no gateway (raw IP link).
+   [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "" "" "$metric"
+  else
+   proto_add_ipv4_address "$v4_addr" "$prefix"
+   [ "$defaultroute" = 0 ] || proto_add_ipv4_route 0.0.0.0 0 "$v4_gw" "$v4_addr" "$metric"
+  fi
   if [ "$peerdns" = 1 ]; then
    [ -z "$v4_dns1" ] || [ "$v4_dns1" = 0.0.0.0 ] || proto_add_dns_server "$v4_dns1"
    [ -z "$v4_dns2" ] || [ "$v4_dns2" = 0.0.0.0 ] || [ "$v4_dns2" = "$v4_dns1" ] || proto_add_dns_server "$v4_dns2"
@@ -603,6 +626,7 @@ x28_mipc_send() {
  proto_add_data
  json_add_int x28_mipc_cid "$cid"
  json_add_string x28_mipc_owner "$1"
+ [ -z "${passthrough_mac:-}" ] || [ -z "$v4_addr" ] || json_add_string x28_passthrough_ip "$v4_addr"
  proto_close_data
  proto_send_update "$1"
 }
@@ -626,6 +650,9 @@ x28_mipc_teardown() {
  rm -f "${X28_MIPC_RUN:-/var/run/x28_mipc}/$interface.v6"
  proto_init_update "*" 0
  proto_send_update "$interface"
+ # After netifd dropped the default route, so nothing leaves ccmni unSNATed in between.
+ ${X28_MIPC_PASSTHROUGH:-x28-passthrough} down >/dev/null 2>&1
+ return 0
 }
 
 proto_x28_mipc_setup() { x28_mipc_run_locked "$1" x28_mipc_setup; }

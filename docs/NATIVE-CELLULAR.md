@@ -49,6 +49,28 @@ Do not enable this protocol on the active vendor-managed gateway. Use a spare un
 Run local checks with `node tests/test_luci.cjs` and `sh -n package/x28-mipc/files/x28_mipc.sh tests/run-case.sh`.
 Run mock helper tests with `python3 tests/test_native.py --router router`. This needs SSH/SCP and the device's existing OpenWrt helpers. Read the harness before running it on another system.
 
+## IPv4 passthrough (#581)
+
+`option passthrough_mac '<MAC>'` on the `x28_mipc` WAN (LuCI: Advanced Settings > IPv4 passthrough to) gives that LAN
+device the cellular IPv4 address by DHCP, like the stock firmware's bridge mode, which turned out to be plain Linux
+routing (community dump of a stock unit, 2026-11-18):
+
+| | Stock | Native |
+|---|---|---|
+| Host address | cellular IP | same |
+| Netmask, gateway | /29, IP + 1 | /29, IP + 1; wider prefix or IP - 1 at the /29 edges |
+| DNS | 8.8.8.8, 1.1.1.1 | the carrier's DNS from the bearer |
+| Lease | 10 days | 10 minutes, so a new bearer address reaches the host fast |
+| Inbound | everything forwarded, no firewall | the same, plus a MAC guard against other LAN clients using the address |
+
+The X28 keeps no IPv4 address on `ccmni`; it holds the gateway as a /32 on `br-lan` with `proxy_arp`, routes the
+cellular address to `br-lan` and SNATs everything leaving `ccmni` to it (its own traffic and other LAN clients keep
+working; for the host the SNAT changes nothing). `/sbin/x28-passthrough` does this from the protocol's setup and
+teardown and, as a firewall include, again after every fw3 reload. IPv6 is unchanged (routed /64 on the LAN).
+The package registers its firewall include at installation and before fw3 starts at boot; the runtime helper only changes temporary state.
+After enabling, renew the device's DHCP lease (e.g. `ifup wan` on a downstream OpenWrt). The device needs its own
+firewall. With Passwall2's kill switch on, the host's traffic is filtered like any LAN client's.
+
 ## Limits and next work
 
 One native cellular WAN, no PAP/CHAP, no SIM PIN submission. The external CLI has no explicit timeout; hangs and netifd

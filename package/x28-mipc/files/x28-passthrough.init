@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Register before fw3 starts, independently of any active bearer.
+START=18
+
+start() {
+ [ "$(uci -q get firewall.x28_passthrough.path)" = /sbin/x28-passthrough ] &&
+ [ "$(uci -q get firewall.x28_passthrough.reload)" = 1 ] && return 0
+ uci -q batch <<'UCI'
+set firewall.x28_passthrough=include
+set firewall.x28_passthrough.type=script
+set firewall.x28_passthrough.path=/sbin/x28-passthrough
+set firewall.x28_passthrough.reload=1
+commit firewall
+UCI
+}

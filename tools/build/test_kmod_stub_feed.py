@@ -230,6 +230,15 @@ class Build(unittest.TestCase):
             self.assertEqual({m.name: m.mode for m in ctrl}, {'./control': 0o644, './conffiles': 0o644})
             self.assertEqual(f.parse_index((out / 'Packages').read_text())['x28-meta']['Depends'], 'x28-cfg')
 
+    def test_mipc_installs_firewall_registration_before_first_activation(self):
+        package = next(p for p in f.read_packages() if p[0] == 'x28-mipc')
+        files = {name: data for name, data, _ in package[3]}
+        self.assertIn('./etc/init.d/x28-passthrough', files)
+        scripts = dict(package[5])
+        self.assertIn(b'/etc/init.d/x28-passthrough start', scripts['postinst'])
+        self.assertIn(b'IPKG_INSTROOT', scripts['postinst'])
+        self.assertNotIn(b'commit firewall', files['./sbin/x28-passthrough'])
+
     def test_x28_base_requires_every_other_package_of_the_spec(self):
         pk = {p[0]: p for p in f.read_packages()}
         base = set(pk['x28-base'][1].split(', '))
