@@ -217,6 +217,8 @@ def verify(item, directory):
     errors = [e for e in events if e.get("action") == 3]
     up = [e for e in events if e.get("action") == 0 and e.get("link-up")]
     assert not any("FORBIDDEN" in line or "--data_call_deact_apn" in line for line in commands), commands
+    if rc == 0 and up:  # every bearer that came up is watched (#662)
+        assert {"action": 1, "command": ["/sbin/x28-bearer-watch", "ccmni7"]}.items() <= next(e for e in events if e.get("action") == 1).items(), events
     activations = [c for c in commands if c.startswith("--data_call_act ")]
     assert len(activations) <= 1, commands
     if activations:

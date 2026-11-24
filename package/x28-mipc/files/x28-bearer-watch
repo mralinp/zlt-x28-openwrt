@@ -1,0 +1,16 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# x28-bearer-watch <ccmni>: started by x28_mipc through netifd once the WAN is up; exits when the modem has lost the
+# bearer on <ccmni>, so netifd sees the link lost and sets the interface up again, like a pppd that died (#662).
+# The modem can drop the bearer with no event: netifd kept the WAN up for hours with packets out and none back.
+# Only an answered query without the bearer counts; a failed or timed-out query (modem busy) changes nothing.
+dev=$1
+case "$dev" in ccmni[0-9]|ccmni[0-9][0-9]) ;; *) exit 2 ;; esac
+miss=0
+while sleep "${X28_BW_EVERY:-30}"; do
+	out=$(timeout 15 mipc_wan_cli --data_call_get 2>/dev/null) || continue
+	if echo "$out" | grep -Eq "\"iface\": *\"$dev\""; then miss=0; else miss=$((miss + 1)); fi
+	[ "$miss" -lt 2 ] && continue
+	logger -t x28_mipc "the modem dropped the bearer on $dev; reconnecting"
+	exit 1
+done
