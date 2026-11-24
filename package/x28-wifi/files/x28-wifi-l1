@@ -8,6 +8,17 @@
 L1=${L1:-/etc/wireless/l1profile.dat}
 PCI=${PCI:-/sys/bus/pci/devices}
 
+# mt_wifi creates ra1.. / rai1.. from BssidNum when it loads, so every band's profile and its stock copy (the handler renders from
+# it) carry the networks-per-band maximum before then (#640; keep in step with MTWIFI_MAXBSS in mtwifi.sh).
+BSS=${MTWIFI_MAXBSS:-4}; DIR=${MTWIFI_DIR:-/etc/wireless/mediatek}
+for g in "$DIR"/mt7915.dbdc.b0.dat "$DIR"/mt7915.dbdc.b1.dat; do
+	for f in "$g" "$g.stock"; do
+		# sync before mv: on UBIFS a power cut after an unsynced rename can leave an empty .stock (nothing rebuilds that).
+		[ -f "$f" ] && grep -q '^BssidNum=' "$f" && ! grep -qx "BssidNum=$BSS" "$f" &&
+			sed "s/^BssidNum=.*/BssidNum=$BSS/" "$f" > "$f.tmp" && sync && mv "$f.tmp" "$f"
+	done
+done
+
 chips=$(cat "$PCI"/*/class 2>/dev/null | grep -c '^0x0280\|^0x000280')  # network controller (this kernel prints the class as 0x000280); the PCIe root port is not
 cards=$(grep -c '^INDEX[0-9]*=' "$L1" 2>/dev/null)
 [ "$chips" = 1 ] || [ "$chips" = 2 ] || exit 0
