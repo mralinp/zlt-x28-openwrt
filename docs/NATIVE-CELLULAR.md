@@ -67,6 +67,7 @@ The X28 keeps no IPv4 address on `ccmni`; it holds the gateway as a /32 on `br-l
 cellular address to `br-lan` and SNATs everything leaving `ccmni` to it (its own traffic and other LAN clients keep
 working; for the host the SNAT changes nothing). `/sbin/x28-passthrough` does this from the protocol's setup and
 teardown and, as a firewall include, again after every fw3 reload. IPv6 is unchanged (routed /64 on the LAN).
+The package registers its firewall include at installation and before fw3 starts at boot; the runtime helper only changes temporary state.
 After enabling, renew the device's DHCP lease (e.g. `ifup wan` on a downstream OpenWrt). The device needs its own
 firewall. With Passwall2's kill switch on, the host's traffic is filtered like any LAN client's.
 

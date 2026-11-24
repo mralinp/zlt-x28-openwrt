@@ -502,15 +502,12 @@ x28_mipc_setup() {
  if [ -n "$v6_addr" ] && ! x28_mipc_v6_valid; then
   x28_mipc_fail_owned "$interface" "$cid" INVALID_REPLY; return 1
  fi
- # After a change that made the modem re-register, it can drop the fresh bearer moments later while netifd would keep the
- # interface up (seen on a unit after a switch to 4G only: packets out, none back, --data_call_get empty, no event). Check
- # once it settled, before anything is reported to netifd: returning here while setup is still pending makes netifd tear
- # down and retry (after an IPv6 link-local update it would not). The bearer is gone, so there is nothing to deactivate;
- # the retry changes nothing on the modem and keeps its bearer.
- if [ -n "$x28_mipc_moved" ]; then
+ # The modem can drop a fresh bearer after re-registering or enabling passthrough, without a teardown event.
+ # Check before publishing any link-up so netifd retries; the lost bearer needs no deactivation.
+ if [ -n "$x28_mipc_moved" ] || [ -n "$passthrough_mac" ]; then
   sleep "${X28_MIPC_SETTLE:-10}"
   if ! mipc_wan_cli --data_call_get 2>/dev/null | grep -q '"CID"'; then
-   logger -t x28_mipc "the modem dropped the new bearer after re-registering; reconnecting"
+   logger -t x28_mipc "the modem dropped the new bearer; reconnecting"
    proto_notify_error "$interface" CONNECT_FAILED; return 1
   fi
  fi

@@ -32,6 +32,8 @@ def cases():
         case("passthrough-modem-address", config={"passthrough_mac": "02:00:00:aa:bb:01"},
              expect_cmds=["ip -4 addr del 198.51.100.7/32 dev ccmni7", "passthrough up"]),
         case("passthrough-no-modem-address", config={"passthrough_mac": "02:00:00:aa:bb:01"}, passthrough_has_addr=0),
+        case("passthrough-bearer-lost", config={"passthrough_mac": "02:00:00:aa:bb:01"},
+             bearer_lost=1, error="CONNECT_FAILED", no_rat_set=True),
         case("passthrough-helper-failed", config={"passthrough_mac": "02:00:00:aa:bb:01"},
              passthrough_rc=1, error="PASSTHROUGH_FAILED", cleanup=True),
         case("passthrough-delete-failed", config={"passthrough_mac": "02:00:00:aa:bb:01"},
