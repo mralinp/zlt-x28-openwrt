@@ -157,16 +157,6 @@ dhcp-option=tag:$PT_TAG,option:router,$gw"
 	[ -z "$dns1" ] || conf="$conf
 dhcp-option=tag:$PT_TAG,option:dns-server,$dns1${dns2:+,$dns2}"
 	pt_dhcp "$conf" || { pt_down; return 1; }
-	# The rules above go when fw3 restarts; this include puts them back.
-	if [ "$(uci -q get firewall.x28_passthrough)" != include ]; then
-		uci -q batch <<-EOF
-			set firewall.x28_passthrough=include
-			set firewall.x28_passthrough.type=script
-			set firewall.x28_passthrough.path=/sbin/x28-passthrough
-			set firewall.x28_passthrough.reload=1
-			commit firewall
-		EOF
-	fi
 	logger -t x28-passthrough "$cell/$prefix gateway $gw to $mac on br-lan"
 }
 
@@ -184,9 +174,15 @@ pt_selftest() {
 }
 
 pt_main() {
-	local dev cell gw prefix mac proxy lock="${X28_PT_LOCK:-/var/lock/x28-passthrough.lock}"
+	local dev cell gw prefix mac proxy tries=30 lock="${X28_PT_LOCK:-/var/lock/x28-passthrough.lock}"
 	case "$1" in selftest) pt_selftest; return ;; esac
-	exec 8>"$lock" && flock -w 30 8 || return 1
+	exec 8>"$lock" || return 1
+	# BusyBox flock has no -w: retry its nonblocking lock for at most 30 seconds.
+	until flock -n 8; do
+		[ "$tries" -gt 0 ] || return 1
+		tries=$((tries - 1))
+		sleep 1
+	done
 	case "$1" in
 		up) shift; pt_up "$@" ;;
 		down) pt_down ;;

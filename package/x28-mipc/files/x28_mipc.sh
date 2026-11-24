@@ -520,6 +520,15 @@ x28_mipc_setup() {
   x28_mipc_fail_owned "$interface" "$cid" LINK_NOT_READY; return 1
  fi
  [ "$v4_gw" != 0.0.0.0 ] || v4_gw=
+ # The vendor stack can assign the bearer address before netifd does. It belongs to the
+ # downstream host in passthrough mode; remove only this validated bearer address.
+ if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ] &&
+    ip -4 addr show dev "$ifname" | grep -q "inet $v4_addr/$prefix "; then
+  ip -4 addr del "$v4_addr/$prefix" dev "$ifname" || {
+   x28_mipc_fail_owned "$interface" "$cid" PASSTHROUGH_FAILED
+   proto_block_restart "$interface"; return 1
+  }
+ fi
  # IPv4 passthrough (#581) before the first update to netifd carries the default route: without the SNAT, traffic leaving a
  # ccmni with no IPv4 address would go out with a LAN source. A refusal does not clear by retrying, so retries stop.
  if [ -n "$passthrough_mac" ] && [ -n "$v4_addr" ] &&

@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=x28-mipc
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=1
+PKG_RELEASE:=7
 PKG_LICENSE:=GPL-2.0-only
 
 include $(INCLUDE_DIR)/package.mk
@@ -38,6 +38,12 @@ define Package/x28-mipc/install
 	$(INSTALL_BIN) ./files/x28-passthrough $(1)/sbin/x28-passthrough
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/x28-autotune.init $(1)/etc/init.d/x28-autotune
+	$(INSTALL_BIN) ./files/x28-passthrough.init $(1)/etc/init.d/x28-passthrough
+endef
+
+define Package/x28-mipc/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/x28-passthrough start
 endef
 
 $(eval $(call BuildPackage,x28-mipc))

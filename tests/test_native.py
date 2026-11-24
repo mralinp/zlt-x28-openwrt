@@ -29,6 +29,13 @@ def cases():
     own = {"data": {"x28_mipc_cid": 4, "x28_mipc_owner": "wan"}}
     return [
         case("point-to-point"),
+        case("passthrough-modem-address", config={"passthrough_mac": "02:00:00:aa:bb:01"},
+             expect_cmds=["ip -4 addr del 198.51.100.7/32 dev ccmni7", "passthrough up"]),
+        case("passthrough-no-modem-address", config={"passthrough_mac": "02:00:00:aa:bb:01"}, passthrough_has_addr=0),
+        case("passthrough-helper-failed", config={"passthrough_mac": "02:00:00:aa:bb:01"},
+             passthrough_rc=1, error="PASSTHROUGH_FAILED", cleanup=True),
+        case("passthrough-delete-failed", config={"passthrough_mac": "02:00:00:aa:bb:01"},
+             passthrough_delete_rc=1, error="PASSTHROUGH_FAILED", cleanup=True),
         case("attach-sync-apn", ia="IA apn:mcinet pdp_type:1 roaming_type:3 bearer_bitmask:0xffffffff\n",
              expect_cmds=["--apn_ia_set example.invalid 1 3", "--at_cmd at+cfun=0", "--at_cmd at+cfun=1", "--data_call_act"]),
         case("attach-sync-iptype", ia="IA apn:example.invalid pdp_type:3 roaming_type:3 bearer_bitmask:0xffffffff\n",
@@ -290,6 +297,11 @@ def verify(item, directory):
                 assert not last.get("ipaddr") and not last.get("routes"), events
                 assert last["dns"] == ["2001:db8::53"], events
                 return
+            if item["config"].get("passthrough_mac"):
+                assert not last.get("ipaddr"), events
+                assert last["data"]["x28_passthrough_ip"] == "198.51.100.7", events
+                assert last["routes"][0]["target"] == "0.0.0.0" and not last["routes"][0].get("gateway"), events
+                return
             assert last["ipaddr"] == [{"ipaddr": "198.51.100.7", "mask": "24" if item["name"] == "gateway" else "32"}], events
             assert last["data"] == {"x28_mipc_cid": 4, "x28_mipc_owner": "wan"}, events
             if item["name"] == "no-route-dns":
@@ -346,6 +358,8 @@ def main():
             (d / "cfun_ok").write_text(str(item.get("cfun_ok", 1)))
             (d / "get").write_text(json.dumps(item["get"]) if item.get("get") else "")
             (d / "bearer_lost").write_text(str(item.get("bearer_lost", 0)))
+            for field, default in [("passthrough_has_addr", 1), ("passthrough_rc", 0), ("passthrough_delete_rc", 0)]:
+                (d / field).write_text(str(item.get(field, default)))
             for field in ["sim", "activate_rc", "deactivate_rc", "notify_rc", "link", "operation", "vendor_active", "status_rc"]:
                 (d / field).write_text(str(item[field]))
         archive = tmp / "inputs.tgz"

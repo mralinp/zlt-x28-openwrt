@@ -25,9 +25,17 @@ echo "ip $*" >> "$T/calls"
 [ -n "${X28_FAKE_LOCAL:-}" ] && [ "$3" = get ] && { echo "local $4 dev lo src $4"; exit 0; }
 case "$*" in "-4 route get 192.168.70."*) echo "$4 dev br-lan src 192.168.70.1" ;; "-4 route get "*) echo "$4 dev ccmni2 src 192.168.70.1" ;; esac
 EOF
-printf '#!/bin/sh\necho "uci $*" >> "$T/calls"; case "$*" in *batch*) cat >> "$T/calls" ;; esac\n' > "$t/bin/uci"
+printf '#!/bin/sh\necho "uci $*" >> "$T/calls"; cat >> "$T/calls"\n' > "$t/bin/uci"
 printf '#!/bin/sh\n:\n' > "$t/bin/logger"
-printf '#!/bin/sh\n:\n' > "$t/bin/flock"
+# BusyBox flock has no -w; a successful mock must reject unsupported options.
+cat > "$t/bin/flock" <<'EOF'
+#!/bin/sh
+[ "$#" = 2 ] && [ "$1" = -n ] && [ "$2" = 8 ] || exit 2
+if [ -f "$T/lock-busy-once" ]; then
+ rm "$T/lock-busy-once"
+ exit 1
+fi
+EOF
 printf '#!/bin/sh\necho "dnsmasq $*" >> "$T/calls"\n' > "$t/bin/dnsmasq-init"
 chmod 755 "$t/bin/"*
 echo "conf-dir=$t/dnsmasq.d,.bak" > "$t/dnsmasq.conf.cfg01411c"
@@ -47,7 +55,7 @@ grep -qxF "ip -4 route replace 100.127.201.42/32 dev br-lan" "$t/calls" || fail 
 grep -qxF "dhcp-range=set:x28-passthrough,100.127.201.42,static,255.255.255.248,10m" "$conf" || fail "no DHCP range"
 grep -qxF "dhcp-option=tag:x28-passthrough,option:router,100.127.201.43" "$conf" || fail "no DHCP router"
 grep -qxF "dhcp-option=tag:x28-passthrough,option:dns-server,10.0.0.53" "$conf" || fail "no DHCP DNS"
-grep -qF "set firewall.x28_passthrough.path=/sbin/x28-passthrough" "$t/calls" || fail "no firewall include"
+grep -q "^uci " "$t/calls" && fail "runtime helper writes persistent UCI"
 [ "$(grep -c '^dnsmasq restart' "$t/calls")" = 1 ] || fail "dnsmasq not restarted once"
 
 # fw3 restart flushes the rules; the include puts them back once, without touching DHCP.
@@ -70,7 +78,9 @@ sh "$t/pt" down || fail "down"
 [ -e "$conf" ] && fail "DHCP snippet left after down"
 [ -e "$t/run/x28-passthrough" ] && fail "state left after down"
 [ "$(cat "$t/sys/br-lan/proxy_arp")" = 0 ] || fail "proxy_arp not restored"
-sh "$t/pt" down || fail "second down"
+touch "$t/lock-busy-once"
+sh "$t/pt" down || fail "second down after lock contention"
+[ ! -f "$t/lock-busy-once" ] || fail "lock contention not exercised"
 
 # Refusals: a LAN address, a bad MAC, a bad device.
 sh "$t/pt" up ccmni2 192.168.70.5 02:00:00:aa:bb:01 && fail "LAN address accepted"
