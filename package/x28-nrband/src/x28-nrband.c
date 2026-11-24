@@ -154,8 +154,11 @@ static int dcwait(const char *c, const char *s)
 	 * then shares ttyCMIPC0. "dipcd" is listed (ttyCMIPC8) and nothing on the image uses it. */
 	if (mipc_init("dipcd"))
 		return 2;
-	mipc_msg_register_ind_api(0x10, 0x4202, (void *)dc_cb, NULL, NULL);
-	mipc_msg_register_ind_api(0x10, 0x420b, (void *)dc_cb, NULL, NULL);
+	if (mipc_msg_register_ind_api(0x10, 0x4202, (void *)dc_cb, NULL, NULL) ||
+	    mipc_msg_register_ind_api(0x10, 0x420b, (void *)dc_cb, NULL, NULL)) {
+		mipc_deinit();  /* not listening: the watcher must not take a 124 for "nothing announced" */
+		return 2;
+	}
 	for (unsigned long i = 0; i < sec * 10 && !dc_ended; i++)
 		usleep(100000);
 	mipc_msg_register_ind_api(0x10, 0x4202, NULL, NULL, NULL);
