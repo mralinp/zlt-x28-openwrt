@@ -577,6 +577,8 @@ x28_mipc_setup() {
   x28_mipc_publish6 "$interface" && split6=1
  fi
  x28_mipc_send "$interface" || { x28_mipc_fail_owned "$interface" "$cid" NOTIFY_FAILED; return 1; }
+ # The modem can drop the bearer later with no event (#662); the watcher exits then and netifd reconnects.
+ proto_run_command "$interface" /sbin/x28-bearer-watch "$ifname"
 }
 
 # The IPv6 result goes to a `wan6` interface (proto x28_mipc6, device '@<this interface>') when one exists, like a standard
