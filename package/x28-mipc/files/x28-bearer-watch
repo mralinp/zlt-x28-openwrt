@@ -1,13 +1,29 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
-# x28-bearer-watch <ccmni>: started by x28_mipc through netifd once the WAN is up; exits when the modem has lost the
-# bearer on <ccmni>, so netifd sees the link lost and sets the interface up again, like a pppd that died (#662).
-# The modem can drop the bearer with no event: netifd kept the WAN up for hours with packets out and none back.
-# Only an answered query without the bearer counts; a failed or timed-out query (modem busy) changes nothing.
-dev=$1
+# x28-bearer-watch <ccmni> <cid>: started by x28_mipc through netifd once the WAN is up; exits when the modem has lost
+# the bearer on <ccmni>, so netifd sees the link lost and sets the interface up again, like a pppd that died (#662).
+# The modem can drop the bearer while netifd keeps the WAN up (packets out, none back, for hours).
+# Event first: `x28-nrband dcwait` returns as soon as the modem announces it ended call <cid>; that is final. A query
+# cannot confirm it: after the radio came back the modem re-created call <cid> by itself, listed by --data_call_get with
+# no traffic through it (seen on a unit). Polling is the backup for a drop it never announces (or an x28-nrband
+# without dcwait): two answered queries in a row without the call. A failed or timed-out query counts for nothing.
+dev=$1 cid=$2
 case "$dev" in ccmni[0-9]|ccmni[0-9][0-9]) ;; *) exit 2 ;; esac
-miss=0 seen=
-while sleep "${X28_BW_EVERY:-30}"; do
+case "$cid" in ''|*[!0-9]*) exit 2 ;; esac
+every=${X28_BW_EVERY:-60}
+miss=0 seen= child=
+# netifd stops the watcher with TERM; the listener holds a modem port and must go with it.
+trap '[ -z "$child" ] || kill "$child" 2>/dev/null; exit 0' TERM INT
+while :; do
+	${X28_BW_EVENT:-x28-nrband} dcwait "$cid" "$every" >/dev/null 2>&1 &
+	child=$!
+	wait "$child"
+	rc=$? child=
+	case $rc in
+		0) logger -t x28_mipc "the modem ended the bearer on $dev; reconnecting"; exit 1 ;;
+		124) ;;
+		*) sleep "$every" || exit 0 ;;  # no event listener: poll only
+	esac
 	out=$(timeout 15 mipc_wan_cli --data_call_get 2>/dev/null) || continue
 	# Misses count only once the call was seen: a reply that never lists it (other format, another call) never loops.
 	if echo "$out" | grep -Eq "\"iface\": *\"$dev\""; then seen=1 miss=0; elif [ -n "$seen" ]; then miss=$((miss + 1)); fi
