@@ -10,11 +10,18 @@ fail() { echo "FAIL: $*"; exit 1; }
 cat > "$t/ev" <<'X'
 #!/bin/sh
 [ "$1 $2 $3" = "dcwait 4 60" ] || { echo "bad args: $*" >> "$T/bad"; exit 2; }
+echo x >> "$T/evcalls"
 l=$(head -n 1 "$T/plan"); [ -n "$l" ] || { : > "$T/over"; exit 1; }
 [ "$l" != hang ] || { echo $$ > "$T/evpid"; exec /bin/sleep 30; }
 sed -i.bak 1d "$T/plan"; echo "${l#* }" > "$T/now"; exit "${l%% *}"
 X
-printf '#!/bin/sh\n[ ! -e "$T/over" ]\n' > "$t/sleep"
+# In poll-only rounds the sleep takes the round's line, "s <query answer>"; other sleeps (hold-off) take none.
+cat > "$t/sleep" <<'X'
+#!/bin/sh
+[ ! -e "$T/over" ] || exit 1
+l=$(head -n 1 "$T/plan")
+case "$l" in "s "*) sed -i.bak 1d "$T/plan"; echo "${l#s }" > "$T/now" ;; '') [ "$1" = 5 ] || exit 1 ;; esac
+X
 cat > "$t/mipc_wan_cli" <<'X'
 #!/bin/sh
 case "$(cat "$T/now")" in
@@ -27,7 +34,7 @@ X
 printf '#!/bin/sh\nshift; exec "$@"\n' > "$t/timeout"; printf '#!/bin/sh\n' > "$t/logger"
 chmod +x "$t"/*
 export T="$t" X28_BW_EVENT="$t/ev"
-run() { rm -f "$t/over"; printf '%s\n' "$@" > "$t/plan"; PATH="$t:$PATH" sh "$S" ccmni1 4; }
+run() { rm -f "$t/over" "$t/evcalls"; printf '%s\n' "$@" > "$t/plan"; PATH="$t:$PATH" sh "$S" ccmni1 4; }
 left() { [ "$(grep -c . "$t/plan")" = "$1" ] || fail "$2"; }
 run '124 up' '124 up' '124 up'; [ $? = 0 ] || fail 'exited with the bearer present'
 run '124 up' '0 up' '124 up'; [ $? = 1 ] || fail 'an announced end did not exit (the modem may list a re-created call)'
@@ -37,7 +44,9 @@ run '124 up' '124 gone' '124 gone' '124 up'; [ $? = 1 ] || fail 'unannounced los
 left 1 'polling did not exit at the second miss'
 run '124 up' '124 gone' '124 up' '124 gone' '124 up'; [ $? = 0 ] || fail 'non-consecutive misses made it exit'
 run '124 up' '124 gone' '124 err' '124 gone'; [ $? = 1 ] || fail 'a failed query between misses reset the count'
-run '1 up' '1 gone' '1 gone' '1 up'; [ $? = 1 ] || fail 'without a listener, polling did not take over'
+run '1 x' 's up' 's gone' 's gone' 's up'; [ $? = 1 ] || fail 'without a listener, polling did not take over'
+left 1 'poll-only did not exit at the second miss'
+[ "$(grep -c . "$t/evcalls")" = 1 ] || fail 'kept calling a listener that does not work'
 run '124 up' '124 other' '124 other'; [ $? = 1 ] || fail 'a bearer on another ccmni hid the loss'
 # netifd's TERM takes the listener down too (it holds a modem port).
 printf 'hang\n' > "$t/plan"; PATH="$t:$PATH" sh "$S" ccmni1 4 & w=$!

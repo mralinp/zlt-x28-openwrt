@@ -11,19 +11,25 @@ dev=$1 cid=$2
 case "$dev" in ccmni[0-9]|ccmni[0-9][0-9]) ;; *) exit 2 ;; esac
 case "$cid" in ''|*[!0-9]*) exit 2 ;; esac
 every=${X28_BW_EVERY:-60}
-miss=0 seen= child=
+miss=0 seen= child= noevent=
 # netifd stops the watcher with TERM; the listener holds a modem port and must go with it.
 trap '[ -z "$child" ] || kill "$child" 2>/dev/null; exit 0' TERM INT
 while :; do
-	${X28_BW_EVENT:-x28-nrband} dcwait "$cid" "$every" >/dev/null 2>&1 &
-	child=$!
-	wait "$child"
-	rc=$? child=
-	case $rc in
-		0) logger -t x28_mipc "the modem ended the bearer on $dev; reconnecting"; exit 1 ;;
-		124) ;;
-		*) sleep "$every" || exit 0 ;;  # no event listener: poll only
-	esac
+	if [ -n "$noevent" ]; then
+		sleep "$every" || exit 0
+	else
+		${X28_BW_EVENT:-x28-nrband} dcwait "$cid" "$every" >/dev/null 2>&1 &
+		child=$!
+		wait "$child"
+		rc=$? child=
+		case $rc in
+			# A short hold-off: a modem that keeps ending the call right after setup must not spin the WAN.
+			0) logger -t x28_mipc "the modem ended the bearer on $dev; reconnecting"; sleep 5; exit 1 ;;
+			124) ;;
+			# An x28-nrband without dcwait (older images) would read the bands every round: poll only from now on.
+			*) noevent=1; sleep "$every" || exit 0 ;;
+		esac
+	fi
 	out=$(timeout 15 mipc_wan_cli --data_call_get 2>/dev/null) || continue
 	# Misses count only once the call was seen: a reply that never lists it (other format, another call) never loops.
 	if echo "$out" | grep -Eq "\"iface\": *\"$dev\""; then seen=1 miss=0; elif [ -n "$seen" ]; then miss=$((miss + 1)); fi
