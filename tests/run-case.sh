@@ -98,6 +98,7 @@ ip() {
  return 0
 }
 sleep() { :; }
+logger() { printf 'logger %s\n' "$*" >> "$TRACE"; }  # never into the unit's real log
 uci() { [ "$*" = '-q show network' ] && return 0; printf 'FORBIDDEN uci\n' >> "$TRACE"; return 99; }
 killall() { printf 'FORBIDDEN killall\n' >> "$TRACE"; return 99; }
 ifup() { printf 'FORBIDDEN ifup\n' >> "$TRACE"; return 99; }

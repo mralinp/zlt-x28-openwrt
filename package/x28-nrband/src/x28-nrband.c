@@ -11,12 +11,16 @@
  *                           nr=<rsrp> <rsrq> as positive numbers (MIPC_NW_GET_SIGNAL_REQ 0x411, reply TLV 0x10e, 28 B of int32: the
  *                           NR block; field order inferred from Android's signal structs and the vendor LED code, not yet checked
  *                           against the vendor UI's 5G values). Ids from ql_ril_service (#492).
+ *   x28-nrband dcwait <cid> <s>  waits up to <s> seconds for the modem to end data call <cid>; exit 0 when it does,
+ *                           124 when the time is up. MIPC_DATA_DEACT_CALL_IND 0x4202 and MIPC_DATA_MD_DEACT_CALL_IND 0x420b,
+ *                           TLV 0x100 = the call id (u8, u32 in the second); both seen on a unit when the radio went off (#662).
  *   x28-nrband selftest     decode check against a captured reply, no modem needed
  */
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef struct mipc_msg mipc_msg_t;
 mipc_msg_t *mipc_msg_init(uint16_t id, uint32_t ps);
@@ -27,6 +31,7 @@ void mipc_msg_deinit(mipc_msg_t *m);
 void mipc_msg_set_timeout_once(uint32_t ms);
 int mipc_init(const char *name);
 void mipc_deinit(void);
+int mipc_msg_register_ind_api(uint32_t ps, uint16_t id, void *cb, void *api_cb, void *priv);
 
 #define NR_WORDS 32
 
@@ -117,6 +122,51 @@ static int signal_cmd(void)
 	return rc;
 }
 
+/* 1 when a deact indication's call id TLV (u8 or little-endian u32) names call <cid> */
+static int dc_match(const uint8_t *v, uint16_t len, unsigned cid)
+{
+	if (!v || (len != 1 && len != 4))
+		return 0;
+	return (len == 1 ? v[0] : (unsigned)(v[0] | v[1] << 8 | v[2] << 16 | (uint32_t)v[3] << 24)) == cid;
+}
+
+static unsigned dc_cid;
+static volatile int dc_ended;
+
+static void dc_cb(mipc_msg_t *m, void *priv)
+{
+	uint16_t len = 0;
+
+	(void)priv;
+	if (dc_match(mipc_msg_get_val_ptr(m, 0x100, &len), len, dc_cid))
+		dc_ended = 1;
+}
+
+static int dcwait(const char *c, const char *s)
+{
+	char *e;
+	unsigned long cid = strtoul(c, &e, 10), sec;
+
+	if (*c < '0' || *c > '9' || *e || cid > 255 || (sec = strtoul(s, &e, 10)) < 1 || sec > 86400 || *e)
+		return 2;
+	dc_cid = cid;
+	/* libmipc_msg maps a client name to its own /dev/ttyCMIPC port (one process each); an unlisted name first sleeps 30 s,
+	 * then shares ttyCMIPC0. "dipcd" is listed (ttyCMIPC8) and nothing on the image uses it. */
+	if (mipc_init("dipcd"))
+		return 2;
+	mipc_msg_register_ind_api(0x10, 0x4202, (void *)dc_cb, NULL, NULL);
+	mipc_msg_register_ind_api(0x10, 0x420b, (void *)dc_cb, NULL, NULL);
+	for (unsigned long i = 0; i < sec * 10 && !dc_ended; i++)
+		usleep(100000);
+	mipc_msg_register_ind_api(0x10, 0x4202, NULL, NULL, NULL);
+	mipc_msg_register_ind_api(0x10, 0x420b, NULL, NULL, NULL);
+	mipc_deinit();
+	if (!dc_ended)
+		return 124;
+	puts("ended");
+	return 0;
+}
+
 static int selftest(void)
 {
 	/* captured on the old unit (EN-DC, 2026-11-09) */
@@ -125,7 +175,10 @@ static int selftest(void)
 	static const uint8_t none[28] = { 0 };
 	int rsrp = 0, rsrq = 0;
 
-	if (nr_decode(nr, 28, &rsrp, &rsrq) || rsrp != 80 || rsrq != 14 || !nr_decode(none, 28, &rsrp, &rsrq) || !nr_decode(nr, 24, &rsrp, &rsrq)) {
+	static const uint8_t id0[4] = { 0 }, id5[4] = { 5, 0, 0, 0 }, id261[4] = { 5, 1, 0, 0 };
+
+	if (nr_decode(nr, 28, &rsrp, &rsrq) || rsrp != 80 || rsrq != 14 || !nr_decode(none, 28, &rsrp, &rsrq) || !nr_decode(nr, 24, &rsrp, &rsrq) ||
+	    !dc_match(id0, 1, 0) || !dc_match(id5, 4, 5) || dc_match(id5, 1, 0) || dc_match(id261, 4, 5) || dc_match(id5, 2, 5) || dc_match(NULL, 4, 0)) {
 		puts("selftest failed");
 		return 1;
 	}
@@ -141,6 +194,8 @@ int main(int argc, char **argv)
 	setvbuf(stdout, NULL, _IONBF, 0);
 	if (argc == 2 && !strcmp(argv[1], "selftest"))
 		return selftest();
+	if (argc == 4 && !strcmp(argv[1], "dcwait"))
+		return dcwait(argv[2], argv[3]);
 	if (argc < 2 || mipc_init("mipc_wan_cli"))
 		return 2;
 	if (argc == 2 && !strcmp(argv[1], "signal")) {
