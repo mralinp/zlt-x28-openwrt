@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Keeps our own log lines (tags x28_mipc and x28-*: WAN setup, bearer watch, auto-tune, wan up/down) in a file the vendor
+# daemons' noise cannot push out: the 64 KB system log holds seconds on this unit (#667). RAM only; a reboot clears it.
+START=13
+USE_PROCD=1
+
+start_service() {
+	mkdir -p /tmp/log
+	procd_open_instance
+	# -S rotates the file to .old at 64 KB: days of WAN events. -Z 0 skips the kernel, which names the process in its lines
+	# (x28-nrband opens a modem port every minute).
+	procd_set_param command /sbin/logread -f -e x28 -Z 0 -F /tmp/log/x28-wan.log -S 65536
+	procd_set_param respawn
+	procd_close_instance
+}
