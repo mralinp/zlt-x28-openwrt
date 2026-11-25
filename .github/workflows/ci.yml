@@ -53,6 +53,7 @@ jobs:
       - run: sh tests/test_wan6.sh
       - run: sh tests/test_packages_restore.sh
       - run: sh tests/test_bearer_watch.sh
+      - run: sh tests/test_wan_log.sh
       - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py
