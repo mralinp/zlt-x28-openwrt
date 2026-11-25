@@ -41,7 +41,7 @@ docs/
 ├── research/vendor-ipset-packaging.md  ipset packages for the vendor kernel's module subset
 ├── research/signed-package-feed.md  the signed X28 opkg feed: contents, signing and hosting
 ├── research/memory-accounting.md  where the 1 GiB goes: carve-outs, md1rom, kernel, what Linux holds (#299)
-├── research/feed-index.txt   the index of the X28 feed that is pinned in feed_release.py (224 packages), for review before signing
+├── research/feed-index.txt   the index of the X28 feed that is pinned in feed_release.py (226 packages), for review before signing
 ├── research/kmod-gap.md      all 976 official kmods sorted by what it takes to run them on 4.19.205 (#394)
 ├── research/x28-flasher-binary.md  x28-flasher as a single binary: guard changes, identity, CI (#272)
 ├── research/rust-flasher-design.md  dropped Rust flasher (#270), kept for protocol and DA findings
