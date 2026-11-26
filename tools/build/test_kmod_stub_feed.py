@@ -230,6 +230,15 @@ class Build(unittest.TestCase):
             self.assertEqual({m.name: m.mode for m in ctrl}, {'./control': 0o644, './conffiles': 0o644})
             self.assertEqual(f.parse_index((out / 'Packages').read_text())['x28-meta']['Depends'], 'x28-cfg')
 
+    def test_mipc_installs_firewall_registration_before_first_activation(self):
+        package = next(p for p in f.read_packages() if p[0] == 'x28-mipc')
+        files = {name: data for name, data, _ in package[3]}
+        self.assertIn('./etc/init.d/x28-passthrough', files)
+        scripts = dict(package[5])
+        self.assertIn(b'/etc/init.d/x28-passthrough start', scripts['postinst'])
+        self.assertIn(b'IPKG_INSTROOT', scripts['postinst'])
+        self.assertNotIn(b'commit firewall', files['./sbin/x28-passthrough'])
+
     def test_x28_base_requires_every_other_package_of_the_spec(self):
         pk = {p[0]: p for p in f.read_packages()}
         base = set(pk['x28-base'][1].split(', '))
@@ -244,7 +253,7 @@ class Build(unittest.TestCase):
             b = Path(d) / 'x28-nrband'
             b.write_bytes(b'\x7fELF')
             name, depends, _, files, arch, scripts, version = f.nrband_package(b)
-            self.assertEqual((name, depends, arch, scripts, version), ('x28-nrband', '', 'aarch64_generic', (), '0.1.0-2'))
+            self.assertEqual((name, depends, arch, scripts, version), ('x28-nrband', '', 'aarch64_generic', (), '0.1.0-3'))
             self.assertEqual(files, [('./usr/sbin/x28-nrband', b'\x7fELF', 0o755)])
 
     def test_epoch_keeps_the_stub_above_the_feed(self):

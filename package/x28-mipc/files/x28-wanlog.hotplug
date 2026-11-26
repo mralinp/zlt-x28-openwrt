@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# wan and wan6 up and down into the x28-wanlog file (#667). hotplug-call sources this file: never exit here.
+case "$INTERFACE:$ACTION" in
+	wan:ifup|wan:ifdown|wan:ifup-failed|wan6:ifup|wan6:ifdown|wan6:ifup-failed)
+		logger -t x28-wan "$INTERFACE $ACTION${DEVICE:+ on $DEVICE}" ;;
+esac

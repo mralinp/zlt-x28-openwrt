@@ -47,6 +47,15 @@ grep -q 'proto_add_ipv6_address 2001' "$calls" || grep -q 'proto_add_ipv6_prefix
 x28_mipc_publish6 wan
 [ "$(cat "$X28_MIPC_RUN/wan.v6")" = "$(printf '2001:db8:1:2::5\n2001:db8:1:2::\n\n2001:db8::53\n')" ] || fail 'state file content'
 
+# Passthrough and split IPv6 coexist: no cellular IPv4 on ccmni, but wan6 still owns the global IPv6.
+passthrough_mac=02:00:00:aa:bb:01
+: > "$calls"; x28_mipc_send wan
+grep -q 'proto_add_ipv4_address' "$calls" && fail 'passthrough installed IPv4 on ccmni'
+grep -q 'json_add_string x28_passthrough_ip 10.0.0.2' "$calls" || fail 'passthrough result missing'
+grep -q 'proto_add_ipv6_prefix' "$calls" && fail 'passthrough stole wan6 prefix'
+x28_mipc_publish6 wan
+passthrough_mac=
+
 # x28_mipc6 installs what wan published.
 t_defaultroute= t_peerdns= t_metric=
 : > "$calls"

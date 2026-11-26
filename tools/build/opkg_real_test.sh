@@ -95,9 +95,11 @@ check "reinstalling the loader enables it again" "$(try x28-kmods >/dev/null; ls
 echo "--- the x28-* packages (#417)"
 if [ -f /pkg/x28-packages.ini ]; then
 	awk '/^\[/{gsub(/[][]/,""); pkg=$0} /^[ \t]+[0-7][0-7][0-7][0-7] \//{print pkg, $1, $2, $3}' /pkg/x28-packages.ini > /tmp/x28files
+	# The version each package must have: version-release of its section in x28-packages.ini.
+	ver() { awk -v s="[$1]" '$0==s{f=1;next} /^\[/{f=0} f&&$1=="version"{v=$3} f&&$1=="release"{r=$3} END{print v"-"r}' /pkg/x28-packages.ini; }
 	for p in $(awk '{print $1}' /tmp/x28files | uniq); do
 		check "$p installs" "$(try $p)" 0
-		check "  is version 0.1.0-1" "$(opkg list-installed $p | grep -c ' - 0\.1\.0-1$')" 1
+		check "  is version $(ver $p)" "$(opkg list-installed $p | grep -c " - $(ver $p)\$")" 1
 		while read -r _ mode dest src; do
 			check "  $dest is the source file" "$(cmp -s /pkg/$src $dest && echo same || echo different)" same
 			case $mode in 0755) want=rwxr-xr-x ;; 0644) want=rw-r--r-- ;; *) want=$mode ;; esac  # busybox has no stat
@@ -117,9 +119,9 @@ else
 fi
 echo "--- x28-base protects the required packages (#418)"
 if [ -f /pkg/x28-packages.ini ]; then
-	MEMBERS="x28-mipc x28-modem x28-wifi x28-leds x28-bootok x28-dhcp x28-kmods x28-storage luci-proto-x28-mipc x28-switch x28-nrband"
+	MEMBERS="x28-mipc x28-modem x28-wifi x28-leds x28-bootok x28-dhcp x28-kmods x28-storage luci-proto-x28-mipc x28-switch x28-nrband x28-telephony x28-update"
 	check "x28-base installs" "$(try x28-base)" 0
-	check "  is version 0.1.0-2" "$(opkg list-installed x28-base | grep -c ' - 0\.1\.0-2$')" 1
+	check "  is version $(ver x28-base)" "$(opkg list-installed x28-base | grep -c " - $(ver x28-base)\$")" 1
 	check "  x28-nrband brought /usr/sbin/x28-nrband (executable, an ELF file)" "$([ -x /usr/sbin/x28-nrband ] && head -c 4 /usr/sbin/x28-nrband | tr -d '\177')" ELF
 	for m in $MEMBERS kernel; do
 		check "removing $m is refused" "$(opkg remove $m >/dev/null 2>&1; echo $?)" 255

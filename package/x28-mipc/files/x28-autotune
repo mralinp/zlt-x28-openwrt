@@ -99,7 +99,7 @@ wait_up() {
 		i=0
 		sleep 5
 		until [ "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.up')" = true ] &&
-			{ [ "$(uci -q get "network.$IF.iptype")" = 2 ] || [ -n "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address')" ]; }; do
+			{ [ "$(uci -q get "network.$IF.iptype")" = 2 ] || [ -n "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' -e '@.data.x28_passthrough_ip')" ]; }; do
 			[ "$i" -ge 115 ] && return 1
 			# A network that refuses the SIM: x28_mipc gives up after a minute and goes back to automatic.
 			case "$(ifstatus "$IF" 2>/dev/null | jsonfilter -e '@.errors[*].code')" in *OPERATOR_FAILED*) return 2 ;; esac

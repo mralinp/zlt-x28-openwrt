@@ -38,6 +38,10 @@ protocol.renderFormOptions({tab: (key, title) => tabs[key] = title, taboption: (
 assert.equal(options.apn.validate(null, 'example.invalid'), true);
 assert.equal(typeof options.apn.validate(null, 'x;bad'), 'string');
 assert.equal(options.apn.validate(null, ''), true);
+assert.equal(options.passthrough_mac.tab, 'advanced');
+assert.equal(options.passthrough_mac.datatype, 'macaddr');
+assert.deepEqual(options.passthrough_mac.deps, [['iptype', '3'], ['iptype', '1']]);
+assert(errors.PASSTHROUGH_FAILED);
 assert.deepEqual(Object.keys(options.iptype.choices).sort(), ['1', '2', '3']);
 assert.equal(options.iptype.default, '3');
 assert.equal(tabs.carrier, 'Carrier');

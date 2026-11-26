@@ -8,6 +8,7 @@ export TRACE="$case_dir/commands" NOTIFICATIONS="$case_dir/notifications"
 export X28_MIPC_LOCKFILE="$case_dir/modem.lock"
 export X28_MIPC_APN_CMD="cat $case_dir/sim_apns"
 export X28_MIPC_SYSCTL="$case_dir/sysctl"
+export X28_MIPC_RUN="$case_dir/run"
 export X28_MIPC_SETTLE=0
 mkdir -p "$case_dir/sysctl/ccmni7"
 : > "$TRACE"
@@ -65,6 +66,14 @@ mock_nrband() {
  esac
 }
 export X28_MIPC_NRBAND=mock_nrband
+mock_passthrough() {
+ [ "$1" = up ] || return 0
+ printf 'passthrough %s\n' "$*" >> "$TRACE"
+ # The modem creates this address during activation; it must be removed before handoff.
+ [ "$(cat "$case_dir/passthrough_has_addr")" = 0 ] || grep -qx 'ip -4 addr del 198.51.100.7/32 dev ccmni7' "$TRACE" || return 1
+ return "$(cat "$case_dir/passthrough_rc")"
+}
+export X28_MIPC_PASSTHROUGH=mock_passthrough
 [ ! -e "$case_dir/nr_missing" ] || X28_MIPC_NRBAND=no_such_tool
 ubus() {
  if [ "$1" = call ] && [ "$2" = network.interface ] && [ "$3" = notify_proto ]; then
@@ -80,6 +89,8 @@ ubus() {
  printf 'Unexpected ubus call: %s\n' "$*" >&2; return 99
 }
 ip() {
+ if [ "$*" = '-4 addr show dev ccmni7' ]; then [ "$(cat "$case_dir/passthrough_has_addr")" = 0 ] || echo '    inet 198.51.100.7/32 scope global ccmni7'; return 0; fi
+ if [ "$*" = '-4 addr del 198.51.100.7/32 dev ccmni7' ]; then printf 'ip %s\n' "$*" >> "$TRACE"; return "$(cat "$case_dir/passthrough_delete_rc")"; fi
  if [ "$*" = '-6 addr show dev ccmni7 scope global' ]; then cat "$case_dir/v6_global"; return 0; fi
  case "$*" in '-6 addr del '*' dev ccmni7') printf '%s\n' "$4" >> "$case_dir/ip6del"; return 0 ;; esac
  [ "$*" = 'link show dev ccmni7 up' ] || { printf 'Unexpected ip command\n' >&2; return 99; }
@@ -87,7 +98,8 @@ ip() {
  return 0
 }
 sleep() { :; }
-uci() { printf 'FORBIDDEN uci\n' >> "$TRACE"; return 99; }
+logger() { printf 'logger %s\n' "$*" >> "$TRACE"; }  # never into the unit's real log
+uci() { [ "$*" = '-q show network' ] && return 0; printf 'FORBIDDEN uci\n' >> "$TRACE"; return 99; }
 killall() { printf 'FORBIDDEN killall\n' >> "$TRACE"; return 99; }
 ifup() { printf 'FORBIDDEN ifup\n' >> "$TRACE"; return 99; }
 ifdown() { printf 'FORBIDDEN ifdown\n' >> "$TRACE"; return 99; }

@@ -1,11 +1,11 @@
-# X28 feed index review. Packages sha256 dbcf3059b0d45609968e4c0bbbb896e0091d6b09f0dfb7f51ff3744112d973ea
-# 224 packages: kernel, 180 stubs, 40 built packages, 3 vendor ipset.
+# X28 feed index review. Packages sha256 8c3f4e2ff1b75410eb8ae8893a3b6a55d900e1617187ace083c6a315b068e214
+# 226 packages: kernel, 180 stubs, 42 built packages, 3 vendor ipset.
 # columns: package, version, architecture, size (the ipk), sha256 (first 16 hex), depends
 
 ## kernel record
 kernel                             1:4.19.205-x28       all                 425  336b75fff89439c5  -
 
-## built packages (40): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader, the x28-* packages are the userspace
+## built packages (42): module packages carry .ko files in /lib/modules/x28 and a load list in /etc/x28-kmods.d; x28-kmods is the loader, the x28-* packages are the userspace
 kmod-bonding                       1:4.19.205-x28-r2    aarch64_generic   81688  114a7f14a98d4892  kernel (= 1:4.19.205-x28)
 kmod-crypto-chacha20poly1305       1:4.19.205-x28-r2    aarch64_generic   11269  1f470d4482fe4376  kernel (= 1:4.19.205-x28), kmod-crypto-aead, kmod-crypto-manager
 kmod-crypto-user                   1:4.19.205-x28-r2    aarch64_generic    6934  93bbb978bf42fccb  kernel (= 1:4.19.205-x28), kmod-crypto-hash, kmod-crypto-manager
@@ -34,18 +34,20 @@ kmod-usb-ledtrig-usbport           1:4.19.205-x28-r2    aarch64_generic    4201 
 kmod-usbip                         1:4.19.205-x28-r2    aarch64_generic   14492  b4c077d88f2883a9  kernel (= 1:4.19.205-x28), kmod-usb-core
 kmod-veth                          1:4.19.205-x28-r2    aarch64_generic    9929  ce922e4a82d9a70c  kernel (= 1:4.19.205-x28)
 kmod-wireguard                     1:4.19.205-x28-r2    aarch64_generic   72724  ee58ec86f0ea632c  kernel (= 1:4.19.205-x28)
-luci-proto-x28-mipc                0.1.0-1              all                5447  b5ac254e4a2be36e  luci-base, x28-mipc
-x28-base                           0.1.0-2              all                 627  513ebd33e1b6e0dd  kernel, x28-kmods, x28-storage, x28-bootok, x28-dhcp, x28-leds, x28-modem, x28-mipc, luci-proto-x28-mipc, x28-wifi, x28-switch, x28-nrband
-x28-bootok                         0.1.0-1              all                2088  cfd2f62a6717a9d8  dropbear
+luci-proto-x28-mipc                0.1.0-4              all                7566  c2111e5627ef708b  luci-base, x28-mipc
+x28-base                           0.1.0-4              all                 655  8dc8c04b62f39e28  kernel, x28-kmods, x28-storage, x28-bootok, x28-dhcp, x28-leds, x28-modem, x28-mipc, luci-proto-x28-mipc, x28-wifi, x28-switch, x28-nrband, x28-update, x28-telephony
+x28-bootok                         0.1.0-2              all                2146  1bac45e10991d491  dropbear
 x28-dhcp                           0.1.0-1              all                1781  32c5adaa1188985a  dnsmasq
-x28-kmods                          1:4.19.205-x28-r2    all                2739  b360a8462652ad66  kernel (= 1:4.19.205-x28)
-x28-leds                           0.1.0-1              all                2598  33c87993bc2bdb42  jsonfilter
-x28-mipc                           0.1.0-1              all               11865  be0c123219492a6b  netifd, jshn
+x28-kmods                          1:4.19.205-x28-r3    all                2766  c8a337e64b6fe694  kernel (= 1:4.19.205-x28)
+x28-leds                           0.1.0-3              all                2804  b060cb96d7edbf1b  jsonfilter
+x28-mipc                           0.1.0-11             all               24722  6b25ceedface45f0  netifd, jshn, lua, luci-lib-nixio, curl
 x28-modem                          0.1.0-1              all                2811  538373b7b1b40cbd  x28-mipc
-x28-nrband                         0.1.0-1              aarch64_generic    3545  d90ea63ff68679f4  -
-x28-storage                        0.1.0-1              all                2186  4dca2f1f45c80f88  -
-x28-switch                         0.1.0-1              all                1137  bef8c97692a58b72  -
-x28-wifi                           0.1.0-1              all                7474  377605f5d9fea62c  netifd
+x28-nrband                         0.1.0-3              aarch64_generic    4429  db028ccf048162dc  -
+x28-storage                        0.1.0-2              all                3868  555bdea2dce58a1a  -
+x28-switch                         0.1.0-3              all                2036  bba9bbed173a2972  -
+x28-telephony                      0.1.0-3              all               15094  da507c9b75ad5dc8  x28-mipc, lua, luci-base, luci-lib-jsonc, curl
+x28-update                         0.1.0-8              all                6640  2c469aefcc5e45a3  luci-base, uclient-fetch, curl
+x28-wifi                           0.1.0-7              all               12709  32d0720b945342ee  netifd, wireless-tools, ebtables-legacy
 
 ## vendor ipset (3)
 ipset                              1:7.17-1-x28-1       aarch64_generic    2406  7c85703a8d3764f2  libc, x28-ipset-kernel (= 1:4.19.205-x28), libmnl0, libipset13 (= 1:7.17-1-x28-1)

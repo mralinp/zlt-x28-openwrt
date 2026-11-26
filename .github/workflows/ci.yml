@@ -52,9 +52,13 @@ jobs:
       - run: sh tests/test_switch.sh
       - run: sh tests/test_wan6.sh
       - run: sh tests/test_packages_restore.sh
+      - run: sh tests/test_bearer_watch.sh
+      - run: sh tests/test_wan_log.sh
       - run: sh tests/test_mtwifi_scan.sh
       - run: sh tests/test_modem.sh
       - run: python3 tests/test_passthrough.py
+      - run: sh tests/test_x28_passthrough.sh
+      - run: sh package/x28-mipc/files/x28-passthrough selftest
       - run: node tests/test_luci.cjs
       - run: node tests/test_telephony_luci.cjs
       - run: sh tests/test_bootok.sh
